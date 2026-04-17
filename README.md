@@ -1,4 +1,4 @@
-# 🏥 Integrar Salud | Sistema de Gestión Clínica SaaS
+# 🏥 Integrar Salud | Sistema de Gestión Clínica
 
 <p align="center">
   <img src="https://img.shields.io/badge/React-19-%2361DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React">
@@ -41,7 +41,7 @@ Para levantar el entorno de desarrollo localmente, sigue estas instrucciones:
 
 1.  **Clonar el repositorio:**
     ```bash
-    git clone [https://github.com/tu-usuario/integrar-salud.git](https://github.com/tu-usuario/integrar-salud.git)
+    git clone https://github.com/Jmpyy/Integrar-salud
     ```
 
 2.  **Instalar dependencias:**
