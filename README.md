@@ -64,9 +64,6 @@ Para levantar el entorno de desarrollo localmente, sigue estas instrucciones:
 
 ## 📸 Capturas de Pantalla (Screenshots)
 
-> [!NOTE]
-> Reemplaza los enlaces a continuación con las rutas locales de tus imágenes (ej. `./assets/dashboard.png`).
-
 ### 🖥️ Dashboard de Gestión
 *Visualización general de métricas financieras e ingresos.*
 ![Dashboard](./assets/Finanzas.png)
