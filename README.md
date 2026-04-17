@@ -69,15 +69,11 @@ Para levantar el entorno de desarrollo localmente, sigue estas instrucciones:
 
 ### 🖥️ Dashboard de Gestión
 *Visualización general de métricas financieras e ingresos.*
-![Dashboard](https://imgur.com/CHzgRko)
+![Dashboard](./assets/Finanzas.png)
 
 ### 📅 Agenda de Turnos
 *Interfaz dinámica para la organización de citas médicas.*
-![Agenda](https://via.placeholder.com/800x450/2d3436/ffffff?text=Agenda+Inteligente+Preview)
-
-### 📄 Historia Clínica
-*Módulo de seguimiento y evolución del paciente.*
-![Historia Clinica](https://via.placeholder.com/800x450/2d3436/ffffff?text=Evolución+Paciente+Preview)
+![Agenda](./assets/Agenda.png)
 
 ---
 
