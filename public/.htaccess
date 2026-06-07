@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /consultorio/
+  
+  # Si el archivo termina en estas extensiones y existe, NO lo reescribas
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|webmanifest)$ - [L]
+
+  # Regla para React Router
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /consultorio/index.html [L]
+</IfModule>

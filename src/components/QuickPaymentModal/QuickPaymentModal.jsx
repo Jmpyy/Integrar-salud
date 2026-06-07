@@ -58,7 +58,7 @@ export default function QuickPaymentModal({ appointment, doctor, onClose, onPaid
 
       await store.updateAppointment(appointment.id, updatedFields);
       const tx = await store.createTransaction({
-        date:      new Date().toISOString(),
+        date:      appointment.date ? `${appointment.date}T${appointment.time || '12:00'}:00` : new Date().toISOString(),
         type:      'Ingreso',
         concept:   `Cobro — ${appointment.title} · ${appointment.patient}`,
         method,
@@ -141,7 +141,7 @@ export default function QuickPaymentModal({ appointment, doctor, onClose, onPaid
             </label>
             <div className="relative group">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-emerald-500/30 group-focus-within:text-emerald-500 transition-colors">$</span>
-              <input
+              <input id="amount" name="amount"
                 type="number"
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
@@ -182,7 +182,7 @@ export default function QuickPaymentModal({ appointment, doctor, onClose, onPaid
             <label className="block text-[11px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-2 ml-1">
               Observaciones <span className="normal-case font-bold opacity-40">(opcional)</span>
             </label>
-            <input
+            <input id="notes" name="notes"
               type="text"
               value={notes}
               onChange={e => setNotes(e.target.value)}
@@ -191,21 +191,10 @@ export default function QuickPaymentModal({ appointment, doctor, onClose, onPaid
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-2">
+          {/* AFIP Toggle */}
+          {isAfipConfigured && (
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 py-3.5 text-xs font-black text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-main)] hover:bg-[var(--accent-light)] rounded-2xl border border-[var(--border-color)] transition-all uppercase tracking-widest"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !amount || Number(amount) <= 0}
-              className="flex-[2] py-3.5 text-xs font-black bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 uppercase tracking-widest"
-            >
-              {saving ? (
               onClick={() => setEmitAfip(!emitAfip)}
               className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
                 emitAfip 
@@ -221,19 +210,29 @@ export default function QuickPaymentModal({ appointment, doctor, onClose, onPaid
                 </div>
               </div>
               <div className={`w-10 h-5 rounded-full relative transition-colors ${emitAfip ? 'bg-indigo-500' : 'bg-slate-300'}`}>
-                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${emitAfip ? 'left-5.5' : 'left-0.5'}`} />
+                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${emitAfip ? 'right-1' : 'left-1'}`} />
               </div>
             </button>
           )}
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50"
-          >
-            {saving ? <RefreshCw className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
-            <span className="uppercase tracking-[0.2em] text-xs">Confirmar Cobro</span>
-          </button>
+          {/* Actions */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-4 text-xs font-black text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-main)] hover:bg-[var(--accent-light)] rounded-2xl border border-[var(--border-color)] transition-all uppercase tracking-widest"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !amount || Number(amount) <= 0}
+              className="flex-[2] py-4 text-xs font-black bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 uppercase tracking-widest"
+            >
+              {saving ? <RefreshCw className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+              {saving ? "Procesando..." : "Confirmar Cobro"}
+            </button>
+          </div>
         </form>
       </div>
     </div>

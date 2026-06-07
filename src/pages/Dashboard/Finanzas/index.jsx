@@ -1,10 +1,14 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../../stores/useStore';
+import { nowForAPI, toLocalDateString } from '../../../utils/helpers';
 import {
    TrendingUp, DollarSign, Wallet, Clock, Users, ChevronDown,
    Briefcase, Activity, ArrowUpRight, ArrowDownRight,
    Download, FileText, Plus, X, List, PieChart, BarChart2, Trash2, Pencil, Landmark
 } from 'lucide-react';
+
+import ConfirmDialog from '../../../components/ConfirmDialog/ConfirmDialog';
+import CustomDatePicker from '../../../components/ui/CustomDatePicker';
 
 export default function FinanzasPage() {
    const store = useStore();
@@ -17,10 +21,12 @@ export default function FinanzasPage() {
    const [activeTab, setActiveTab] = useState('diario'); // 'diario' | 'profesionales'
 
    const [isAddingExpense, setIsAddingExpense] = useState(false);
-   const [newExpense, setNewExpense] = useState({ category: '', amount: '', method: 'Efectivo', date: new Date().toISOString().split('T')[0], receipt: '', notes: '', doctor_id: '' });
+   const [newExpense, setNewExpense] = useState({ category: '', amount: '', method: 'Efectivo', date: toLocalDateString(new Date()), receipt: '', notes: '', doctor_id: '' });
 
    // Estado para Liquidación Rápida
    const [settlementDoctor, setSettlementDoctor] = useState(null);
+   const [editingTxId, setEditingTxId] = useState(null);
+   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, txId: null });
 
    // Cargar maestros al montar
    useEffect(() => {
@@ -70,29 +76,56 @@ export default function FinanzasPage() {
 
    const stats = useMemo(() => {
       const now = new Date();
+      // Función robusta: obtiene 'YYYY-MM-DD' de una fecha sin que la timezone la rompa
+      const toLocalDateStr = (dateStr) => {
+         if (!dateStr) return '';
+         // Si tiene T y Z (ISO UTC), convertir a local. Si no, tomar los primeros 10 chars.
+         const d = new Date(dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T'));
+         const y = d.getFullYear();
+         const m = String(d.getMonth() + 1).padStart(2, '0');
+         const day = String(d.getDate()).padStart(2, '0');
+         return `${y}-${m}-${day}`;
+      };
+      const todayStr = toLocalDateStr(now.toISOString());
 
-      // 1. Filtrar transacciones por rango
+      // 1. Filtrar transacciones por rango y ocultar ajustes técnicos
       const filteredTxs = (transactions || []).filter(t => {
-         const txDate = new Date(t.date);
-         if (dateRange === 'Hoy') return txDate.toDateString() === now.toDateString();
+         if (t.concept && t.concept.includes('Ajuste Honorarios (Redondeo)')) return false;
+         
+         const txDateStr = toLocalDateStr(t.date);
+         if (!txDateStr) return true; // si no tiene fecha, mostrar siempre
+         
+         if (dateRange === 'Hoy') return txDateStr === todayStr;
          if (dateRange === 'Esta Semana') {
-            const weekAgo = new Date();
+            const weekAgo = new Date(now);
             weekAgo.setDate(now.getDate() - 7);
-            return txDate >= weekAgo;
+            return txDateStr >= toLocalDateStr(weekAgo.toISOString());
          }
          if (dateRange === 'Mes en curso') {
-            return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+            return txDateStr.startsWith(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
          }
-         return true;
+         return true; // Año en curso: el servidor ya filtra
       });
 
       const dynamicExpenses = filteredTxs.filter(t => t.type === 'Egreso').reduce((acc, t) => acc + Number(t.amount || 0), 0);
       const dynamicIncome = filteredTxs.filter(t => t.type === 'Ingreso').reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
       // 2. Calcular Distribución de medios (Donut)
-      const methods = ['Transferencia', 'Efectivo', 'Debito', 'Tarjeta'];
+      const methods = ['Efectivo', 'Tarjeta', 'Transferencia'];
       const methodCounts = filteredTxs.reduce((acc, t) => {
-         acc[t.method] = (acc[t.method] || 0) + 1;
+         let m = t.method || 'Efectivo';
+         const lowM = m.toLowerCase();
+
+         if (lowM.includes('efectivo')) {
+            m = 'Efectivo';
+         } else if (lowM.includes('tarjeta') || lowM.includes('debito') || lowM.includes('crédito') || lowM.includes('credito')) {
+            m = 'Tarjeta';
+         } else {
+            // Todo lo demás (Transferencia, Mercado Pago, MP, etc.) va a Transferencia
+            m = 'Transferencia';
+         }
+         
+         acc[m] = (acc[m] || 0) + 1;
          return acc;
       }, {});
       const totalCount = filteredTxs.length || 1;
@@ -139,22 +172,33 @@ export default function FinanzasPage() {
    }
 
    // Manejador del Modal de Gasto
-   const handleAddExpense = (e) => {
+   const handleAddExpense = async (e) => {
       e.preventDefault();
       if (!newExpense.amount || !newExpense.category) return;
 
-      const newTx = {
-         date: newExpense.date ? new Date(newExpense.date).toISOString() : new Date().toISOString(),
-         type: 'Egreso',
+      const txData = {
+         date: newExpense.date ? new Date(newExpense.date + 'T12:00:00Z').toISOString() : new Date(Date.now() - (new Date()).getTimezoneOffset() * 60000).toISOString(),
+         type: newExpense.type || 'Egreso',
          concept: newExpense.category + (newExpense.receipt ? ` (#${newExpense.receipt})` : ''),
-         method: newExpense.method || 'Caja Fija',
+         method: newExpense.method || 'Efectivo',
          amount: Number(newExpense.amount),
          notes: newExpense.notes,
          category: 'Gastos Generales'
       };
-      store.createTransaction(newTx);
+
+      if (editingTxId) {
+         await store.updateTransaction(editingTxId, txData);
+         setToastMsg(`✔ Transacción actualizada con éxito.`);
+      } else {
+         await store.createTransaction(txData);
+         setToastMsg(`✔ Gasto registrado correctamente.`);
+      }
+
+      await store.fetchTransactions();
       setIsAddingExpense(false);
-      setNewExpense({ category: '', amount: '', method: 'Efectivo', date: new Date().toISOString().split('T')[0], receipt: '', notes: '', doctor_id: null });
+      setEditingTxId(null);
+      setNewExpense({ category: '', amount: '', method: 'Efectivo', date: toLocalDateString(new Date()), receipt: '', notes: '', doctor_id: null });
+      setTimeout(() => setToastMsg(''), 3000);
    };
 
    const handleExport = (type) => {
@@ -199,58 +243,71 @@ export default function FinanzasPage() {
             <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in-quick">
                <div className="bg-[var(--bg-card)] rounded-[2.5rem] p-8 w-full max-w-lg shadow-2xl maxHeight-[90vh] overflow-y-auto custom-scrollbar border border-[var(--glass-border)]">
                   <div className="flex justify-between items-center mb-6">
-                     <h3 className="text-xl font-black text-[var(--text-primary)] flex items-center gap-2"><ArrowDownRight className="text-red-500" /> Detalle de Egreso</h3>
-                     <button onClick={() => setIsAddingExpense(false)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"><X size={24} /></button>
+                     <h3 className="text-xl font-black text-[var(--text-primary)] flex items-center gap-2">
+                        {editingTxId ? <Pencil size={20} className="text-amber-500" /> : <ArrowDownRight className="text-red-500" />}
+                        {editingTxId ? 'Editar Movimiento' : 'Detalle de Egreso'}
+                     </h3>
+                     <button onClick={() => { setIsAddingExpense(false); setEditingTxId(null); }} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"><X size={24} /></button>
                   </div>
                   <form onSubmit={handleAddExpense} className="space-y-4">
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                           <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Categoría *</label>
-                           <select required value={newExpense.category} onChange={e => setNewExpense({ ...newExpense, category: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-red-400 focus:ring-2 focus:ring-red-500/10 transition-all">
-                              <option value="" className="bg-[var(--bg-card)]">Seleccionar...</option>
-                              <option value="Sueldos y Honorarios" className="bg-[var(--bg-card)]">Sueldos y Honorarios</option>
-                              <option value="Insumos Médicos" className="bg-[var(--bg-card)]">Insumos Médicos</option>
-                              <option value="Mantenimiento e Infraestructura" className="bg-[var(--bg-card)]">Mantenimiento e Infraestructura</option>
-                              <option value="Servicios (Luz/Internet)" className="bg-[var(--bg-card)]">Servicios (Luz/Internet)</option>
-                              <option value="Otros Gastos" className="bg-[var(--bg-card)]">Otros Gastos</option>
-                           </select>
+                           <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Categoría o Concepto *</label>
+                           <input id="category" name="category" 
+                              type="text" 
+                              required 
+                              list="category-suggestions"
+                              value={newExpense.category} 
+                              onChange={e => setNewExpense({ ...newExpense, category: e.target.value })} 
+                              className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-red-400 focus:ring-2 focus:ring-red-500/10 transition-all"
+                              placeholder="Ej: Sueldos, Seña, etc."
+                           />
+                           <datalist id="category-suggestions">
+                              <option value="Sueldos y Honorarios" />
+                              <option value="Insumos Médicos" />
+                              <option value="Mantenimiento e Infraestructura" />
+                              <option value="Servicios (Luz/Internet)" />
+                              <option value="Otros Gastos" />
+                           </datalist>
                         </div>
                         <div>
                            <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Monto ($) *</label>
-                           <input type="number" required value={newExpense.amount} onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-black text-red-500 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-500/10 transition-all placeholder:text-[var(--text-secondary)]/30" placeholder="Ej: 45000" />
+                           <input id="amount" name="amount" type="number" required value={newExpense.amount} onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-black text-red-500 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-500/10 transition-all placeholder:text-[var(--text-secondary)]/30" placeholder="Ej: 45000" />
                         </div>
                      </div>
 
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                            <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Fecha</label>
-                           <input type="date" required value={newExpense.date} onChange={e => setNewExpense({ ...newExpense, date: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-red-400 transition-all" />
+                           <CustomDatePicker 
+                             value={newExpense.date} 
+                             onChange={val => setNewExpense({ ...newExpense, date: val })} 
+                             className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] transition-all" 
+                           />
                         </div>
                         <div>
                            <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Método de Pago</label>
-                           <select value={newExpense.method} onChange={e => setNewExpense({ ...newExpense, method: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-red-400 transition-all">
+                           <select id="method" name="method" value={newExpense.method} onChange={e => setNewExpense({ ...newExpense, method: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-red-400 transition-all">
                               <option value="Efectivo" className="bg-[var(--bg-card)]">Efectivo</option>
-                              <option value="Transferencia" className="bg-[var(--bg-card)]">Transferencia</option>
-                              <option value="Tarjeta de Crédito" className="bg-[var(--bg-card)]">Tarjeta de Crédito</option>
-                              <option value="Tarjeta de Débito" className="bg-[var(--bg-card)]">Tarjeta de Débito</option>
-                              <option value="Cheque" className="bg-[var(--bg-card)]">Cheque</option>
+                              <option value="Tarjeta" className="bg-[var(--bg-card)]">Tarjeta (Débito/Crédito)</option>
+                              <option value="Transferencia" className="bg-[var(--bg-card)]">Transferencia / Mercado Pago</option>
                            </select>
                         </div>
                      </div>
 
                      <div>
                         <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">N° Comprobante / Factura</label>
-                        <input type="text" value={newExpense.receipt} onChange={e => setNewExpense({ ...newExpense, receipt: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-red-400 transition-all placeholder:text-[var(--text-secondary)]/30" placeholder="Opcional. Ej: FC-A-002-14002" />
+                        <input id="receipt" name="receipt" type="text" value={newExpense.receipt} onChange={e => setNewExpense({ ...newExpense, receipt: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-red-400 transition-all placeholder:text-[var(--text-secondary)]/30" placeholder="Opcional. Ej: FC-A-002-14002" />
                      </div>
 
                      <div>
                         <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Detalles u Observaciones</label>
-                        <textarea value={newExpense.notes} onChange={e => setNewExpense({ ...newExpense, notes: e.target.value })} rows="2" className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-red-400 transition-all resize-none placeholder:text-[var(--text-secondary)]/30" placeholder="Opcional. Motivo del gasto..."></textarea>
+                        <textarea id="notes" name="notes" value={newExpense.notes} onChange={e => setNewExpense({ ...newExpense, notes: e.target.value })} rows="2" className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-red-400 transition-all resize-none placeholder:text-[var(--text-secondary)]/30" placeholder="Opcional. Motivo del gasto..."></textarea>
                      </div>
 
                      <div className="pt-2">
-                        <button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-2xl transition-all shadow-lg hover:shadow-red-500/20">
-                           Confirmar y Registrar Egreso
+                        <button type="submit" className={`w-full ${editingTxId ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20' : 'bg-red-600 hover:bg-red-700 shadow-red-500/20'} text-white font-black py-4 rounded-2xl transition-all shadow-lg`}>
+                           {editingTxId ? 'Actualizar Transacción' : 'Confirmar y Registrar Egreso'}
                         </button>
                      </div>
                   </form>
@@ -429,10 +486,14 @@ export default function FinanzasPage() {
                            <th className="py-5 px-3 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Detalle</th>
                            <th className="py-5 px-3 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 hidden sm:table-cell">Medio</th>
                            <th className="py-5 px-3 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-right">Monto Neto</th>
+                           <th className="py-5 px-3"></th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-[var(--border-color)]/30">
-                        {(transactions || []).sort((a, b) => new Date(b.date) - new Date(a.date)).map(tx => (
+                        {(transactions || [])
+                           .filter(t => !t.concept || !t.concept.includes('Ajuste Honorarios (Redondeo)'))
+                           .sort((a, b) => new Date(b.date) - new Date(a.date))
+                           .map(tx => (
                            <tr key={tx.id} className="hover:bg-[var(--bg-main)]/50 transition-colors group">
                               <td className="py-5 px-3 text-xs font-bold text-[var(--text-secondary)] font-mono">
                                  {new Date(tx.date).toLocaleDateString()}
@@ -450,6 +511,35 @@ export default function FinanzasPage() {
                               <td className="py-5 px-3 hidden sm:table-cell"><span className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest px-3 py-1.5 bg-[var(--bg-main)] rounded-lg border border-[var(--border-color)] group-hover:border-[var(--accent-primary)]/30 transition-colors">{tx.method}</span></td>
                               <td className={`py-5 px-3 text-right text-base font-black ${tx.type === 'Ingreso' ? 'text-[var(--accent-primary)]' : 'text-red-500'}`}>
                                  {tx.type === 'Ingreso' ? '+' : '-'}{formatMoney(tx.amount)}
+                              </td>
+                              <td className="py-5 px-3 text-right">
+                                 <div className="flex justify-end gap-2">
+                                    <button
+                                      onClick={() => {
+                                         const parts = tx.concept.split(' (#');
+                                         setNewExpense({
+                                            type: tx.type,
+                                            category: parts[0],
+                                            amount: tx.amount,
+                                            method: tx.method,
+                                            date: tx.date.split(' ')[0],
+                                            receipt: parts[1] ? parts[1].replace(')', '') : '',
+                                            notes: tx.notes || ''
+                                         });
+                                         setEditingTxId(tx.id);
+                                         setIsAddingExpense(true);
+                                      }}
+                                      className="p-2 text-slate-300 hover:text-[var(--accent-primary)] hover:bg-[var(--accent-light)] rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    >
+                                      <Pencil size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteConfirm({ isOpen: true, txId: tx.id })}
+                                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                 </div>
                               </td>
                            </tr>
                         ))}
@@ -481,7 +571,7 @@ export default function FinanzasPage() {
                                     .filter(t => t.doctor_id === doc.id && t.type === 'Ingreso')
                                     .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
                                  const pagado = transactions
-                                    .filter(t => t.doctor_id === doc.id && t.type === 'Egreso' && t.concept.includes('Honorarios'))
+                                    .filter(t => t.doctor_id === doc.id && t.type === 'Egreso')
                                     .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
 
                                  const porc = doc.remuneration_type === 'porcentaje' ? (Number(doc.remuneration) || 0) : 0;
@@ -508,7 +598,7 @@ export default function FinanzasPage() {
                                        </td>
                                        <td className="py-5 px-2 text-center text-right pr-4">
                                           {doc.remuneration_type === 'porcentaje' && deuda > 0 ? (
-                                             <button onClick={() => setSettlementDoctor({ ...doc, pendingAmount: deuda })} className="bg-[var(--accent-primary)] text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[var(--accent-primary)]/20 hover:scale-105 active:scale-95">Liquidar</button>
+                                             <button onClick={() => setSettlementDoctor({ ...doc, pendingAmount: deuda, originalPending: deuda, autoAdjust: false })} className="bg-[var(--accent-primary)] text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[var(--accent-primary)]/20 hover:scale-105 active:scale-95">Liquidar</button>
                                           ) : doc.remuneration_type === 'porcentaje' ? (
                                              <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Saldado
@@ -560,32 +650,106 @@ export default function FinanzasPage() {
                   <div className="w-16 h-16 bg-[var(--accent-light)] rounded-[2rem] flex items-center justify-center mb-8 text-[var(--accent-primary)] shadow-inner"><Wallet size={32} /></div>
                   <h3 className="text-2xl font-black text-[var(--text-primary)] mb-2 tracking-tight">Liquidar Honorarios</h3>
                   <p className="text-sm font-medium text-[var(--text-secondary)] mb-8 leading-relaxed">Estás por registrar el pago de honorarios profesionales para <strong className="text-[var(--text-primary)]">{settlementDoctor.name}</strong>.</p>
-                  <div className="bg-[var(--bg-main)] rounded-2xl p-6 border border-[var(--border-color)] mb-10 shadow-inner">
-                     <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest">Importe Pendiente</span>
-                        <span className="text-3xl font-black text-red-500 font-mono tracking-tighter">{formatMoney(settlementDoctor.pendingAmount)}</span>
+                  
+                  <div className="bg-[var(--bg-main)] rounded-2xl p-6 border border-[var(--border-color)] mb-6 shadow-inner">
+                     <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-70">Importe a Liquidar ($)</label>
+                        <input id="pendingAmount" name="pendingAmount" 
+                           type="number" 
+                           value={settlementDoctor.pendingAmount} 
+                           onChange={e => setSettlementDoctor({...settlementDoctor, pendingAmount: e.target.value})}
+                           className="text-3xl font-black text-red-500 font-mono tracking-tighter bg-transparent outline-none w-full border-b border-red-500/20 focus:border-red-500 transition-all"
+                        />
                      </div>
                   </div>
+
+                  <div className="mb-8">
+                     <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-3 uppercase tracking-widest opacity-70">Método de Pago Empleado</label>
+                     <div className="flex gap-2 p-1.5 bg-[var(--bg-main)] rounded-2xl border border-[var(--border-color)]/30">
+                        {['Efectivo', 'Transferencia'].map(m => (
+                           <button 
+                              key={m}
+                              type="button"
+                              onClick={() => setSettlementDoctor({...settlementDoctor, method: m})}
+                              className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${
+                                 (settlementDoctor.method || 'Transferencia') === m 
+                                    ? 'bg-[var(--accent-primary)] text-white shadow-lg' 
+                                    : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100'
+                              }`}
+                           >
+                              {m}
+                           </button>
+                        ))}
+                     </div>
+                  </div>
+
+                  {Math.abs(Number(settlementDoctor.originalPending) - Number(settlementDoctor.pendingAmount)) > 0 && (
+                     <div className="mb-8 p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl flex items-center gap-4 animate-fade-in-quick">
+                        <div className="flex-1">
+                           <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Diferencia detectada: {formatMoney(Math.abs(Number(settlementDoctor.originalPending) - Number(settlementDoctor.pendingAmount)))}</p>
+                           <p className="text-[9px] font-bold text-amber-600/70 leading-tight">¿Desea dar por saldado el resto por redondeo?</p>
+                        </div>
+                        <button 
+                           type="button"
+                           onClick={() => setSettlementDoctor({...settlementDoctor, autoAdjust: !settlementDoctor.autoAdjust})}
+                           className={`w-12 h-6 rounded-full relative transition-all ${settlementDoctor.autoAdjust ? 'bg-amber-500' : 'bg-slate-300'}`}
+                        >
+                           <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settlementDoctor.autoAdjust ? 'left-7' : 'left-1'}`}></div>
+                        </button>
+                     </div>
+                  )}
+
                   <div className="flex gap-4">
                      <button onClick={() => setSettlementDoctor(null)} className="flex-1 py-4 text-xs font-black text-[var(--text-secondary)] uppercase tracking-widest hover:text-[var(--text-primary)] transition-colors">Abortar</button>
                      <button onClick={async () => {
+                        // 1. Pago Principal
                         await store.createTransaction({
-                           date: new Date().toISOString(),
+                           date: nowForAPI(),
                            type: 'Egreso',
                            concept: `Cierre de Honorarios — ${settlementDoctor.name}`,
-                           method: 'Transferencia',
+                           method: settlementDoctor.method || 'Transferencia',
                            amount: Number(settlementDoctor.pendingAmount),
                            category: 'Sueldos',
                            doctor_id: settlementDoctor.id
                         });
+
+                        // 2. Ajuste Automático si se marcó
+                        if (settlementDoctor.autoAdjust) {
+                           const diff = Number(settlementDoctor.originalPending) - Number(settlementDoctor.pendingAmount);
+                           await store.createTransaction({
+                              date: nowForAPI(),
+                              type: 'Egreso',
+                              concept: `Ajuste Honorarios (Redondeo) — ${settlementDoctor.name}`,
+                              method: settlementDoctor.method || 'Transferencia',
+                              amount: diff,
+                              category: 'Sueldos',
+                              doctor_id: settlementDoctor.id
+                           });
+                        }
+
+                        await store.fetchTransactions();
                         setSettlementDoctor(null);
-                        setToastMsg(`✔  Liquidación de ${settlementDoctor.name} registrada.`);
+                        setToastMsg(`✔ Liquidación de ${settlementDoctor.name} finalizada.`);
                         setTimeout(() => setToastMsg(''), 3000);
-                     }} className="flex-2 px-8 py-4 bg-[var(--accent-primary)] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl shadow-[var(--accent-primary)]/20 active:scale-95 transition-all">Confirmar Liquidación</button>
+                     }} className="flex-2 px-8 py-4 bg-[var(--accent-primary)] text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl shadow-[var(--accent-primary)]/20 active:scale-95 transition-all">Confirmar Pago</button>
                   </div>
                </div>
             </div>
          )}
+
+         {/* DIALOGO DE CONFIRMACION PROFESIONAL */}
+         <ConfirmDialog
+            isOpen={deleteConfirm.isOpen}
+            title="¿Eliminar registro contable?"
+            description="Esta acción eliminará el movimiento permanentemente de los registros de finanzas y no podrá deshacerse."
+            confirmText="Sí, eliminar"
+            cancelText="Cancelar"
+            onConfirm={async () => {
+               await store.deleteTransaction(deleteConfirm.txId);
+               setDeleteConfirm({ isOpen: false, txId: null });
+            }}
+            onCancel={() => setDeleteConfirm({ isOpen: false, txId: null })}
+         />
       </div>
    );
 }

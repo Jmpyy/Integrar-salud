@@ -5,6 +5,7 @@ import {
   ChevronRight, X, CheckCheck, AlertTriangle,
 } from 'lucide-react';
 import { useStore } from '../../stores/useStore';
+import { toast } from 'react-hot-toast';
 import { APPOINTMENT_STATUS } from '../../config/constants';
 
 /* ── helpers ── */
@@ -245,7 +246,58 @@ export default function NotificationCenter() {
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-4 border-t border-[var(--border-color)]/30 bg-[var(--bg-sidebar)]/50 backdrop-blur-md">
+            <div className="px-5 py-4 border-t border-[var(--border-color)]/30 bg-[var(--bg-sidebar)]/50 backdrop-blur-md flex flex-col gap-3">
+              
+              {/* Push Subscription Button */}
+              {('Notification' in window && Notification.permission !== 'granted') && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const permission = await Notification.requestPermission();
+                      if (permission === 'granted') {
+                        const swReg = await navigator.serviceWorker.ready;
+                        
+                        // Fetch public key from backend
+                        const pkResp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/push/public_key`);
+                        const { publicKey } = await pkResp.json();
+                        if (!publicKey) throw new Error('VAPID key missing');
+
+                        // Convert base64 string to Uint8Array
+                        const padding = '='.repeat((4 - publicKey.length % 4) % 4);
+                        const base64 = (publicKey + padding).replace(/\-/g, '+').replace(/_/g, '/');
+                        const rawData = window.atob(base64);
+                        const outputArray = new Uint8Array(rawData.length);
+                        for (let i = 0; i < rawData.length; ++i) {
+                          outputArray[i] = rawData.charCodeAt(i);
+                        }
+
+                        const subscription = await swReg.pushManager.subscribe({
+                          userVisibleOnly: true,
+                          applicationServerKey: outputArray
+                        });
+
+                        // Send to backend
+                        await fetch(`${import.meta.env.VITE_API_BASE_URL}/push/subscribe`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                          },
+                          body: JSON.stringify(subscription)
+                        });
+                        toast.success('¡Notificaciones activadas!');
+                      }
+                    } catch (e) {
+                      console.error('Push setup failed', e);
+                      toast.error('Error al configurar notificaciones.');
+                    }
+                  }}
+                  className="w-full text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl transition-colors shadow-sm"
+                >
+                  Activar notificaciones de escritorio
+                </button>
+              )}
+
               <Link
                 to="/consultorio"
                 onClick={() => setIsOpen(false)}

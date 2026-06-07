@@ -13,12 +13,14 @@ import {
   Activity,
   BarChart as BarChartIcon
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell
 } from 'recharts';
+import { toast } from 'react-hot-toast';
 import { useStore } from '../../stores/useStore';
+import { nowForAPI } from '../../utils/helpers';
 
 export default function DashboardPage() {
   const store = useStore();
@@ -57,24 +59,30 @@ export default function DashboardPage() {
   // Reloj en tiempo real para el Dashboard
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
-    // Calculamos el mes para Dashboard (desde el dia 1 hasta hoy o hasta fin de mes)
     const now = new Date();
     const pad = (n) => n.toString().padStart(2, '0');
-    
-    // Traemos todo el mes actual para los KPIs
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const dateFrom = `${firstDay.getFullYear()}-${pad(firstDay.getMonth() + 1)}-01`;
-    const dateTo = `${lastDay.getFullYear()}-${pad(lastDay.getMonth() + 1)}-${pad(lastDay.getDate())}`;
 
-    // Carga de datos inicial optimizada
-    store.fetchAppointments({ dateFrom, dateTo });
+    // Rango del mes actual → para turnos y KPIs del día
+    const firstDayCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDayCurrentMonth  = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const dateFromMonth = `${firstDayCurrentMonth.getFullYear()}-${pad(firstDayCurrentMonth.getMonth() + 1)}-01`;
+    const dateTo        = `${lastDayCurrentMonth.getFullYear()}-${pad(lastDayCurrentMonth.getMonth() + 1)}-${pad(lastDayCurrentMonth.getDate())}`;
+
+    // Rango de los últimos 4 meses → para el gráfico histórico de ingresos
+    const firstDayChart  = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    const dateFromChart  = `${firstDayChart.getFullYear()}-${pad(firstDayChart.getMonth() + 1)}-01`;
+
+    store.fetchAppointments({ dateFrom: dateFromMonth, dateTo });
     store.fetchDoctors();
-    store.fetchTransactions({ dateFrom, dateTo });
+    if (['admin', 'administracion'].includes(store.userRole)) {
+      // Cargamos los últimos 4 meses de transacciones para tener
+      // datos históricos disponibles en el gráfico aunque cambie el mes
+      store.fetchTransactions({ dateFrom: dateFromChart, dateTo });
+    }
     store.fetchPatients();
     store.fetchDashboardNote();
 
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Check every minute
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
@@ -107,6 +115,33 @@ export default function DashboardPage() {
   // Estado del dropdown
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [senasInput, setSenasInput] = useState({ appId: null, value: '' }); // inline seña input
+
+  const handleSendWhatsApp = (app) => {
+    if (!app) return;
+    const patientRecord = store.patients.find(p => p.id === app.patientId || p.name === app.patient);
+    const phone = app.phone || patientRecord?.phone || app.patientPhone;
+    
+    if (!phone) {
+      toast.error('El paciente no tiene un teléfono registrado');
+      return;
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    const finalPhone = cleanPhone.startsWith('54') ? cleanPhone : `549${cleanPhone}`;
+
+    // Obtener plantilla y datos
+    const config = store.globalConfig || {};
+    const template = config.whatsappTemplate || "Hola *{patient}*, te recordamos tu turno para el día *{date}* a las *{time}hs*.";
+    
+    const message = template
+      .replace(/{patient}/g, app.patient)
+      .replace(/{date}/g, new Date(app.date + 'T12:00:00').toLocaleDateString('es-AR'))
+      .replace(/{time}/g, app.time)
+      .replace(/{doctor}/g, doctors.find(d => d.id === app.doctorId)?.name || 'Profesional')
+      .replace(/{clinic}/g, config.businessName || 'Integrar Salud');
+
+    window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
 
   // Helper para determinar el estado visual del turno basado en la hora
   const getAppointmentStatus = (app) => {
@@ -154,6 +189,7 @@ export default function DashboardPage() {
     }).length;
 
   const isAdmin = userRole === 'admin';
+  const canViewFinances = ['admin', 'administracion'].includes(userRole);
 
   // Métricas alternativas para no-admins
   const todaysPatientCount = todaysPatientAppointments.length;
@@ -169,11 +205,11 @@ export default function DashboardPage() {
       color: "bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400 border border-sky-100 dark:border-sky-800" 
     },
     { 
-      title: isAdmin ? "Honorarios Mes" : "Asistencias Hoy", 
-      value: isAdmin ? formatMoney(monthlyIncome) : assistedTodayCount.toString(), 
-      trend: isAdmin ? "Real" : "Clínico", 
+      title: canViewFinances ? "Honorarios Mes" : "Asistencias Hoy", 
+      value: canViewFinances ? formatMoney(monthlyIncome) : assistedTodayCount.toString(), 
+      trend: canViewFinances ? "Real" : "Clínico", 
       isPositive: true, 
-      icon: isAdmin ? Wallet : CheckCircle2, 
+      icon: canViewFinances ? Wallet : CheckCircle2, 
       color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800" 
     },
     { 
@@ -194,43 +230,62 @@ export default function DashboardPage() {
     },
   ];
 
-  // Datos para Recharts (Asegurar que sean enteros para evitar el error de precisión)
-  const chartData = [
-    { name: 'Ene', income: Math.round(monthlyIncome * 0.8) },
-    { name: 'Feb', income: Math.round(monthlyIncome * 0.9) },
-    { name: 'Mar', income: Math.round(monthlyIncome * 1.1) },
-    { name: 'Abr', income: Math.round(monthlyIncome) },
-  ];
+  // Datos para Recharts: Calculamos los últimos 4 meses de forma real
+  const chartData = useMemo(() => {
+    const months = [];
+    const now = new Date();
+    
+    for (let i = 3; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      const monthLabel = d.toLocaleDateString('es-ES', { month: 'short' }).replace('.', '');
+      
+      const income = (transactions || [])
+        .filter(t => t.type === 'Ingreso')
+        .filter(t => {
+          const td = new Date(t.date);
+          return td.getMonth() === m && td.getFullYear() === y;
+        })
+        .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+      months.push({ 
+        name: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1), 
+        income: Math.round(income) 
+      });
+    }
+    return months;
+  }, [transactions]);
 
   return (
     <>
-      {/* ROW: Tarjetas de Resumen (Stats) */}
-      <div className="flex overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 snap-x snap-mandatory hide-scrollbar">
+      {/* ROW: Tarjetas de Resumen (Stats) - Grid 2x2 en móvil */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {stats.map((stat, idx) => (
-          <div key={idx} className="min-w-[260px] sm:min-w-0 shrink-0 snap-center card-premium p-5 sm:p-6 group">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${stat.color}`}>
-                <stat.icon size={22} className="sm:w-6 sm:h-6" />
+          <div key={idx} className="card-premium p-4 sm:p-6 group">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${stat.color}`}>
+                <stat.icon size={20} className="sm:w-6 sm:h-6" />
               </div>
-              <div className={`flex items-center gap-1 text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full ${stat.isPositive ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-red-50 text-red-600 dark:bg-red-900/20'}`}>
-                {stat.isPositive ? <TrendingUp size={12}/> : <TrendingUp size={12} className="rotate-180"/>}
+              <div className={`flex items-center gap-1 text-[9px] sm:text-xs font-bold px-2 py-0.5 rounded-full ${stat.isPositive ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-red-50 text-red-600 dark:bg-red-900/20'}`}>
+                {stat.isPositive ? <TrendingUp size={11}/> : <TrendingUp size={11} className="rotate-180"/>}
                 {stat.trend}
               </div>
             </div>
-            <h3 className="text-[var(--text-secondary)] text-xs sm:text-sm font-medium mb-1 tracking-tight">{stat.title}</h3>
-            <p className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tighter">{stat.value}</p>
+            <h3 className="text-[var(--text-secondary)] text-[11px] sm:text-sm font-medium mb-1 tracking-tight">{stat.title}</h3>
+            <p className="text-xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tighter">{stat.value}</p>
           </div>
         ))}
       </div>
 
       {/* NEW: Visual Insights Section */}
-      <div className={`grid grid-cols-1 ${isAdmin ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-6`}>
-        {isAdmin && (
+      <div className={`grid grid-cols-1 ${canViewFinances ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-6`}>
+        {canViewFinances && (
           <div className="card-premium p-4 sm:p-6 flex flex-col h-[280px] sm:h-[350px]">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-sm font-black text-[var(--text-primary)] uppercase tracking-wider">Flujo de Ingresos</h3>
-                <p className="text-xs text-[var(--text-secondary)] font-medium">Comparativo mensual (Estimado)</p>
+                <p className="text-xs text-[var(--text-secondary)] font-medium">Comparativo mensual (Real)</p>
               </div>
               <Activity className="text-[var(--accent-primary)] opacity-40" size={20} />
             </div>
@@ -254,7 +309,7 @@ export default function DashboardPage() {
                   <Tooltip 
                     contentStyle={{backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', borderRadius: '12px', color: 'var(--text-primary)'}}
                     itemStyle={{color: 'var(--accent-primary)', fontWeight: 'bold'}}
-                    formatter={(value) => formatMoney(value)}
+                    formatter={(value) => [formatMoney(value), 'Ingreso']}
                   />
                   <Area 
                     type="monotone" 
@@ -290,7 +345,12 @@ export default function DashboardPage() {
               ]}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: 'var(--text-secondary)', fontSize: 10, fontWeight: 600}} />
-                <Tooltip cursor={{fill: 'var(--accent-light)'}} contentStyle={{backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}} />
+                <Tooltip 
+                  cursor={{fill: 'var(--accent-light)'}} 
+                  contentStyle={{backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', color: 'var(--text-primary)'}} 
+                  itemStyle={{color: 'var(--text-primary)', fontWeight: 'bold'}}
+                  formatter={(value) => [value, 'Cantidad']}
+                />
                 <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                   { [0,1,2,3].map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={index === 2 ? 'var(--accent-primary)' : 'var(--text-secondary)'} opacity={index === 2 ? 1 : 0.4} />
@@ -325,7 +385,7 @@ export default function DashboardPage() {
               )}
             </div>
             
-            <button onClick={() => navigate('/agenda')} className="text-sm font-bold text-[var(--accent-primary)] hover:text-[var(--accent-hover)] hover:underline">Ver agenda completa</button>
+            <button onClick={() => navigate('/dashboard/agenda')} className="text-sm font-bold text-[var(--accent-primary)] hover:text-[var(--accent-hover)] hover:underline">Ver agenda completa</button>
           </div>
 
           <div className="card-premium min-h-[100px] overflow-visible">
@@ -347,11 +407,11 @@ export default function DashboardPage() {
                   return (
                   <div key={app.id} className={`p-4 sm:p-6 transition-colors flex items-center gap-3 sm:gap-6 group relative ${isSuspended ? 'opacity-50 grayscale' : 'hover:bg-indigo-50/30'} ${isBlock ? 'bg-stripes bg-slate-50 border-b border-slate-100' : ''}`}>
                     {/* Hora */}
-                    <div className="w-12 sm:w-16 text-center shrink-0">
-                      <p className={`text-xs sm:text-sm font-bold transition-colors ${isInProgress && !isBlock ? 'text-[var(--accent-primary)]' : (isFinished || isBlock ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)] group-hover:text-[var(--accent-primary)]')}`}>
+                    <div className="w-10 sm:w-16 text-center shrink-0">
+                      <p className={`text-[11px] sm:text-sm font-black transition-colors ${isInProgress && !isBlock ? 'text-[var(--accent-primary)]' : (isFinished || isBlock ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)] group-hover:text-[var(--accent-primary)]')}`}>
                         {app.time}
                       </p>
-                      <p className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5">HS</p>
+                      <p className="text-[8px] font-black text-[var(--text-secondary)] mt-0.5 opacity-50 uppercase">HS</p>
                     </div>
                     
                     {/* Línea de tiempo visual (Punto palpitante si está en progreso) */}
@@ -365,13 +425,13 @@ export default function DashboardPage() {
                     {/* Info Paciente y Pago */}
                     <div className="flex-1 min-w-0 flex items-center gap-4">
                       {/* Avatar */}
-                      <div className={`hidden sm:flex w-12 h-12 rounded-full font-bold items-center justify-center shrink-0 border uppercase ${isBlock ? 'bg-[var(--border-color)] text-[var(--text-secondary)] border-[var(--border-color)]' : isFinished ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/40 dark:border-emerald-800' : 'bg-[var(--accent-light)] text-[var(--accent-primary)] border-[var(--accent-light)]'}`}>
-                        {isBlock ? <Clock size={20} /> : (isFinished ? <CheckCircle2 size={20} /> : app.patient.charAt(0))}
+                      <div className={`hidden sm:flex w-10 h-10 sm:w-12 sm:h-12 rounded-full font-bold items-center justify-center shrink-0 border uppercase ${isBlock ? 'bg-[var(--border-color)] text-[var(--text-secondary)] border-[var(--border-color)]' : isFinished ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/40 dark:border-emerald-800' : 'bg-[var(--accent-light)] text-[var(--accent-primary)] border-[var(--accent-light)]'}`}>
+                        {isBlock ? <Clock size={18} /> : (isFinished ? <CheckCircle2 size={18} /> : app.patient.charAt(0))}
                       </div>
                       
                       <div className="min-w-0 pr-2">
                         <div className="flex items-center gap-2">
-                          <h4 className={`text-base font-bold truncate ${isSuspended ? 'line-through text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>
+                          <h4 className={`text-sm sm:text-base font-bold truncate ${isSuspended ? 'line-through text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>
                             {isBlock ? app.title : app.patient}
                           </h4>
                           {app.paymentStatus && app.paymentStatus !== 'pendiente' && !isBlock && (
@@ -425,12 +485,12 @@ export default function DashboardPage() {
                           <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActiveDropdown(null); }}></div>
                           <div className="absolute right-0 top-10 w-48 bg-[var(--bg-card)] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-[var(--border-color)] py-1 z-50 animate-fade-in-quick">
                             {/* WhatsApp */}
-                            {app.phone && (
+                            {store.globalConfig?.whatsappEnabled && (
                                <button 
                                  onClick={(e) => {
                                    e.stopPropagation();
                                    setActiveDropdown(null);
-                                   window.open(`https://wa.me/${app.phone.replace(/[^0-9]/g, '')}`, '_blank');
+                                   handleSendWhatsApp(app);
                                  }}
                                  className="w-full text-left px-4 py-2.5 text-xs font-bold text-green-600 hover:bg-green-50 transition-colors border-b border-slate-50 flex items-center gap-2"
                                >
@@ -467,7 +527,7 @@ export default function DashboardPage() {
                                   if (totalFee > 0) {
                                     store.createTransaction({
                                       id: Date.now(),
-                                      date: new Date().toISOString(),
+                                      date: nowForAPI(),
                                       type: 'Ingreso',
                                       concept: `Cobro Total ${app.title} — ${app.patient}`,
                                       method: app.paymentMethod || 'Efectivo',
@@ -504,7 +564,7 @@ export default function DashboardPage() {
                                    <div className="flex gap-2">
                                      <div className="relative flex-1">
                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-indigo-500">$</span>
-                                       <input
+                                       <input id="value" name="value"
                                          type="number"
                                          autoFocus
                                          min="0"
@@ -520,7 +580,7 @@ export default function DashboardPage() {
                                              if (amount > 0) {
                                                store.createTransaction({
                                                  id: Date.now(),
-                                                 date: new Date().toISOString(),
+                                                 date: nowForAPI(),
                                                  type: 'Ingreso',
                                                  concept: `Seña ${app.title} — ${app.patient}`,
                                                  method: app.paymentMethod || 'Efectivo',
@@ -575,7 +635,7 @@ export default function DashboardPage() {
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate('/agenda');
+                                navigate('/dashboard/agenda');
                               }}
                               className="w-full text-left px-4 py-2.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
                             >
@@ -620,7 +680,7 @@ export default function DashboardPage() {
                       </h5>
                       {isSaving && <span className="text-[10px] font-bold text-[var(--accent-primary)] animate-pulse italic">Guardando...</span>}
                    </div>
-                   <textarea
+                   <textarea id="noteContent" name="noteContent"
                      value={noteContent}
                      onChange={(e) => {
                        setNoteContent(e.target.value);
@@ -635,16 +695,18 @@ export default function DashboardPage() {
              <h2 className="text-xs font-black text-[var(--text-secondary)] flex items-center gap-2 uppercase tracking-widest bg-[var(--bg-main)] px-4 py-2 rounded-xl border border-[var(--border-color)]">Accesos Rápidos</h2>
              
              {/* Botón Gigante de Llamada a la Acción */}
-             <button onClick={() => navigate('/agenda?new=true')} className="w-full bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-hover)] text-white rounded-[32px] p-5 sm:p-6 shadow-xl shadow-sky-500/10 hover:-translate-y-1 hover:shadow-2xl transition-all duration-300 flex flex-col items-center justify-center gap-2 sm:gap-3 group relative overflow-hidden text-center">
-               <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-               <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform">
-                 <Plus size={28} className="text-white" />
-               </div>
-               <div className="relative z-10">
-                 <h3 className="font-bold text-lg leading-tight text-white">Nuevo Turno</h3>
-                 <p className="text-sm text-sky-50 font-medium mt-1">Registrar cita en agenda</p>
-               </div>
-             </button>
+             {userRole !== 'medico' && (
+               <button onClick={() => navigate('/dashboard/agenda?new=true')} className="w-full bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-hover)] text-white rounded-[32px] p-5 sm:p-6 shadow-xl shadow-sky-500/10 hover:-translate-y-1 hover:shadow-2xl transition-all duration-300 flex flex-col items-center justify-center gap-2 sm:gap-3 group relative overflow-hidden text-center">
+                 <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                 <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform">
+                   <Plus size={28} className="text-white" />
+                 </div>
+                 <div className="relative z-10">
+                   <h3 className="font-bold text-lg leading-tight text-white">Nuevo Turno</h3>
+                   <p className="text-sm text-sky-50 font-medium mt-1">Registrar cita en agenda</p>
+                 </div>
+               </button>
+             )}
           </div>
         </div>
         

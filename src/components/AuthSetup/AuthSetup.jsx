@@ -3,7 +3,7 @@ import { useStore } from '../../stores/useStore';
 import { Key, Lock, ShieldCheck, RefreshCw, X } from 'lucide-react';
 import api from '../../services/api';
 
-export default function ForcePasswordChange() {
+export default function AuthSetup() {
   const { user, isAuthenticated, auth } = useStore();
   const [show, setShow] = useState(isAuthenticated && user?.must_change_password);
   const [form, setForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
@@ -91,7 +91,7 @@ export default function ForcePasswordChange() {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contraseña Actual</label>
                   <div className="relative">
                     <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                    <input 
+                    <input id="current_password" name="current_password" 
                       type="password" required
                       value={form.current_password}
                       onChange={e => setForm({...form, current_password: e.target.value})}
@@ -105,7 +105,7 @@ export default function ForcePasswordChange() {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nueva Contraseña</label>
                   <div className="relative">
                     <ShieldCheck size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                    <input 
+                    <input id="new_password" name="new_password" 
                       type="password" required
                       value={form.new_password}
                       onChange={e => setForm({...form, new_password: e.target.value})}
@@ -119,7 +119,7 @@ export default function ForcePasswordChange() {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Confirmar Nueva Contraseña</label>
                   <div className="relative">
                     <RefreshCw size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                    <input 
+                    <input id="confirm_password" name="confirm_password" 
                       type="password" required
                       value={form.confirm_password}
                       onChange={e => setForm({...form, confirm_password: e.target.value})}

@@ -1,33 +1,36 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  server: {
-    host: true, // Habilita acceso en red local
-    port: 5173,
-  },
-  build: {
-    target: 'esnext', // Optimiza usando sintaxis moderna (más ligero)
-    minify: 'esbuild',
-    sourcemap: false, // Quita los sourcemaps en producción (ahorra peso)
-    rollupOptions: {
-      output: {
-        // Divide el código en paquetes separados para que el navegador los guarde en caché.
-        // Si actualizas tu código futuro, el cliente no tiene que volver a descargar todo React.
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-charts': ['recharts'],
-          'vendor-icons': ['lucide-react'],
-          'vendor-utils': ['axios', 'zustand', 'react-hot-toast', 'uuid', 'zod', 'clsx']
-        }
+  base: '/',
+  plugins: [
+    react(), 
+    tailwindcss(),
+    VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      registerType: 'prompt',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}']
+      },
+      manifest: {
+        name: 'Integrar Salud Consultorio',
+        short_name: 'IntegrarSalud',
+        theme_color: '#0f172a',
+        display: 'standalone',
+        icons: [
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' }
+        ]
       }
-    }
-  },
-  esbuild: {
-    // Eliminar todos los console.log en el entorno de producción
-    drop: ['console', 'debugger'],
+    })
+  ],
+  build: {
+    target: 'esnext',
+    minify: 'esbuild',
   }
 })

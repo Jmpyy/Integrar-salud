@@ -3,12 +3,18 @@ import { Settings, Clock, Building2, Shield, Bell, Save, Check, ChevronRight, Fi
 import { toast } from 'react-hot-toast';
 import { useStore } from '../../../stores/useStore';
 import { afipService } from '../../../services/afip';
+import CustomTimePicker from '../../../components/ui/CustomTimePicker';
 
 const DEFAULT_CONFIG = {
   businessName: 'Integrar Salud',
+  primaryColor: '#f43f5e',
+  logoUrl: '/pwa-192x192.png',
   address: '',
   phone: '',
   email: '',
+  instagram: '',
+  facebook: '',
+  linkedin: '',
   defaultDuration: 1,
   defaultPaymentMethod: 'Efectivo',
   currency: 'ARS',
@@ -16,6 +22,9 @@ const DEFAULT_CONFIG = {
   sessionTimeout: 60,
   requirePasswordChangeDays: 90,
   whatsappEnabled: true,
+  whatsappTemplate: "Hola *{patient}*, te recordamos tu turno para el día *{date}* a las *{time}hs*. ¡Te esperamos! ✨",
+  supportContact: "",
+  responsibleName: "",
   emailEnabled: false,
   appointmentReminders: true,
   hours: {
@@ -55,7 +64,11 @@ export default function ConfiguracionPage() {
 
   useEffect(() => {
     if (store.globalConfig) {
-      setConfig(prev => ({ ...prev, ...store.globalConfig }));
+      setConfig(prev => ({ 
+        ...DEFAULT_CONFIG, 
+        ...store.globalConfig,
+        hours: { ...DEFAULT_CONFIG.hours, ...(store.globalConfig.hours || {}) }
+      }));
     }
     
     // Cargar config de AFIP desde el backend
@@ -109,11 +122,15 @@ export default function ConfiguracionPage() {
     }
   };
 
-  const handleSave = () => {
-    store.setGlobalConfig(config);
-    toast.success('Configuración guardada correctamente.');
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    try {
+      await store.setGlobalConfig(config);
+      toast.success('Configuración sincronizada con el servidor.');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      toast.error('Error al sincronizar con el servidor.');
+    }
   };
 
   const update    = (k, v)            => setConfig(p => ({ ...p, [k]: v }));
@@ -195,19 +212,47 @@ export default function ConfiguracionPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="sm:col-span-2">
                   <label className={labelClass}>Nombre Institucional</label>
-                  <input type="text" value={config.businessName} onChange={e => update('businessName', e.target.value)} className={fieldClass} placeholder="Ej: Clínica Central" />
+                  <input id="businessName" name="businessName" type="text" value={config.businessName} onChange={e => update('businessName', e.target.value)} className={fieldClass} placeholder="Ej: Clínica Central" />
+                </div>
+                <div>
+                  <label className={labelClass}>Color Principal de la Marca</label>
+                  <div className="flex items-center gap-4">
+                    <input id="primaryColor" name="primaryColor" type="color" value={config.primaryColor} onChange={e => update('primaryColor', e.target.value)} className="w-12 h-12 rounded-xl cursor-pointer border-none p-0 outline-none" />
+                    <input id="primaryColor" name="primaryColor" type="text" value={config.primaryColor} onChange={e => update('primaryColor', e.target.value)} className={fieldClass} placeholder="#f43f5e" />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelClass}>URL del Logo Institucional</label>
+                  <input id="logoUrl" name="logoUrl" type="text" value={config.logoUrl} onChange={e => update('logoUrl', e.target.value)} className={fieldClass} placeholder="/pwa-192x192.png o https://..." />
                 </div>
                 <div className="sm:col-span-2">
                   <label className={labelClass}>Domicilio Físico</label>
-                  <input type="text" value={config.address} onChange={e => update('address', e.target.value)} className={fieldClass} placeholder="Ciudad, Provincia, Dirección" />
+                  <input id="address" name="address" type="text" value={config.address} onChange={e => update('address', e.target.value)} className={fieldClass} placeholder="Ciudad, Provincia, Dirección" />
                 </div>
                 <div>
                   <label className={labelClass}>Línea Telefónica</label>
-                  <input type="tel" value={config.phone} onChange={e => update('phone', e.target.value)} className={fieldClass} placeholder="+54 11 0000 0000" />
+                  <input id="phone" name="phone" type="tel" value={config.phone} onChange={e => update('phone', e.target.value)} className={fieldClass} placeholder="+54 11 0000 0000" />
                 </div>
                 <div>
                   <label className={labelClass}>Correo Electrónico Corporativo</label>
-                  <input type="email" value={config.email} onChange={e => update('email', e.target.value)} className={fieldClass} placeholder="admin@consultorio.com" />
+                  <input id="email" name="email" type="email" value={config.email} onChange={e => update('email', e.target.value)} className={fieldClass} placeholder="admin@consultorio.com" />
+                </div>
+                <div className="sm:col-span-2 pt-4 border-t border-[var(--border-color)]/30 mt-4">
+                  <h4 className="text-[11px] font-black text-[var(--text-primary)] uppercase tracking-widest mb-4">Redes Sociales</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className={labelClass}>Instagram URL</label>
+                      <input id="instagram" name="instagram" type="url" value={config.instagram || ''} onChange={e => update('instagram', e.target.value)} className={fieldClass} placeholder="https://instagram.com/tu_usuario" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Facebook URL</label>
+                      <input id="facebook" name="facebook" type="url" value={config.facebook || ''} onChange={e => update('facebook', e.target.value)} className={fieldClass} placeholder="https://facebook.com/tu_pagina" />
+                    </div>
+                    <div>
+                      <label className={labelClass}>LinkedIn URL</label>
+                      <input id="linkedin" name="linkedin" type="url" value={config.linkedin || ''} onChange={e => update('linkedin', e.target.value)} className={fieldClass} placeholder="https://linkedin.com/in/tu_perfil" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -235,15 +280,21 @@ export default function ConfiguracionPage() {
                       </span>
                       {h.enabled ? (
                         <div className="flex items-center gap-6 ml-auto flex-wrap">
-                          <label className="flex items-center gap-3">
+                          <label className="flex items-center gap-3 relative">
                             <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase opacity-60">Desde</span>
-                            <input type="time" value={h.start} onChange={e => updateDay(day, 'start', e.target.value)}
-                              className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs font-black text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                            <CustomTimePicker 
+                              value={h.start} 
+                              onChange={val => updateDay(day, 'start', val)}
+                              className="w-[100px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs font-black outline-none hover:border-[var(--accent-primary)] transition-all shadow-sm"
+                            />
                           </label>
-                          <label className="flex items-center gap-3">
+                          <label className="flex items-center gap-3 relative">
                             <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase opacity-60">Hasta</span>
-                            <input type="time" value={h.end} onChange={e => updateDay(day, 'end', e.target.value)}
-                              className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs font-black text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                            <CustomTimePicker 
+                              value={h.end} 
+                              onChange={val => updateDay(day, 'end', val)}
+                              className="w-[100px] bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs font-black outline-none hover:border-[var(--accent-primary)] transition-all shadow-sm"
+                            />
                           </label>
                         </div>
                       ) : (
@@ -266,7 +317,7 @@ export default function ConfiguracionPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 <div>
                   <label className={labelClass}>Espaciado de Turnos</label>
-                  <select value={config.defaultDuration} onChange={e => update('defaultDuration', Number(e.target.value))} className={fieldClass}>
+                  <select id="defaultDuration" name="defaultDuration" value={config.defaultDuration} onChange={e => update('defaultDuration', Number(e.target.value))} className={fieldClass}>
                     <option value={0.5} className="bg-[var(--bg-card)]">Intervalo de 30 minutos</option>
                     <option value={1} className="bg-[var(--bg-card)]">Bloques de 1 hora</option>
                     <option value={1.5} className="bg-[var(--bg-card)]">Bloques de 1:30 hs</option>
@@ -275,13 +326,13 @@ export default function ConfiguracionPage() {
                 </div>
                 <div>
                   <label className={labelClass}>Caja Predeterminada</label>
-                  <select value={config.defaultPaymentMethod} onChange={e => update('defaultPaymentMethod', e.target.value)} className={fieldClass}>
+                  <select id="defaultPaymentMethod" name="defaultPaymentMethod" value={config.defaultPaymentMethod} onChange={e => update('defaultPaymentMethod', e.target.value)} className={fieldClass}>
                     {['Efectivo', 'Transferencia', 'Tarjeta', 'Débito', 'Crédito'].map(m => <option key={m} className="bg-[var(--bg-card)]">{m}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className={labelClass}>Divisa Transaccional</label>
-                  <select value={config.currency} onChange={e => update('currency', e.target.value)} className={fieldClass}>
+                  <select id="currency" name="currency" value={config.currency} onChange={e => update('currency', e.target.value)} className={fieldClass}>
                     <option value="ARS" className="bg-[var(--bg-card)]">ARS — Peso Argentino</option>
                     <option value="USD" className="bg-[var(--bg-card)]">USD — Dólar Estadounidense</option>
                     <option value="UYU" className="bg-[var(--bg-card)]">UYU — Peso Uruguayo</option>
@@ -289,7 +340,7 @@ export default function ConfiguracionPage() {
                 </div>
                 <div>
                   <label className={labelClass}>Huso Horario</label>
-                  <select value={config.timezone} onChange={e => update('timezone', e.target.value)} className={fieldClass}>
+                  <select id="timezone" name="timezone" value={config.timezone} onChange={e => update('timezone', e.target.value)} className={fieldClass}>
                     <option value="America/Argentina/Buenos_Aires" className="bg-[var(--bg-card)]">Buenos Aires (UTC-3)</option>
                     <option value="America/Montevideo" className="bg-[var(--bg-card)]">Montevideo (UTC-3)</option>
                     <option value="America/Santiago" className="bg-[var(--bg-card)]">Santiago (UTC-4)</option>
@@ -322,6 +373,32 @@ export default function ConfiguracionPage() {
                     <Toggle value={config[key]} onChange={v => update(key, v)} color={color} />
                   </div>
                 ))}
+
+                {config.whatsappEnabled && (
+                  <div className="mt-6 p-8 bg-emerald-500/5 border border-emerald-500/20 rounded-[2.5rem] animate-fade-in-quick">
+                    <label className={labelClass}>Plantilla de Mensaje (Recordatorio)</label>
+                    <textarea id="whatsappTemplate" name="whatsappTemplate" 
+                      value={config.whatsappTemplate}
+                      onChange={e => update('whatsappTemplate', e.target.value)}
+                      className={`${fieldClass} h-32 resize-none mt-2`}
+                      placeholder="Escribe el mensaje que recibirá el paciente..."
+                    />
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      {['{patient}', '{date}', '{time}', '{doctor}', '{clinic}'].map(tag => (
+                        <button 
+                          key={tag}
+                          onClick={() => update('whatsappTemplate', config.whatsappTemplate + ' ' + tag)}
+                          className="px-3 py-1.5 bg-white border border-[var(--border-color)] rounded-xl text-[10px] font-black text-[var(--accent-primary)] hover:bg-[var(--accent-light)] transition-all shadow-sm"
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-[var(--text-secondary)] font-bold mt-4 opacity-50 italic">
+                      💡 Haz clic en las etiquetas para insertarlas. Se reemplazarán automáticamente con los datos del turno.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -336,7 +413,7 @@ export default function ConfiguracionPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 <div>
                   <label className={labelClass}>Auto-Cierre de Sesión</label>
-                  <select value={config.sessionTimeout} onChange={e => update('sessionTimeout', Number(e.target.value))} className={fieldClass}>
+                  <select id="sessionTimeout" name="sessionTimeout" value={config.sessionTimeout} onChange={e => update('sessionTimeout', Number(e.target.value))} className={fieldClass}>
                     <option value={30} className="bg-[var(--bg-card)]">Inactividad: 30 minutos</option>
                     <option value={60} className="bg-[var(--bg-card)]">Inactividad: 1 hora</option>
                     <option value={120} className="bg-[var(--bg-card)]">Inactividad: 2 horas</option>
@@ -346,7 +423,7 @@ export default function ConfiguracionPage() {
                 </div>
                 <div>
                   <label className={labelClass}>Ciclo de Cifrado (Password)</label>
-                  <select value={config.requirePasswordChangeDays} onChange={e => update('requirePasswordChangeDays', Number(e.target.value))} className={fieldClass}>
+                  <select id="requirePasswordChangeDays" name="requirePasswordChangeDays" value={config.requirePasswordChangeDays} onChange={e => update('requirePasswordChangeDays', Number(e.target.value))} className={fieldClass}>
                     <option value={30} className="bg-[var(--bg-card)]">Rotar cada 30 días</option>
                     <option value={60} className="bg-[var(--bg-card)]">Rotar cada 60 días</option>
                     <option value={90} className="bg-[var(--bg-card)]">Rotar cada 90 días</option>
@@ -403,7 +480,7 @@ export default function ConfiguracionPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div>
                       <label className={labelClass}>CUIT del Emisor</label>
-                      <input 
+                      <input id="cuit" name="cuit" 
                         type="text" 
                         value={afipConfig.cuit || ''} 
                         onChange={e => setAfipConfig({...afipConfig, cuit: e.target.value})} 
@@ -413,7 +490,7 @@ export default function ConfiguracionPage() {
                     </div>
                     <div>
                       <label className={labelClass}>Punto de Venta</label>
-                      <input 
+                      <input id="punto_venta" name="punto_venta" 
                         type="number" 
                         value={afipConfig.punto_venta} 
                         onChange={e => setAfipConfig({...afipConfig, punto_venta: parseInt(e.target.value)})} 
@@ -422,7 +499,7 @@ export default function ConfiguracionPage() {
                     </div>
                     <div>
                       <label className={labelClass}>Condición Tributaria</label>
-                      <select 
+                      <select id="tax_condition" name="tax_condition" 
                         value={afipConfig.tax_condition} 
                         onChange={e => setAfipConfig({...afipConfig, tax_condition: e.target.value})} 
                         className={fieldClass}
@@ -492,7 +569,7 @@ export default function ConfiguracionPage() {
                        <label className="block w-full text-center py-4 bg-[var(--bg-main)] hover:bg-[var(--accent-light)] border-2 border-dashed border-[var(--border-color)] rounded-2xl cursor-pointer transition-all text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--accent-primary)] hover:border-[var(--accent-primary)]/50">
                          <Upload size={16} className="mx-auto mb-2 opacity-30" />
                          {afipConfig.has_cert ? 'Actualizar Certificado' : 'Subir Archivo .crt'}
-                         <input type="file" className="hidden" accept=".crt,.pem" onChange={e => handleUpload(e, 'cert')} />
+                         <input id="field_3762" name="field_3762" type="file" className="hidden" accept=".crt,.pem" onChange={e => handleUpload(e, 'cert')} />
                        </label>
                     </div>
 
@@ -514,7 +591,7 @@ export default function ConfiguracionPage() {
                        <label className="block w-full text-center py-4 bg-[var(--bg-main)] hover:bg-[var(--accent-light)] border-2 border-dashed border-[var(--border-color)] rounded-2xl cursor-pointer transition-all text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--accent-primary)] hover:border-[var(--accent-primary)]/50">
                          <Upload size={16} className="mx-auto mb-2 opacity-30" />
                          {afipConfig.has_key ? 'Actualizar Llave Key' : 'Subir Archivo .key'}
-                         <input type="file" className="hidden" accept=".key,.pem" onChange={e => handleUpload(e, 'key')} />
+                         <input id="field_17087" name="field_17087" type="file" className="hidden" accept=".key,.pem" onChange={e => handleUpload(e, 'key')} />
                        </label>
                     </div>
                   </div>

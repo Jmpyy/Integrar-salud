@@ -2,11 +2,14 @@ import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, Sparkles, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useStore } from '../stores/useStore';
 
 export default function LoginPage({ onLogin, isLoading = false }) {
+  const globalConfig = useStore(state => state.globalConfig);
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -40,10 +43,23 @@ export default function LoginPage({ onLogin, isLoading = false }) {
     try {
       // 3. Llamar al backend vía store
       if (onLogin) {
-        await onLogin(email, password);
+        await onLogin(email, password, rememberMe);
       }
 
-      toast.success('¡Bienvenido!');
+      toast.success('¡Bienvenido!', {
+        style: {
+          background: '#ffffff',
+          color: '#1e293b',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+          fontWeight: '700',
+          borderRadius: '12px',
+        },
+        iconTheme: {
+          primary: '#22c55e',
+          secondary: '#ffffff',
+        },
+      });
       setIsTransitioning(true);
       setTimeout(() => {
         navigate('/dashboard');
@@ -59,7 +75,7 @@ export default function LoginPage({ onLogin, isLoading = false }) {
   };
 
   return (
-    <div className={`min-h-screen flex selection:bg-indigo-100 bg-white ${isTransitioning ? 'animate-fade-out pointer-events-none' : ''}`}>
+    <div className={`min-h-dvh flex selection:bg-indigo-100 bg-white ${isTransitioning ? 'animate-fade-out pointer-events-none' : ''}`}>
 
       {/* LADO IZQUIERDO: Imagen / Branding (Oculto en móviles) */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-50 items-center justify-center">
@@ -80,7 +96,7 @@ export default function LoginPage({ onLogin, isLoading = false }) {
             Priorizando el bienestar, simplificando la <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-emerald-600">atención</span>.
           </h2>
           <p className="text-slate-600 text-lg leading-relaxed">
-            Bienvenido al panel central de Integrar Salud. Acceda para gestionar agendas y brindar una mejor experiencia a nuestros pacientes.
+            Bienvenido al panel central de {globalConfig?.businessName || 'Integrar Salud'}. Acceda para gestionar agendas y brindar una mejor experiencia a nuestros pacientes.
           </p>
         </div>
       </div>
@@ -91,8 +107,12 @@ export default function LoginPage({ onLogin, isLoading = false }) {
 
           {/* Logo móvil */}
           <div className="lg:hidden flex justify-center mb-8">
-            <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
-              <span className="text-white font-bold text-2xl">I</span>
+            <div className="w-12 h-12 bg-[var(--accent-primary)] rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100 overflow-hidden">
+              {globalConfig?.logoUrl ? (
+                <img src={globalConfig.logoUrl} alt="Logo" className="w-full h-full object-contain bg-white" />
+              ) : (
+                <span className="text-white font-bold text-2xl">{(globalConfig?.businessName || 'I')[0].toUpperCase()}</span>
+              )}
             </div>
           </div>
 
@@ -118,9 +138,14 @@ export default function LoginPage({ onLogin, isLoading = false }) {
                   <Mail size={20} />
                 </span>
                 <input
+                  id="email"
+                  name="email"
                   type="email"
                   ref={emailRef}
                   value={email}
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   onChange={(e) => {
                     setEmail(e.target.value);
                     if (errors.email) setErrors({ ...errors, email: '' });
@@ -151,7 +176,7 @@ export default function LoginPage({ onLogin, isLoading = false }) {
             </div>
 
             {/* Campo Contraseña */}
-            <div className="group relative mt-12">
+            <div className="group relative mt-8 sm:mt-12">
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-sm font-semibold text-slate-700 transition-colors group-focus-within:text-indigo-600">
                   Contraseña <span className="text-indigo-500 ml-1" title="Campo requerido">*</span>
@@ -163,6 +188,8 @@ export default function LoginPage({ onLogin, isLoading = false }) {
                   <Lock size={20} />
                 </span>
                 <input
+                  id="password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
                   ref={passwordRef}
                   value={password}
@@ -206,7 +233,10 @@ export default function LoginPage({ onLogin, isLoading = false }) {
             <div className="flex items-center pt-6">
               <input
                 id="remember-me"
+                name="rememberMe"
                 type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
                 className="w-4 h-4 text-indigo-600 bg-slate-100 border-slate-300 rounded focus:ring-indigo-500 focus:ring-2 cursor-pointer"
               />
               <label htmlFor="remember-me" className="ml-2 text-sm font-medium text-slate-600 cursor-pointer">
@@ -245,10 +275,17 @@ export default function LoginPage({ onLogin, isLoading = false }) {
 
           {/* Link para volver */}
           <div className="mt-10 text-center">
-            <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-indigo-600 transition-colors">
+            <a 
+              href={
+                window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                  ? '#/' 
+                  : 'https://integrarsalud.me'
+              } 
+              className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-indigo-600 transition-colors"
+            >
               <ArrowRight size={16} className="rotate-180" />
               Volver a la página principal
-            </Link>
+            </a>
           </div>
 
         </div>

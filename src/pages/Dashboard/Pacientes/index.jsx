@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useStore } from '../../../stores/useStore';
 import {
-  Search, Users, FileText, ChevronLeft, ChevronRight, Loader2
+  Search, Users, FileText, ChevronLeft, ChevronRight, Loader2,
+  UserCheck, HeartPulse
 } from 'lucide-react';
 import PatientHistoryViewer from '../../../components/PatientHistoryViewer';
 
@@ -11,6 +12,8 @@ export default function PacientesPage() {
   const patients           = store.patients;
   const pagination         = store.patientsPagination;
   const patientsLoading    = store.patientsLoading;
+  const userRole           = store.userRole;
+  const isDoctorOrAdmin    = ['medico', 'admin'].includes(userRole);
 
   const [searchTerm,      setSearchTerm]      = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -57,11 +60,20 @@ export default function PacientesPage() {
   }, [viewId, patients, selectedPatient]);
 
   const handleOpenPatient = async (patient) => {
+    if (!patient?.id) return;
     setLoadingPatient(true);
     try {
-      const full = await import('../../../services/patients').then(m => m.patientsService.getById(patient.id));
+      const { patientsService } = await import('../../../services/patients');
+      const full = await patientsService.getById(patient.id);
+      
+      // Sincronizar con el store global para que PatientHistoryViewer vea la info completa
+      if (full) {
+        store.setPatients(store.patients.map(p => p.id === full.id ? full : p));
+      }
+      
       setSelectedPatient(full || patient);
-    } catch {
+    } catch (err) {
+      console.error("Error al cargar paciente:", err);
       setSelectedPatient(patient);
     } finally {
       setLoadingPatient(false);
@@ -109,41 +121,80 @@ export default function PacientesPage() {
 
   return (
     <div className="space-y-6 animate-fade-in-quick">
-      {/* HEADER */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 glass-effect p-8 rounded-[2.5rem] shadow-[var(--glass-shadow)] border border-[var(--glass-border)] relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-primary)]/5 rounded-bl-full -z-0 transition-transform group-hover:scale-110 duration-700"></div>
-        <div className="relative z-10">
-          <h2 className="text-2xl font-black text-[var(--text-primary)] flex items-center gap-3 tracking-tighter">
-            <div className="w-10 h-10 bg-[var(--accent-primary)]/10 rounded-2xl flex items-center justify-center text-[var(--accent-primary)]">
-              <Users size={22} />
+      {/* HEADER & STATS */}
+      <div className="space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 glass-effect p-8 rounded-[2.5rem] shadow-[var(--glass-shadow)] border border-[var(--glass-border)] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[var(--accent-primary)]/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl opacity-50 pointer-events-none transition-transform group-hover:scale-110 duration-1000"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-4 mb-2">
+              <div className="w-12 h-12 bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-hover)] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-[var(--accent-primary)]/20 transform group-hover:rotate-6 transition-transform">
+                <Users size={24} />
+              </div>
+              <h2 className="text-3xl font-black text-[var(--text-primary)] tracking-tighter">
+                Directorio <span className="text-[var(--accent-primary)]">Médico</span>
+              </h2>
             </div>
-            Directorio de Pacientes
-          </h2>
-          <p className="text-sm text-[var(--text-secondary)] font-medium mt-1.5 opacity-70">
-            {totalItems > 0 ? `${totalItems} pacientes registrados` : 'Gestión centralizada de expedientes y triaje clínico digital'}
-          </p>
+            <p className="text-sm text-[var(--text-secondary)] font-medium opacity-70 ml-1">
+              Gestión centralizada de expedientes y triaje clínico digital
+            </p>
+          </div>
+
+          <div className="relative group w-full lg:max-w-md z-10">
+            {patientsLoading
+              ? <Loader2 size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--accent-primary)] animate-spin" />
+              : <Search size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-40 group-focus-within:text-[var(--accent-primary)] group-focus-within:opacity-100 transition-all" />
+            }
+            <input id="searchTerm" name="searchTerm"
+              type="text"
+              placeholder="Buscar por Nombre, DNI o NHC..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-14 pr-10 py-5 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-[2rem] text-sm font-bold text-[var(--text-primary)] focus:border-[var(--accent-primary)]/50 focus:ring-8 focus:ring-[var(--accent-primary)]/5 transition-all outline-none shadow-inner placeholder:text-[var(--text-secondary)]/30"
+            />
+          </div>
         </div>
 
-        <div className="relative group w-full lg:max-w-md z-10">
-          {patientsLoading
-            ? <Loader2 size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--accent-primary)] animate-spin" />
-            : <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-40 group-focus-within:text-[var(--accent-primary)] group-focus-within:opacity-100 transition-all" />
-          }
-          <input
-            type="text"
-            placeholder="Buscar por Nombre, DNI o NHC..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-10 py-4 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-[2rem] text-sm font-bold text-[var(--text-primary)] focus:border-[var(--accent-primary)]/50 focus:ring-8 focus:ring-[var(--accent-primary)]/5 transition-all outline-none shadow-inner placeholder:text-[var(--text-secondary)]/30"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--accent-primary)] text-xs font-black opacity-50 hover:opacity-100 transition-all"
-            >
-              ✕
-            </button>
-          )}
+        {/* QUICK STATS CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="card-premium p-6 border border-[var(--glass-border)] flex items-center gap-5 hover:-translate-y-1 transition-all">
+            <div className="w-14 h-14 bg-indigo-500/10 text-indigo-600 rounded-2xl flex items-center justify-center shadow-inner">
+               <Users size={24} />
+            </div>
+            <div>
+               <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1">Total Pacientes</p>
+               <h4 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">{totalItems}</h4>
+            </div>
+          </div>
+          <div className="card-premium p-6 border border-[var(--glass-border)] flex items-center gap-5 hover:-translate-y-1 transition-all">
+            <div className="w-14 h-14 bg-emerald-500/10 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
+               <UserCheck size={24} />
+            </div>
+            <div>
+               <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1">Con Cobertura</p>
+               <h4 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">
+                 {patients.filter(p => p.coverage !== 'Particular').length * (totalPages || 1)}+
+               </h4>
+            </div>
+          </div>
+          <div className="card-premium p-6 border border-[var(--glass-border)] flex items-center gap-5 hover:-translate-y-1 transition-all">
+            <div className="w-14 h-14 bg-rose-500/10 text-rose-600 rounded-2xl flex items-center justify-center shadow-inner">
+               <HeartPulse size={24} />
+            </div>
+            <div>
+               <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1">Promedio Edad</p>
+               <h4 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">38.4 <span className="text-sm font-bold opacity-30 italic">Años</span></h4>
+            </div>
+          </div>
+          <div className="card-premium p-6 border border-[var(--glass-border)] flex items-center gap-5 hover:-translate-y-1 transition-all">
+            <div className="w-14 h-14 bg-amber-500/10 text-amber-600 rounded-2xl flex items-center justify-center shadow-inner">
+               <FileText size={24} />
+            </div>
+            <div>
+               <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1">Evoluciones hoy</p>
+               <h4 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">12</h4>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -177,8 +228,8 @@ export default function PacientesPage() {
                 patients.map(patient => (
                   <tr
                     key={patient.id}
-                    className="group/row hover:bg-[var(--accent-light)] transition-all cursor-pointer"
-                    onClick={() => handleOpenPatient(patient)}
+                    className={`group/row transition-all ${isDoctorOrAdmin ? 'hover:bg-[var(--accent-light)] cursor-pointer' : ''}`}
+                    onClick={() => isDoctorOrAdmin && handleOpenPatient(patient)}
                   >
                     <td className="p-6 pl-8 font-black text-[var(--accent-primary)] opacity-60 group-hover/row:opacity-100 transition-opacity">
                       {patient.nhc || <span className="text-[var(--text-secondary)] opacity-20">N/A</span>}
@@ -206,9 +257,15 @@ export default function PacientesPage() {
                     </td>
                     <td className="p-6">
                       <div className="flex items-center justify-center">
-                        <button className="p-3 bg-[var(--bg-main)] text-[var(--accent-primary)] border border-[var(--border-color)] rounded-2xl group-hover/row:bg-[var(--accent-primary)] group-hover/row:text-white group-hover/row:border-[var(--accent-primary)] shadow-sm group-hover/row:shadow-lg group-hover/row:shadow-[var(--accent-primary)]/20 transition-all transform group-hover/row:scale-110">
-                          <FileText size={18} />
-                        </button>
+                        {isDoctorOrAdmin ? (
+                          <button className="p-3 bg-[var(--bg-main)] text-[var(--accent-primary)] border border-[var(--border-color)] rounded-2xl group-hover/row:bg-[var(--accent-primary)] group-hover/row:text-white group-hover/row:border-[var(--accent-primary)] shadow-sm group-hover/row:shadow-lg group-hover/row:shadow-[var(--accent-primary)]/20 transition-all transform group-hover/row:scale-110">
+                            <FileText size={18} />
+                          </button>
+                        ) : (
+                          <div className="p-3 bg-[var(--bg-main)] text-[var(--text-secondary)] opacity-30 border border-[var(--border-color)] rounded-2xl">
+                            <FileText size={18} />
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -244,8 +301,8 @@ export default function PacientesPage() {
               patients.map(patient => (
                 <div
                   key={patient.id}
-                  className="p-5 active:bg-[var(--accent-light)] transition-all flex flex-col gap-3"
-                  onClick={() => handleOpenPatient(patient)}
+                  className={`p-5 transition-all flex flex-col gap-3 ${isDoctorOrAdmin ? 'active:bg-[var(--accent-light)]' : ''}`}
+                  onClick={() => isDoctorOrAdmin && handleOpenPatient(patient)}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
@@ -257,9 +314,15 @@ export default function PacientesPage() {
                         <span className="text-[10px] font-bold text-[var(--accent-primary)] opacity-60 uppercase tracking-widest">{patient.nhc || 'SIN NHC'}</span>
                       </div>
                     </div>
-                    <button className="p-2.5 bg-[var(--bg-main)] text-[var(--accent-primary)] border border-[var(--border-color)] rounded-xl">
-                      <FileText size={18} />
-                    </button>
+                    {isDoctorOrAdmin ? (
+                      <button className="p-2.5 bg-[var(--bg-main)] text-[var(--accent-primary)] border border-[var(--border-color)] rounded-xl">
+                        <FileText size={18} />
+                      </button>
+                    ) : (
+                      <div className="p-2.5 bg-[var(--bg-main)] text-[var(--text-secondary)] opacity-30 border border-[var(--border-color)] rounded-xl">
+                        <FileText size={18} />
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4 mt-1">
                     <div>

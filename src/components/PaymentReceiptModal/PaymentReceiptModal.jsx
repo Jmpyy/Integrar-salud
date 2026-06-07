@@ -1,13 +1,8 @@
 import { useRef } from 'react';
 import { X, Printer, CheckCircle2, Calendar, User, Stethoscope, CreditCard, Receipt } from 'lucide-react';
 
-/**
- * PaymentReceiptModal
- * Props:
- *   - appointment: objeto del turno con { id, patient, title, date, time, paymentStatus, paymentMethod, paymentAmount, paidAmount, doctorId }
- *   - doctor: objeto del doctor { name, specialty }
- *   - onClose: fn
- */
+import { createPortal } from 'react-dom';
+
 export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
   const receiptRef = useRef(null);
 
@@ -26,8 +21,8 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
 
   const isPaid   = appointment.paymentStatus === 'pagado';
   const isSenado = appointment.paymentStatus === 'senado';
-  const amount   = Number(appointment.paidAmount  || appointment.paymentAmount || 0);
-  const method   = appointment.paymentMethod || 'Efectivo';
+  const amount   = Number(isSenado ? appointment.paidAmount : (appointment.paymentAmount || appointment.paidAmount || 0));
+  const method   = isSenado ? (appointment.paidMethod || 'Efectivo') : (appointment.paymentMethod || 'Efectivo');
 
   const appointmentDate = appointment.date
     ? new Date(appointment.date + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -162,8 +157,8 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
     ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border-[var(--accent-primary)]/20'
     : 'bg-[var(--border-color)]/20 text-[var(--text-secondary)] border-[var(--border-color)]/30';
 
-  return (
-    <div className="fixed inset-0 bg-slate-950/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in-quick">
+  return createPortal(
+    <div className="fixed inset-0 bg-slate-950/60 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in-quick">
       <div className="bg-[var(--bg-card)] border border-[var(--glass-border)] rounded-3xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-up">
 
         {/* Header */}
@@ -306,6 +301,7 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

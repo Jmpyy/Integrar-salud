@@ -39,8 +39,13 @@ export const appointmentsService = {
     return data.appointment;
   },
 
-  async updatePayment(id, paymentStatus) {
-    const { data } = await api.patch(`/appointments/${id}/payment`, { paymentStatus });
+  async updatePayment(id, paymentData) {
+    const { data } = await api.patch(`/appointments/${id}/payment`, paymentData);
+    return data.appointment;
+  },
+
+  async updateVideoStatus(id, estado_videollamada) {
+    const { data } = await api.patch(`/appointments/${id}/video_status`, { estado_videollamada });
     return data.appointment;
   },
 };

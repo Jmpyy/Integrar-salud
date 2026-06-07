@@ -41,6 +41,15 @@ export const patientsService = {
     return data.entry;
   },
 
+  async updateHistoryEntry(patientId, entryId, entryData) {
+    const { data } = await api.put(`/patients/${patientId}/history/${entryId}`, entryData);
+    return data.entry;
+  },
+
+  async deleteHistoryEntry(patientId, entryId) {
+    await api.delete(`/patients/${patientId}/history/${entryId}`);
+  },
+
   // Medicación
   async getMedications(patientId) {
     const { data } = await api.get(`/patients/${patientId}/medications`);

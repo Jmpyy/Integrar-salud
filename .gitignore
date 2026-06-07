@@ -31,3 +31,13 @@ eslint-results.txt
 *.njsproj
 *.sln
 *.sw?
+
+# Integrar Salud - Sensitive Files
+VPS.txt
+*.txt
+backend/api/config.php
+backend/database.sql
+.env
+.env.production
+dist/
+node_modules/

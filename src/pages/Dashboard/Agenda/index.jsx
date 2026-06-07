@@ -5,12 +5,16 @@ import { toast } from 'react-hot-toast';
 import {
   ChevronLeft, ChevronRight, Plus, Search, Clock, User, Landmark,
   MoreHorizontal, X, UserCheck, AlertCircle, CheckCircle2, UserX, UserMinus, Filter, CalendarDays, Lock, Wallet, RefreshCw,
-  Calendar, Stethoscope, Receipt, Eye, Trash2, ReceiptText, MessageCircle, Activity
+  Calendar, Stethoscope, Receipt, Eye, Trash2, ReceiptText, MessageCircle, Activity, Video, Copy
 } from 'lucide-react';
 import ConfirmDialog from '../../../components/ConfirmDialog/ConfirmDialog';
 import PaymentReceiptModal from '../../../components/PaymentReceiptModal/PaymentReceiptModal';
-import { generateNHC } from '../../../utils/helpers';
+import { generateNHC, nowForAPI } from '../../../utils/helpers';
 import { BUSINESS_HOURS, TIME_SLOT_ROUNDING } from '../../../config/constants';
+import { createPortal } from 'react-dom';
+import { playPopSound, playSuccessSound, playCashSound, playErrorSound } from '../../../utils/sounds';
+import CustomDatePicker from '../../../components/ui/CustomDatePicker';
+import CustomTimePicker from '../../../components/ui/CustomTimePicker';
 
 export default function AgendaPage() {
   const store = useStore();
@@ -19,7 +23,7 @@ export default function AgendaPage() {
   const appointments = store.appointments;
   const doctors = store.doctors;
   const patients = store.patients;
-  const { userRole, user } = store;
+  const { userRole, user, globalConfig } = store;
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState('daily'); // 'daily' or 'weekly'
 
@@ -33,17 +37,19 @@ export default function AgendaPage() {
   const currentSelectedDateString = getLocalDayString(currentDate);
 
   // Configuración global (días y horas de atención)
-  const config = store.globalConfig || {
-    hours: {
-      1: { enabled: true,  start: '09:00', end: '18:00' },
-      2: { enabled: true,  start: '09:00', end: '18:00' },
-      3: { enabled: true,  start: '09:00', end: '18:00' },
-      4: { enabled: true,  start: '09:00', end: '18:00' },
-      5: { enabled: true,  start: '09:00', end: '18:00' },
-      6: { enabled: false, start: '09:00', end: '13:00' },
-      0: { enabled: false, start: '09:00', end: '13:00' },
-    }
+  const DEFAULT_HOURS = {
+    1: { enabled: true,  start: '09:00', end: '18:00' },
+    2: { enabled: true,  start: '09:00', end: '18:00' },
+    3: { enabled: true,  start: '09:00', end: '18:00' },
+    4: { enabled: true,  start: '09:00', end: '18:00' },
+    5: { enabled: true,  start: '09:00', end: '18:00' },
+    6: { enabled: false, start: '09:00', end: '13:00' },
+    0: { enabled: false, start: '09:00', end: '13:00' },
   };
+
+  const config = store.globalConfig 
+    ? { ...store.globalConfig, hours: store.globalConfig.hours || DEFAULT_HOURS }
+    : { hours: DEFAULT_HOURS };
 
   // Calcular rango de horas dinámico (Min Start y Max End de los días habilitados)
   const hours = (() => {
@@ -104,7 +110,8 @@ export default function AgendaPage() {
   const [confirmOverlapDrop, setConfirmOverlapDrop] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [pendingDrop, setPendingDrop] = useState(null); // { targetCol, newTime }
-  const [senasInput, setSenasInput] = useState({ appId: null, value: '' }); // inline seña input
+  const [senasInput, setSenasInput] = useState({ appId: null, value: '' }); // inline seña input (desktop)
+  const [mobileSeñaInput, setMobileSeñaInput] = useState({ active: false, value: '' }); // seña input en bottom sheet mobile
   const [receiptApp, setReceiptApp] = useState(null);   // appointment for which to show receipt
 
   // "Mis turnos" filter — for medico role, default to true
@@ -121,6 +128,7 @@ export default function AgendaPage() {
     time: '12:00',
     duration: 1,
     type: 'psicologia',
+    modalidad: 'presencial',
     doctorId: doctors && doctors.length > 0 && doctors[0] ? doctors[0].id : '',
     patientId: '',
     newPatientName: '',
@@ -139,19 +147,39 @@ export default function AgendaPage() {
     emergencyContact: '',
     referrer: '',
     paymentAmount: '35000',
-    paymentMethod: 'Efectivo',
-    paidAmount: ''
+    paidMethod: 'Efectivo',
+    codigoAcceso: '',
+    meetLink: '',
+    estadoVideollamada: 'pendiente'
   };
 
   const [formData, setFormData] = useState(defaultForm);
   const [cashReceived, setCashReceived] = useState('');
 
+  const isDateDisabled = (dateStr) => {
+    if (!globalConfig || !globalConfig.hours) return false;
+    const d = new Date(dateStr + 'T12:00:00Z');
+    const dayOfWeek = d.getDay();
+    const configDay = globalConfig.hours[dayOfWeek];
+    if (configDay && configDay.enabled === false) return true;
+    return false;
+  };
 
+  const getDayConfig = (dateStr) => {
+    if (!globalConfig || !globalConfig.hours || !dateStr) return { start: '06:00', end: '22:00' };
+    const d = new Date(dateStr + 'T12:00:00Z');
+    const configDay = globalConfig.hours[d.getDay()];
+    if (configDay && configDay.enabled) {
+      return { start: configDay.start, end: configDay.end };
+    }
+    return { start: '06:00', end: '22:00' };
+  };
+  const currentDayConfig = getDayConfig(formData.date);
 
   // Handle auto-open for "New Appointment" via query param
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('new') === 'true') {
+    if (params.get('new') === 'true' && userRole !== 'medico') {
       setIsModalOpen(true);
       setEditingAppointmentId(null);
       setFormData(defaultForm);
@@ -194,8 +222,12 @@ export default function AgendaPage() {
        }
     }
   } else {
-    // Vista Diaria (Daily)
-    (visibleDoctors || []).forEach(d => {
+    // Vista Diaria (Daily) — si "Mis Turnos" está activo, solo mostrar columna del médico logueado
+    const doctorsToShow = (userRole === 'medico' && myTurnosOnly && myDoctor)
+      ? [myDoctor]
+      : (visibleDoctors || []);
+
+    doctorsToShow.forEach(d => {
        if (!d) return;
        columns.push({
           id: `doc-${d.id}`,
@@ -236,6 +268,20 @@ export default function AgendaPage() {
   // Manejo de Guardado
   const handleSaveAppointment = async (e) => {
     e.preventDefault();
+
+    // 0. Validar Paciente
+    if (!isBlockMode && !isNewPatient && !formData.patientId) {
+      toast.error('Por favor, selecciona un paciente o elige "Primera Vez" para cargar uno nuevo.');
+      return;
+    }
+
+    if (!isBlockMode && isNewPatient && formData.dni) {
+      const existingPatient = patients.find(p => p.dni === formData.dni);
+      if (existingPatient) {
+        toast.error(`El DNI ${formData.dni} ya está registrado a nombre de ${existingPatient.name}. Búscalo en la pestaña "Frecuente".`);
+        return;
+      }
+    }
 
     // 1. Validar Día Laboral
     const selDate = new Date(formData.date + 'T00:00:00');
@@ -331,10 +377,19 @@ export default function AgendaPage() {
       let baseColorClass = 'bg-indigo-50 border-indigo-200 text-indigo-800';
       if (isBlockMode) {
         baseColorClass = 'bg-stripes bg-slate-100 border-slate-300 text-slate-800';
-      } else if (doctor) {
-        if (doctor.color === 'esmeralda') baseColorClass = 'bg-emerald-50 border-emerald-200 text-emerald-800';
-        if (doctor.color === 'purpura') baseColorClass = 'bg-purple-50 border-purple-200 text-purple-800';
-        if (doctor.color === 'indigo') baseColorClass = 'bg-indigo-50 border-indigo-200 text-indigo-800';
+      } else {
+        const titleLower = (formData.title || '').toLowerCase();
+        if (titleLower.includes('primera vez') || titleLower.includes('ingreso')) {
+          baseColorClass = 'bg-amber-50 border-amber-200 text-amber-800';
+        } else if (titleLower.includes('urgencia')) {
+          baseColorClass = 'bg-rose-50 border-rose-200 text-rose-800';
+        } else if (titleLower.includes('control')) {
+          baseColorClass = 'bg-blue-50 border-blue-200 text-blue-800';
+        } else if (doctor) {
+          if (doctor.color === 'esmeralda') baseColorClass = 'bg-emerald-50 border-emerald-200 text-emerald-800';
+          if (doctor.color === 'purpura') baseColorClass = 'bg-purple-50 border-purple-200 text-purple-800';
+          if (doctor.color === 'indigo') baseColorClass = 'bg-indigo-50 border-indigo-200 text-indigo-800';
+        }
       }
 
       if (editingAppointmentId) {
@@ -358,22 +413,31 @@ export default function AgendaPage() {
         }
 
         // Inyectar en Finanzas si corresponde (Solo la diferencia)
-        const prevPaid = Number(mainApp?.paymentStatus === 'pagado' ? mainApp?.paymentAmount : (mainApp?.paymentStatus === 'senado' ? mainApp?.paidAmount : 0));
-        const currPaid = Number(formData.paymentStatus === 'pagado' ? formData.paymentAmount : (formData.paymentStatus === 'senado' ? formData.paidAmount : 0));
-        const netPaymentNow = currPaid - prevPaid;
+        const prevPaid = Number(mainApp?.paidAmount || 0) + (mainApp?.paymentStatus === 'pagado' ? Number(mainApp?.paymentAmount - mainApp?.paidAmount) : 0);
+        const currPaidTotal = Number(formData.paymentStatus === 'pagado' ? formData.paymentAmount : (formData.paymentStatus === 'senado' ? formData.paidAmount : 0));
+        const netPaymentNow = currPaidTotal - prevPaid;
+
+        // Si el estado es 'senado', actualizamos paidMethod
+        // Si el estado es 'pagado', el nuevo método aplica al saldo
+        const currentTxMethod = formData.paymentStatus === 'senado' ? formData.paidMethod : formData.paymentMethod;
 
         if (netPaymentNow > 0) {
+          toast(`⏳ Procesando... Total: $${currPaidTotal}, Pagado previo: $${prevPaid}, Resta: $${netPaymentNow}`, { duration: 3000 });
           await store.createTransaction({
             id: Date.now(),
-            date: new Date().toISOString(),
+                date: nowForAPI(),
             type: 'Ingreso',
             concept: `${formData.paymentStatus === 'pagado' ? 'Completa Pago' : 'Refuerzo Seña'} ${formData.title} — ${finalPatientName}`,
-            method: formData.paymentMethod || 'Efectivo',
+            method: currentTxMethod || 'Efectivo',
             amount: netPaymentNow,
             notes: `Auto-registrado: Saldo abonado en edición (Turno #${editingAppointmentId})`,
             doctor_id: formData.doctorId,
             patient_id: finalPatientId
           });
+          playCashSound();
+          toast.success(`✅ Restante de $${netPaymentNow.toLocaleString()} registrado en Finanzas!`);
+        } else if (isStatusChangeToPaid && netPaymentNow <= 0) {
+          toast('ℹ️ El turno ya estaba totalmente pagado. No se creó transacción extra.', { icon: '👏' });
         }
       } else {
         let newAppointments = [];
@@ -388,6 +452,7 @@ export default function AgendaPage() {
 
           newAppointments.push({
             ...formData,
+            doctorId: formData.doctorId || (doctors && doctors[0] ? doctors[0].id : null),
             id: ++baseId,
             patientId: finalPatientId,
             date: getLocalDayString(entryDate),
@@ -414,24 +479,27 @@ export default function AgendaPage() {
             if (amountValue > 0) {
               await store.createTransaction({
                 id: Date.now() + Math.random(),
-                date: new Date().toISOString(),
+                    date: nowForAPI(),
                 type: 'Ingreso',
                 concept: `${formData.paymentStatus === 'pagado' ? 'Cobro Total' : 'Seña'} ${formData.title} — ${finalPatientName}`,
-                method: formData.paymentMethod || 'Efectivo',
+                method: (formData.paymentStatus === 'senado' ? formData.paidMethod : formData.paymentMethod) || 'Efectivo',
                 amount: amountValue,
                 notes: `Registrado al crear turno (Turno #${newApp.id})`,
                 doctor_id: formData.doctorId,
                 patient_id: finalPatientId
               });
+              playCashSound();
             }
           }
         }
       }
       
+      playSuccessSound();
       toast.success(editingAppointmentId ? 'Turno actualizado con éxito' : 'Turno agendado correctamente');
       closeModal();
     } catch (error) {
       console.error('Error saving appointment:', error);
+      playErrorSound();
       const errorMessage = error.response?.data?.message || error.message || 'Error al guardar el turno';
       toast.error(errorMessage);
       setIsSaving(false);
@@ -439,8 +507,7 @@ export default function AgendaPage() {
   };
 
   const closeModal = () => {
-    setIsModalOpen(true);
-    setTimeout(() => setIsModalOpen(false), 50); // Pequeño delay para animaciones
+    setIsModalOpen(false);
     setEditingAppointmentId(null);
     setFormData({...defaultForm, date: currentSelectedDateString});
     setIsNewPatient(false);
@@ -448,6 +515,11 @@ export default function AgendaPage() {
     setIsBlockMode(false);
     setRecurringWeeks(0);
     setIsSaving(false);
+  };
+
+  const handleLogout = () => {
+    store.auth.logout();
+    navigate('/login');
   };
 
   useEffect(() => {
@@ -471,30 +543,59 @@ export default function AgendaPage() {
     store.fetchAppointments({ dateFrom, dateTo });
   }, [currentDate.getFullYear(), currentDate.getMonth()]);
 
-  const handleStatusChange = (e, id, newStatus) => {
+  const handleStatusChange = async (e, id, newStatus) => {
     if (e) e.stopPropagation();
-    store.updateAppointmentStatus(id, newStatus);
-    setMenuApp(null);
-    setActiveDropdown(null);
+    try {
+      await store.updateAppointmentStatus(id, newStatus);
+      if (newStatus === 'finalizado') playSuccessSound();
+      else playPopSound();
+      setMenuApp(null);
+      setActiveDropdown(null);
+    } catch (err) {
+      playErrorSound();
+    }
   };
 
   const handleSendWhatsApp = (app) => {
     if (!app) return;
     const patientRecord = store.patients.find(p => p.id === app.patientId || p.name === app.patient);
-    const phone = app.phone || patientRecord?.phone;
+    const phone = app.phone || patientRecord?.phone || app.patientPhone;
     
     if (!phone) {
       toast.error('El paciente no tiene un teléfono registrado');
       return;
     }
 
-    let cleanPhone = phone.replace(/\D/g, '');
-    if (!cleanPhone.startsWith('54')) cleanPhone = '54' + cleanPhone;
+    const cleanPhone = phone.replace(/\D/g, '');
+    const finalPhone = cleanPhone.startsWith('54') ? cleanPhone : `549${cleanPhone}`;
 
-    const consultorio = store.globalConfig?.clinicName || store.globalConfig?.businessName || 'Integrar Salud';
-    const message = `Hola *${app.patient}*, te recordamos tu turno de *${app.title}* para hoy a las *${app.time}hs* en *${consultorio}*. ¡Te esperamos! ✨`;
+    // Obtener plantilla y datos
+    const config = store.globalConfig || {};
+    const template = config.whatsappTemplate || "Hola *{patient}*, te recordamos tu turno para el día *{date}* a las *{time}hs*.";
     
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+    const message = template
+      .replace(/{patient}/g, app.patient)
+      .replace(/{date}/g, new Date(app.date + 'T12:00:00').toLocaleDateString('es-AR'))
+      .replace(/{time}/g, app.time)
+      .replace(/{doctor}/g, doctors.find(d => d.id === app.doctorId)?.name || 'Profesional')
+      .replace(/{clinic}/g, config.businessName || 'Integrar Salud');
+
+    window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const handleCopyVirtualLink = (app, e) => {
+    if (e) e.stopPropagation();
+    const patientRecord = store.patients.find(p => p.id === app.patientId || p.name === app.patient);
+    const dni = patientRecord?.dni || app.patientDni || app.dni;
+    
+    if (!dni || !app.codigoAcceso) {
+      toast.error('El turno no tiene DNI del paciente o Código de Acceso generado.');
+      return;
+    }
+    const link = `https://integrarsalud.me/#/sala-virtual?dni=${dni}&codigo=${app.codigoAcceso}`;
+    navigator.clipboard.writeText(link);
+    toast.success('Link de videollamada copiado al portapapeles');
+    setActiveDropdown(null);
     setMenuApp(null);
   };
 
@@ -504,13 +605,14 @@ export default function AgendaPage() {
       toast.error('No se pudo localizar el registro del paciente');
       return;
     }
-    navigate(`/pacientes?view=${patientRecord.id}`);
+    navigate(`/dashboard/pacientes?view=${patientRecord.id}`);
     setMenuApp(null);
     setActiveDropdown(null);
   };
 
   const handleOpenEdit = useCallback((app) => {
     if (!app) return;
+    playPopSound();
     setActiveDropdown(null);
     setMenuApp(null);
     setEditingAppointmentId(app.id);
@@ -528,6 +630,7 @@ export default function AgendaPage() {
       time: app.time || '',
       duration: app.duration || 1,
       type: app.type || 'psicologia',
+      modalidad: app.modalidad || 'presencial',
       doctorId: app.doctorId,
       patientId: existing ? existing.id : '',
       newPatientName: existing ? '' : (app.isBlock ? '' : (app.patient || '')),
@@ -537,19 +640,22 @@ export default function AgendaPage() {
       attendance: app.attendance || 'agendado',
       coverage: existing ? existing.coverage : (app.coverage || 'Particular'),
       coverageNumber: existing ? existing.coverageNumber : (app.coverageNumber || ''),
-      plan: existing ? existing.plan : '',
-      dni: existing ? existing.dni : '',
-      birthDate: existing ? existing.birthDate : '',
-      gender: existing ? existing.gender : 'femenino',
-      email: existing ? existing.email : '',
-      address: existing ? existing.address : '',
-      emergencyContact: existing ? existing.emergencyContact : '',
+      plan: existing ? existing.plan : (app.plan || ''),
+      dni: existing ? existing.dni : (app.dni || ''),
+      birthDate: existing ? existing.birthDate : (app.birthDate || ''),
+      gender: existing ? existing.gender : (app.gender || 'femenino'),
+      email: existing ? existing.email : (app.email || ''),
+      address: existing ? existing.address : (app.address || ''),
+      emergencyContact: existing ? existing.emergencyContact : (app.emergencyContact || ''),
       referrer: app.referrer || '',
       paymentAmount: app.paymentAmount || '35000',
-      paymentMethod: app.paymentMethod || 'Efectivo',
-      paidAmount: app.paidAmount || ''
+      paidMethod: app.paidMethod || 'Efectivo',
+      codigoAcceso: app.codigoAcceso || '',
+      meetLink: app.meetLink || '',
+      estadoVideollamada: app.estadoVideollamada || 'pendiente'
     });
     setIsNewPatient(!existing && !app.isBlock);
+    setPatientSearch(existing ? existing.name : (app.patient || ''));
     setIsModalOpen(true);
   }, [store.patients]);
 
@@ -560,14 +666,15 @@ export default function AgendaPage() {
   // Drag & Drop
   const handleDrop = (e, targetCol) => {
     e.preventDefault();
-    if (!draggedApp) return;
+    if (!draggedApp || ['medico', 'administracion'].includes(userRole)) return;
 
     const gridRect = e.currentTarget.getBoundingClientRect();
     const y = Math.max(0, e.clientY - gridRect.top);
     
-    // Altura = 96px por hora. Hora inicio = 6.
+    // Altura = 96px por hora. Hora inicio = dinámico según config.
+    const dropStartHour = hours[0] ?? 6;
     const totalHoursFromStart = y / 96;
-    let rawHour = Math.floor(totalHoursFromStart) + 6;
+    let rawHour = Math.floor(totalHoursFromStart) + dropStartHour;
     let rawMinutes = Math.floor((totalHoursFromStart - Math.floor(totalHoursFromStart)) * 60);
 
     const remainder = rawMinutes % 15;
@@ -578,7 +685,7 @@ export default function AgendaPage() {
       roundedMinutes = 0;
     }
     
-    if (rawHour < 6) rawHour = 6;
+    if (rawHour < dropStartHour) rawHour = dropStartHour;
     if (rawHour > 21) { rawHour = 21; roundedMinutes = 45; }
 
     const newTime = `${rawHour.toString().padStart(2, '0')}:${roundedMinutes.toString().padStart(2, '0')}`;
@@ -596,7 +703,9 @@ export default function AgendaPage() {
   const proceedDrop = (targetCol, newTime) => {
     const app = appointments.find(a => a.id === draggedApp.id);
     if (!app) return;
+    // Enviar TODOS los datos existentes + los campos que cambiaron
     store.updateAppointment(draggedApp.id, {
+      ...app,
       time: newTime,
       doctorId: targetCol.doctorId,
       date: targetCol.dateStr
@@ -688,6 +797,12 @@ export default function AgendaPage() {
                         <Stethoscope size={12} />
                         <span>{doctors.find(d => d.id === app.doctorId)?.name?.split(' ')[0] || 'Doc'}</span>
                       </div>
+                      {app.type && (
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/40 rounded-lg">
+                          <span>{app.type.toLowerCase().includes('virtual') ? '💻' : app.type.toLowerCase().includes('domicilio') ? '🏠' : '🏥'}</span>
+                          <span>{app.type}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Badge de pago en móvil flotante */}
@@ -698,8 +813,6 @@ export default function AgendaPage() {
                          </div>
                       </div>
                     )}
-
-                    {/* Menú móvil eliminado de aquí para ser desacoplado */}
                   </div>
                 ))}
               </div>
@@ -713,24 +826,25 @@ export default function AgendaPage() {
 
   return (
     <div className="flex flex-col gap-6 h-full">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 glass-effect p-4 rounded-3xl shadow-[var(--glass-shadow)] border border-[var(--glass-border)]">
+      {/* Header de la Agenda: flex-wrap para que en tablets/móvil fluya correctamente */}
+      <div className="flex flex-wrap items-center justify-between gap-3 glass-effect p-3 sm:p-4 rounded-3xl shadow-[var(--glass-shadow)] border border-[var(--glass-border)]">
         
         {/* VIEW TOGGLE */}
-        <div className="flex items-center bg-[var(--bg-main)] p-1 rounded-xl border border-[var(--border-color)] shrink-0 shadow-inner">
-           <button onClick={() => setViewMode('daily')} className={`px-4 py-1.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${viewMode === 'daily' ? 'bg-[var(--bg-card)] shadow-md text-[var(--accent-primary)]' : 'text-[var(--text-secondary)] opacity-50 hover:opacity-100'}`}>Diaria</button>
-           <button onClick={() => setViewMode('weekly')} className={`px-4 py-1.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${viewMode === 'weekly' ? 'bg-[var(--bg-card)] shadow-md text-[var(--accent-primary)]' : 'text-[var(--text-secondary)] opacity-50 hover:opacity-100'}`}>Semanal</button>
+        <div className="flex items-center bg-[var(--bg-main)] p-1 rounded-xl border border-[var(--border-color)] shrink-0">
+           <button onClick={() => setViewMode('daily')} className={`px-3 sm:px-4 py-1.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all min-h-[36px] ${viewMode === 'daily' ? 'bg-[var(--bg-card)] shadow-md text-[var(--accent-primary)]' : 'text-[var(--text-secondary)] opacity-50 hover:opacity-100'}`}>Diaria</button>
+           <button onClick={() => setViewMode('weekly')} className={`px-3 sm:px-4 py-1.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all min-h-[36px] ${viewMode === 'weekly' ? 'bg-[var(--bg-card)] shadow-md text-[var(--accent-primary)]' : 'text-[var(--text-secondary)] opacity-50 hover:opacity-100'}`}>Semanal</button>
         </div>
 
         {/* Nav de Fechas */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center bg-[var(--bg-main)] rounded-full border border-[var(--border-color)] p-1 shadow-inner">
-            <button onClick={handlePrev} className="p-2.5 hover:bg-[var(--bg-card)] rounded-full transition-all text-[var(--text-secondary)] hover:text-[var(--accent-primary)] hover:shadow-sm leading-none group">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center bg-[var(--bg-main)] rounded-full border border-[var(--border-color)] p-1">
+            <button onClick={handlePrev} className="p-2 sm:p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center hover:bg-[var(--bg-card)] rounded-full transition-all text-[var(--text-secondary)] hover:text-[var(--accent-primary)] hover:shadow-sm leading-none group">
               <ChevronLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
             </button>
-            <span className="px-6 font-black text-[var(--text-primary)] min-w-[200px] text-center capitalize tracking-tight text-sm">
+            <span className="px-2 sm:px-6 font-black text-[var(--text-primary)] min-w-[120px] sm:min-w-[200px] text-center capitalize tracking-tight text-xs sm:text-sm">
               {formattedHeaderDate}
             </span>
-            <button onClick={handleNext} className="p-2.5 hover:bg-[var(--bg-card)] rounded-full transition-all text-[var(--text-secondary)] hover:text-[var(--accent-primary)] hover:shadow-sm leading-none group">
+            <button onClick={handleNext} className="p-2 sm:p-2.5 min-w-[40px] min-h-[40px] flex items-center justify-center hover:bg-[var(--bg-card)] rounded-full transition-all text-[var(--text-secondary)] hover:text-[var(--accent-primary)] hover:shadow-sm leading-none group">
               <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
             </button>
           </div>
@@ -741,9 +855,9 @@ export default function AgendaPage() {
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
           {/* Si es vista semanal, mostramos Selector de Doctor exclusivo (Premium Style) */}
-          {isWeekly && userRole !== 'medico' && (
+          {isWeekly && !['medico', 'administracion'].includes(userRole) && (
              <div className="relative group w-full sm:w-64">
-               <select 
+               <select id="selectedDoctorWeekly" name="selectedDoctorWeekly" 
                  value={selectedDoctorWeekly} 
                  onChange={(e) => setSelectedDoctorWeekly(Number(e.target.value))} 
                  className="appearance-none w-full pl-5 pr-12 py-3 bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] font-black uppercase tracking-widest text-[10px] rounded-full focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--accent-primary)]/10 outline-none transition-all cursor-pointer shadow-md hover:border-[var(--accent-primary)]/50"
@@ -816,9 +930,10 @@ export default function AgendaPage() {
             </button>
           )}
 
-          {userRole !== 'medico' && (
+          {!['medico', 'administracion'].includes(userRole) && (
             <button 
               onClick={() => {
+                playPopSound();
                 // Pre-completar doctor y fecha según la vista
                 setFormData({...defaultForm, doctorId: isWeekly ? selectedDoctorWeekly : (doctors[0]?.id || ''), date: currentSelectedDateString});
                 setIsModalOpen(true);
@@ -833,7 +948,7 @@ export default function AgendaPage() {
       </div>
 
       {/* VISTA MULTICOLUMNA DE AGENDA - RESPONSIVO & FULL SCREEN */}
-      <div className="card-premium overflow-x-auto flex flex-col h-[calc(100vh-14rem)] min-h-[500px] flex-1 custom-scrollbar-horizontal border border-[var(--glass-border)]">
+      <div className="card-premium overflow-x-auto flex flex-col h-[calc(100svh-14rem)] min-h-[500px] flex-1 custom-scrollbar-horizontal border border-[var(--glass-border)]">
         
         {/* Cabeceras de Columnas */}
         <div className="flex border-b border-[var(--border-color)] bg-[var(--bg-sidebar)]">
@@ -887,7 +1002,7 @@ export default function AgendaPage() {
                 const isOffHours = !sched || hour < sched.start || hour >= sched.end;
                 
                 return (
-                  <div key={`grid-${hour}`} className={`h-24 w-full absolute pointer-events-none border-b border-[var(--border-color)]/20 ${isOffHours ? 'bg-[var(--text-secondary)]/5' : 'bg-transparent'}`} style={{ top: `${(hour - 6) * 96}px` }}>
+                  <div key={`grid-${hour}`} className={`h-24 w-full border-b border-[var(--border-color)]/20 ${isOffHours ? 'bg-[var(--text-secondary)]/5' : 'bg-transparent'}`}>
                     {isOffHours && <div className="absolute top-2 right-2 opacity-10"><Lock size={12} className="text-[var(--text-secondary)]"/></div>}
                   </div>
                 )
@@ -895,7 +1010,7 @@ export default function AgendaPage() {
 
                   {/* LÍNEA DE HORA ACTUAL */}
                   {col.dateStr === todayString && (
-                    <div className="absolute left-0 right-0 border-t-2 border-[var(--accent-primary)] z-30 pointer-events-none" style={{ top: `${((new Date().getHours() - 6) + (new Date().getMinutes() / 60)) * 96}px` }}>
+                    <div className="absolute left-0 right-0 border-t-2 border-[var(--accent-primary)] z-30 pointer-events-none" style={{ top: `${((new Date().getHours() - (hours[0] ?? 6)) + (new Date().getMinutes() / 60)) * 96}px` }}>
                       {colIndex === (isWeekly ? columns.findIndex(c => c.dateStr === todayString) : 0) && (
                         <>
                           <div className="absolute -left-2 -top-1.5 w-3 h-3 bg-[var(--accent-primary)] rounded-full shadow-[0_0_15px_var(--accent-primary)] animate-pulse"></div>
@@ -910,7 +1025,8 @@ export default function AgendaPage() {
                   {/* Renderizado de Turnos */}
                   {colAppointments.map(app => {
                     const [h, m] = app.time.split(':').map(Number);
-                    const topOffset = ((h - 6) + (m / 60)) * 96;
+                    const startHour = hours[0] ?? 6;
+                    const topOffset = ((h - startHour) + (m / 60)) * 96;
                     // Asegurar altura mínima para que los turnos cortos no se vean "rotos"
                     const calculatedHeight = Math.max(42, (Number(app.duration) || 0.5) * 96);
                     
@@ -937,7 +1053,7 @@ export default function AgendaPage() {
                         }}
                       >
                         <div
-                          draggable={userRole !== 'medico' && !isSuspended}
+                          draggable={!['medico', 'administracion'].includes(userRole) && !isSuspended}
                           onDragStart={(e) => {
                             if (userRole === 'medico' || isSuspended) { e.preventDefault(); return; }
                             setDraggedApp(app);
@@ -949,7 +1065,8 @@ export default function AgendaPage() {
                         >
                           <div className="flex justify-between items-start mb-1 relative w-full shrink-0">
                             <div className="pr-2 flex-1 min-w-0">
-                              <h4 className={`font-bold ${isShort ? 'text-xs' : 'text-sm'} truncate ${app.attendance === 'ausente' ? 'line-through' : ''}`}>
+                              <h4 className={`font-bold flex items-center gap-1 ${isShort ? 'text-xs' : 'text-sm'} truncate ${app.attendance === 'ausente' ? 'line-through' : ''}`}>
+                                {app.modalidad === 'virtual' && <Video size={12} className="shrink-0 text-indigo-600" />}
                                 {app.title}
                               </h4>
                               
@@ -987,6 +1104,13 @@ export default function AgendaPage() {
                                   {app.attendance === 'confirmado' && <span className="inline-block px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase rounded-md shadow-sm border border-emerald-200">OK</span>}
                                   {app.attendance === 'en_curso' && <span className="inline-block px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-md shadow-md border border-emerald-400 animate-pulse">ATENDIENDO</span>}
                                   {app.attendance === 'en_espera' && <span className="inline-block px-1.5 py-0.5 bg-indigo-600 text-white text-[10px] font-bold uppercase rounded-md animate-pulse shadow-sm shadow-indigo-300">Sala: {app.waitTicket || "Llamar"}</span>}
+                                  
+                                  {/* Tipo de Consulta */}
+                                  {app.type && (
+                                    <span className="inline-block px-1.5 py-0.5 bg-white/80 text-slate-700 text-[10px] font-black uppercase rounded-md shadow-sm border border-slate-200/50 flex items-center gap-1">
+                                      {app.type.toLowerCase().includes('virtual') ? '💻' : app.type.toLowerCase().includes('domicilio') ? '🏠' : '🏥'} {app.type}
+                                    </span>
+                                  )}
                                 </div>
                               )}
                               
@@ -1031,144 +1155,239 @@ export default function AgendaPage() {
                         {/* Menú Dropdown Asistencia/Opciones */}
                         {activeDropdown === app.id && (
                           <>
-                            <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActiveDropdown(null); }}></div>
-                            <div className="absolute right-0 top-6 w-48 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-slate-100 py-1 z-[51] animate-fade-in-quick">
-                              {!isBlock && (
+                            {/* Overlay para móviles y PC */}
+                            <div className="fixed inset-0 z-[150] sm:z-40 bg-black/40 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none transition-all animate-fade-in-quick" onClick={(e) => { e.stopPropagation(); setActiveDropdown(null); }}></div>
+                            
+                            {/* Contenedor del Dropdown (Bottom sheet en móvil, popover en PC) */}
+                            <div className="fixed sm:absolute bottom-0 sm:bottom-auto left-0 sm:left-auto right-0 sm:right-0 top-auto sm:top-6 w-full sm:w-[17rem] bg-[var(--bg-card)] rounded-t-[2rem] sm:rounded-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.3)] sm:shadow-2xl border-t border-l border-r border-[var(--border-color)]/50 sm:border-[var(--glass-border)] pt-3 pb-6 sm:py-0 z-[151] sm:z-[51] animate-fade-in-up sm:animate-fade-in-quick overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[70vh]">
+                              
+                              {/* Grabber para mobile */}
+                              <div className="w-12 h-1.5 bg-[var(--border-color)] rounded-full mx-auto mb-3 sm:hidden opacity-50 shrink-0"></div>
+
+                              <div className="overflow-y-auto custom-scrollbar flex-1 pb-2 sm:pb-0">
+                              {!['medico', 'administracion'].includes(userRole) && !isBlock && (
                                 <>
-                                  {userRole !== 'medico' && (
-                                    <>
-                                      <div className="px-3 py-1 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 border-b border-slate-50">Caja / Cobros</div>
+                                  <div className="px-5 py-2.5 text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-[0.2em] bg-[var(--bg-sidebar)]/30 border-b border-[var(--border-color)]/30 sticky top-0 z-10 backdrop-blur-md">Caja / Cobros</div>
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'pendiente' });
+                                          const resetData = { paymentStatus: 'pendiente', paidAmount: 0 };
+                                          store.updateAppointmentPaymentStatus(app.id, resetData);
                                           setActiveDropdown(null);
                                         }}
-                                        className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors flex items-center justify-between ${app.paymentStatus === 'pendiente' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-600 hover:bg-slate-50'}`}
+                                        className={`w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold transition-all flex items-center justify-between border-b border-[var(--border-color)]/10 ${app.paymentStatus === 'pendiente' ? 'text-[var(--accent-primary)] bg-[var(--accent-primary)]/10' : 'text-[var(--text-primary)] hover:bg-[var(--accent-light)]'}`}
                                       >
                                         Pendiente
                                         {app.paymentStatus === 'pendiente' && <CheckCircle2 size={12} />}
                                       </button>
-                                    </>
-                                  )}
-                                  
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const totalFee = Number(app.paymentAmount || 35000);
-                                      store.updateAppointmentPaymentStatus(app.id, { 
-                                        paymentStatus: 'pagado',
-                                        paidAmount: totalFee
-                                      });
-                                      if (totalFee > 0) {
-                                        store.createTransaction({
-                                          id: Date.now(),
-                                          date: new Date().toISOString(),
-                                          type: 'Ingreso',
-                                          concept: `Cobro Total ${app.title} — ${app.patient}`,
-                                          method: app.paymentMethod || 'Efectivo',
-                                          amount: totalFee,
-                                          notes: `Desde Agenda (Turno #${app.id})`,
-                                          doctor_id: app.doctorId,
-                                          patient_id: app.patientId
-                                        });
-                                      }
-                                      setActiveDropdown(null);
-                                    }}
-                                    className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors flex items-center justify-between ${app.paymentStatus === 'pagado' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-600 hover:bg-slate-50'}`}
-                                  >
-                                    Abonado
-                                    {app.paymentStatus === 'pagado' && <CheckCircle2 size={12} />}
-                                  </button>
+                                      
+                                      <button
+                                         onClick={async (e) => {
+                                           e.stopPropagation();
+                                           if (app.paymentStatus === 'pagado') return;
 
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const defaultAmount = app.paymentAmount || 35000;
-                                      setSenasInput({ appId: app.id, value: String(Math.floor(defaultAmount / 2)) });
-                                    }}
-                                    className={`w-full text-left px-4 py-2 text-xs font-bold border-b border-slate-50 transition-colors flex items-center justify-between ${app.paymentStatus === 'senado' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-600 hover:bg-slate-50'}`}
-                                  >
-                                    Señado
-                                    {app.paymentStatus === 'senado' && <CheckCircle2 size={12} />}
-                                  </button>
+                                           const totalFee = Number(app.paymentAmount) > 0 ? Number(app.paymentAmount) : 35000;
+                                           const prevPaid = Number(app.paidAmount || 0);
+                                           const amountToPay = totalFee - prevPaid;
+                                           
+                                           const token = localStorage.getItem('auth_token');
+                                           const API = 'https://control.integrarsalud.me/api-integrar/api';
+                                           
+                                           toast(`⏳ Procesando... Total: $${totalFee}, Pagado: $${prevPaid}, Resta: $${amountToPay}`, { duration: 3000 });
+                                           let updateOk = false;
+                                           
+                                           try {
+                                              const r1 = await fetch(`${API}/appointments/${app.id}/payment`, {
+                                                method: 'PATCH',
+                                                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee })
+                                              });
+                                              if (r1.ok) {
+                                                updateOk = true;
+                                                playCashSound();
+                                                store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee }).catch(()=>{});
+                                              } else {
+                                                const d1 = await r1.json().catch(()=>({}));
+                                                toast.error(`❌ Error turno: ${d1.message || r1.status}`);
+                                              }
+                                           } catch(err) {
+                                              toast.error(`❌ Error de red (turno): ${err.message}`);
+                                           }
 
-                                  {/* Inline seña input - aparece dentro del dropdown */}
-                                  {senasInput.appId === app.id && (
-                                    <div className="px-3 py-2 border-b border-slate-100 bg-indigo-50/50" onClick={e => e.stopPropagation()}>
-                                      <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-2">Monto de la seña</p>
-                                      <div className="flex gap-2">
-                                        <div className="relative flex-1">
-                                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-indigo-500">$</span>
-                                          <input
-                                            type="number"
-                                            autoFocus
-                                            min="0"
-                                            value={senasInput.value}
-                                            onChange={e => setSenasInput(prev => ({ ...prev, value: e.target.value }))}
-                                            onKeyDown={e => {
-                                              if (e.key === 'Enter') {
-                                                const amount = Number(senasInput.value);
-                                                store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'senado', paidAmount: amount });
-                                                if (amount > 0) {
-                                                  store.createTransaction({
-                                                    id: Date.now(),
-                                                    date: new Date().toISOString(),
+                                           if (updateOk && amountToPay > 0) {
+                                              try {
+                                                const r2 = await fetch(`${API}/transactions/`, {
+                                                  method: 'POST',
+                                                  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify({
                                                     type: 'Ingreso',
-                                                    concept: `Seña ${app.title} — ${app.patient}`,
+                                                    concept: `Cobro Restante ${app.title} — ${app.patient}`,
                                                     method: app.paymentMethod || 'Efectivo',
-                                                    amount,
-                                                    notes: `Desde Agenda (Seña #${app.id})`,
+                                                    amount: amountToPay,
+                                                    date: nowForAPI(),
+                                                    notes: `Cobro desde Agenda (Turno #${app.id})`,
                                                     doctor_id: app.doctorId,
                                                     patient_id: app.patientId
-                                                  });
+                                                  })
+                                                });
+                                                if (r2.ok) {
+                                                  toast.success(`✅ Restante de $${amountToPay.toLocaleString()} registrado en Finanzas!`);
+                                                } else {
+                                                  const d2 = await r2.json().catch(()=>({}));
+                                                  toast.error(`❌ Error Finanzas: ${d2.message || r2.status}`);
                                                 }
+                                              } catch(err) {
+                                                toast.error(`❌ Error de red (finanzas): ${err.message}`);
+                                              }
+                                           } else if (updateOk && amountToPay <= 0) {
+                                              toast('ℹ️ El turno ya estaba totalmente pagado. No se creó transacción extra.', { icon: '👏' });
+                                           }
+
+                                           setActiveDropdown(null);
+                                         }}
+                                         className={`w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold transition-all flex items-center justify-between border-b border-[var(--border-color)]/10 ${app.paymentStatus === 'pagado' ? 'text-emerald-500 bg-emerald-500/10 cursor-default' : 'text-[var(--text-primary)] hover:bg-[var(--accent-light)]'}`}
+                                       >
+                                         Abonado
+                                         {app.paymentStatus === 'pagado' && <CheckCircle2 size={12} />}
+                                       </button>
+
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const defaultAmount = app.paymentAmount || 35000;
+                                          setSenasInput({ appId: app.id, value: String(Math.floor(defaultAmount / 2)) });
+                                        }}
+                                        className={`w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold border-b border-[var(--border-color)]/10 transition-all flex items-center justify-between ${app.paymentStatus === 'senado' ? 'text-indigo-400 bg-indigo-500/10' : 'text-[var(--text-primary)] hover:bg-[var(--accent-light)]'}`}
+                                      >
+                                        Señado
+                                        {app.paymentStatus === 'senado' && <CheckCircle2 size={12} />}
+                                      </button>
+
+                                      {/* Inline seña input - aparece dentro del dropdown */}
+                                      {senasInput.appId === app.id && (
+                                        <div className="px-5 py-4 border-b border-[var(--border-color)]/30 bg-[var(--accent-primary)]/5" onClick={e => e.stopPropagation()}>
+                                          <p className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest mb-3">Monto de la seña</p>
+                                          <div className="flex flex-wrap gap-2">
+                                            <div className="relative flex-1">
+                                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-[var(--accent-primary)]">$</span>
+                                              <input id="value" name="value"
+                                                type="number"
+                                                autoFocus
+                                                min="0"
+                                                value={senasInput.value}
+                                                onChange={e => setSenasInput(prev => ({ ...prev, value: e.target.value }))}
+                                                onKeyDown={async e => {
+                                                  if (e.key === 'Enter') {
+                                                    const amount = Number(senasInput.value);
+                                                    if (amount <= 0) { toast.error('Ingresá un monto válido'); return; }
+                                                    try {
+                                                      await store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'senado', paidAmount: amount });
+                                                      await store.createTransaction({
+                                                        date: nowForAPI(),
+                                                        type: 'Ingreso',
+                                                        concept: `Seña ${app.title} — ${app.patient}`,
+                                                        method: app.paidMethod || app.paymentMethod || 'Efectivo',
+                                                        amount,
+                                                        notes: `Seña desde Agenda (Turno #${app.id})`,
+                                                        doctor_id: app.doctorId,
+                                                        patient_id: app.patientId
+                                                      });
+                                                      toast.success('Seña registrada en Finanzas');
+                                                    } catch(err) {
+                                                      toast.error('Error al registrar la seña: ' + (err?.response?.data?.message || err.message));
+                                                    }
+                                                    setSenasInput({ appId: null, value: '' });
+                                                    setActiveDropdown(null);
+                                                  }
+                                                  if (e.key === 'Escape') setSenasInput({ appId: null, value: '' });
+                                                }}
+                                                className="w-full pl-7 pr-3 py-2 text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl outline-none focus:border-[var(--accent-primary)]/50 transition-all shadow-inner"
+                                                placeholder="0"
+                                              />
+                                            </div>
+                                            <button
+                                              onClick={async e => {
+                                                e.stopPropagation();
+                                                const amount = Number(senasInput.value);
+                                                if (amount <= 0) { toast.error('Ingresá un monto válido'); return; }
+                                                
+                                                const token = localStorage.getItem('auth_token');
+                                                const API = 'https://control.integrarsalud.me/api-integrar/api';
+                                                
+                                                // PASO 1: Actualizar estado del turno
+                                                toast('⏳ Actualizando turno...', { duration: 2000 });
+                                                let paso1Ok = false;
+                                                try {
+                                                  const r1 = await fetch(`${API}/appointments/${app.id}/payment`, {
+                                                    method: 'PATCH',
+                                                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ paymentStatus: 'senado', paidAmount: amount })
+                                                  });
+                                                  const d1 = await r1.json();
+                                                  if (!r1.ok) {
+                                                    toast.error(`❌ Error turno (${r1.status}): ${d1.message || JSON.stringify(d1)}`);
+                                                  } else {
+                                                    paso1Ok = true;
+                                                    // Actualizar store localmente
+                                                    store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'senado', paidAmount: amount }).catch(()=>{});
+                                                  }
+                                                } catch(e1) {
+                                                  toast.error(`❌ Red (turno): ${e1.message}`);
+                                                }
+                                                
+                                                // PASO 2: Crear transacción en Finanzas
+                                                if (paso1Ok) {
+                                                  try {
+                                                    const txBody = {
+                                                      type: 'Ingreso',
+                                                      concept: `Seña ${app.title} — ${app.patient}`,
+                                                      method: app.paidMethod || app.paymentMethod || 'Efectivo',
+                                                      amount,
+                                                      date: nowForAPI(),
+                                                      notes: `Seña desde Agenda (Turno #${app.id})`,
+                                                      doctor_id: app.doctorId,
+                                                      patient_id: app.patientId
+                                                    };
+                                                    const r2 = await fetch(`${API}/transactions/`, {
+                                                      method: 'POST',
+                                                      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                                                      body: JSON.stringify(txBody)
+                                                    });
+                                                    const d2 = await r2.json();
+                                                    if (!r2.ok) {
+                                                      toast.error(`❌ Error finanzas (${r2.status}): ${d2.message || JSON.stringify(d2).substring(0,100)}`);
+                                                    } else {
+                                                      toast.success(`✅ Seña $${amount.toLocaleString()} registrada en Finanzas`);
+                                                    }
+                                                  } catch(e2) {
+                                                    toast.error(`❌ Red (finanzas): ${e2.message}`);
+                                                  }
+                                                }
+                                                
                                                 setSenasInput({ appId: null, value: '' });
                                                 setActiveDropdown(null);
-                                              }
-                                              if (e.key === 'Escape') setSenasInput({ appId: null, value: '' });
-                                            }}
-                                            className="w-full pl-6 pr-2 py-1.5 text-sm font-bold text-indigo-700 bg-white border border-indigo-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-200"
-                                            placeholder="0"
-                                          />
+                                              }}
+                                              className="px-2.5 py-1.5 bg-indigo-600 text-white text-xs font-black rounded-lg hover:bg-indigo-700 transition-colors shrink-0"
+                                            >
+                                              OK
+                                            </button>
+                                          </div>
                                         </div>
-                                        <button
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            const amount = Number(senasInput.value);
-                                            store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'senado', paidAmount: amount });
-                                            if (amount > 0) {
-                                              store.createTransaction({
-                                                id: Date.now(),
-                                                date: new Date().toISOString(),
-                                                type: 'Ingreso',
-                                                concept: `Seña ${app.title} — ${app.patient}`,
-                                                method: app.paymentMethod || 'Efectivo',
-                                                amount,
-                                                notes: `Desde Agenda (Seña #${app.id})`,
-                                                doctor_id: app.doctorId,
-                                                patient_id: app.patientId
-                                              });
-                                            }
-                                            setSenasInput({ appId: null, value: '' });
-                                            setActiveDropdown(null);
-                                          }}
-                                          className="px-2.5 py-1.5 bg-indigo-600 text-white text-xs font-black rounded-lg hover:bg-indigo-700 transition-colors shrink-0"
-                                        >
-                                          OK
-                                        </button>
-                                      </div>
-                                    </div>
+                                      )}
+                                    </>
                                   )}
 
-                                  <div className="px-4 py-2 text-[10px] font-black text-[var(--text-secondary)] opacity-40 uppercase tracking-[0.2em] bg-[var(--bg-sidebar)]/50 border-b border-[var(--border-color)]/30">Estados de Asistencia</div>
-                                  <button onClick={(e) => handleStatusChange(e, app.id, 'agendado')} className="w-full text-left px-5 py-2.5 text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--accent-light)] transition-all flex items-center gap-3"><Clock size={15} className="opacity-40"/> Agendado</button>
-                                  <button onClick={(e) => handleStatusChange(e, app.id, 'confirmado')} className="w-full text-left px-5 py-2.5 text-xs font-bold text-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center gap-3"><UserCheck size={15} className="opacity-60"/> Confirmado</button>
-                                  <button onClick={(e) => handleStatusChange(e, app.id, 'en_espera')} className="w-full text-left px-5 py-2.5 text-xs font-bold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 transition-all flex items-center gap-3"><CalendarDays size={15} className="opacity-60"/> Llegó a Sala</button>
-                                  <button onClick={(e) => handleStatusChange(e, app.id, 'finalizado')} className="w-full text-left px-5 py-2.5 text-xs font-bold text-blue-500 hover:bg-blue-500/10 transition-all flex items-center gap-3"><CheckCircle2 size={15} className="opacity-60"/> Finalizado</button>
-                                  <button onClick={(e) => handleStatusChange(e, app.id, 'ausente')} className="w-full text-left px-5 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"><UserX size={15} className="opacity-60"/> Ausente / Canceló</button>
-                                </>
-                              )}
+                                  {!['medico', 'administracion'].includes(userRole) && (
+                                    <>
+                                      <div className="px-5 py-2.5 text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-[0.2em] bg-[var(--bg-sidebar)]/30 border-y border-[var(--border-color)]/30 sticky top-0 z-10 backdrop-blur-md">Estados de Asistencia</div>
+                                      <button onClick={(e) => handleStatusChange(e, app.id, 'agendado')} className="w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--accent-light)] transition-all flex items-center gap-3 border-b border-[var(--border-color)]/10"><Clock size={15} className="opacity-40"/> Agendado</button>
+                                      <button onClick={(e) => handleStatusChange(e, app.id, 'confirmado')} className="w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold text-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center gap-3 border-b border-[var(--border-color)]/10"><UserCheck size={15} className="opacity-60"/> Confirmado</button>
+                                      <button onClick={(e) => handleStatusChange(e, app.id, 'en_espera')} className="w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 transition-all flex items-center gap-3 border-b border-[var(--border-color)]/10"><CalendarDays size={15} className="opacity-60"/> Llegó a Sala</button>
+                                      <button onClick={(e) => handleStatusChange(e, app.id, 'finalizado')} className="w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold text-blue-400 hover:bg-blue-500/10 transition-all flex items-center gap-3 border-b border-[var(--border-color)]/10"><CheckCircle2 size={15} className="opacity-60"/> Finalizado</button>
+                                      <button onClick={(e) => handleStatusChange(e, app.id, 'ausente')} className="w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"><UserX size={15} className="opacity-60"/> Ausente / Canceló</button>
+                                    </>
+                                  )}
+
 
                               {activeDropdown === app.id && userRole === 'medico' && (
                                 <div className="px-5 py-2.5 text-[10px] font-black text-[var(--text-secondary)] opacity-30 italic uppercase tracking-widest border-b border-[var(--border-color)]/20">
@@ -1190,28 +1409,52 @@ export default function AgendaPage() {
                                  </button>
                                )}
 
-                               <button 
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   handleSendWhatsApp(app);
-                                   setActiveDropdown(null);
-                                 }}
-                                 className="w-full text-left px-5 py-3 text-xs font-bold text-emerald-600 hover:bg-emerald-500/10 transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"
-                               >
-                                 <MessageCircle size={16} className="opacity-70" /> Recordatorio WhatsApp
-                               </button>
+                               {store.globalConfig?.whatsappEnabled && (
+                                 <button 
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     handleSendWhatsApp(app);
+                                     setActiveDropdown(null);
+                                   }}
+                                   className="w-full text-left px-5 py-3 text-xs font-bold text-emerald-600 hover:bg-emerald-500/10 transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"
+                                 >
+                                   <MessageCircle size={16} className="opacity-70" /> Recordatorio WhatsApp
+                                 </button>
+                               )}
 
-                              <button 
+                               {app.modalidad === 'virtual' && userRole === 'medico' && (
+                                 <button 
+                                   onClick={(e) => handleStartVirtualCall(e, app)}
+                                   className="w-full text-left px-5 py-3 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3 shadow-[0_0_15px_rgba(79,70,229,0.3)]"
+                                 >
+                                   <Video size={16} /> Iniciar Consulta Virtual
+                                 </button>
+                               )}
+
+                               {app.modalidad === 'virtual' && (
+                                 <button 
+                                   onClick={(e) => handleCopyVirtualLink(app, e)}
+                                   className="w-full text-left px-5 py-3 text-xs font-bold text-indigo-500 hover:bg-indigo-50 transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"
+                                 >
+                                   <Copy size={16} className="opacity-70" /> Copiar Link Acceso (Paciente)
+                                 </button>
+                               )}
+
+                              <button
                                  onClick={(e) => {
                                    e.stopPropagation();
-                                   handleOpenEdit(app);
+                                   if (userRole === 'administracion') {
+                                     handleViewPatient(app);
+                                   } else {
+                                     handleOpenEdit(app);
+                                   }
                                  }}
                                 className="w-full text-left px-5 py-3 text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--accent-light)] transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"
                               >
-                                <Eye size={16} className="opacity-40" /> {userRole === 'medico' ? 'Ver ficha detallada' : 'Editar detalles'}
+                                <Eye size={16} className="opacity-40" /> {['medico', 'administracion'].includes(userRole) ? 'Ver ficha detallada' : 'Editar detalles'}
                               </button>
                               
-                              {userRole !== 'medico' && (
+                              {!['medico', 'administracion'].includes(userRole) && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1223,6 +1466,7 @@ export default function AgendaPage() {
                                   <Trash2 size={16} className="opacity-60" /> Eliminar {isBlock ? 'bloqueo' : 'turno'}
                                 </button>
                               )}
+                              </div>
                             </div>
                           </>
                         )}
@@ -1238,12 +1482,12 @@ export default function AgendaPage() {
     </div>
 
     {/* MODAL DE NUEVO TURNO / BLOQUEO */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md animate-fade-in-quick" onClick={closeModal}></div>
           
-          <div className="relative bg-[var(--bg-card)] border border-[var(--glass-border)] rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-fade-in-up flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between p-7 border-b border-[var(--border-color)]/30 bg-[var(--bg-sidebar)]/50 backdrop-blur-xl shrink-0">
+          <div className="relative bg-[var(--bg-card)] border border-[var(--glass-border)] rounded-[2rem] sm:rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-fade-in-up flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-5 sm:p-7 border-b border-[var(--border-color)]/30 bg-[var(--bg-sidebar)]/50 backdrop-blur-xl shrink-0">
               <div className="flex flex-col">
                 <h2 className="text-xl font-black text-[var(--text-primary)] tracking-tight">
                   {editingAppointmentId ? (isBlockMode ? "Editar Bloqueo" : "Ficha del Turno") : "Agendar Paciente o Evento"}
@@ -1255,10 +1499,10 @@ export default function AgendaPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveAppointment} className="flex-1 overflow-y-auto p-7 space-y-8 custom-scrollbar">
+            <form onSubmit={handleSaveAppointment} className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-6 sm:space-y-8 custom-scrollbar">
               
-              {!editingAppointmentId && (
-                <div className="flex gap-2 p-1.5 bg-[var(--bg-main)] rounded-2xl border border-[var(--border-color)]/50 shadow-inner">
+              {!editingAppointmentId && userRole !== 'medico' && (
+                <div className="flex gap-2 p-1.5 bg-[var(--bg-main)] rounded-2xl border border-[var(--border-color)]/50">
                   <button type="button" onClick={() => setIsBlockMode(false)} className={`flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${!isBlockMode ? 'bg-[var(--bg-card)] text-[var(--accent-primary)] shadow-md border border-[var(--border-color)]' : 'text-[var(--text-secondary)] opacity-50 hover:opacity-100'}`}>Turno de Paciente</button>
                   <button type="button" onClick={() => setIsBlockMode(true)} className={`flex-1 py-2 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${isBlockMode ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-md border border-[var(--border-color)]' : 'text-[var(--text-secondary)] opacity-50 hover:opacity-100'}`}>Bloqueo de Agenda</button>
                 </div>
@@ -1274,40 +1518,154 @@ export default function AgendaPage() {
                   </div>
 
                   {!isNewPatient ? (
-                    <div className="space-y-4">
-                      <div className="relative group/search">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-40 group-focus-within/search:text-[var(--accent-primary)] group-focus-within/search:opacity-100 transition-all" size={18} />
-                        <input 
-                          type="text" 
-                          placeholder="Buscar por Nombre, DNI o NHC..." 
-                          value={patientSearch}
-                          onChange={(e) => setPatientSearch(e.target.value)}
-                          className="w-full pl-12 pr-4 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] focus:border-[var(--accent-primary)]/50 focus:ring-4 focus:ring-[var(--accent-primary)]/5 transition-all outline-none shadow-sm placeholder:text-[var(--text-secondary)]/30"
-                        />
-                      </div>
-                      
-                      <select 
-                        required={!isNewPatient} 
-                        value={formData.patientId} 
-                        onChange={(e) => setFormData({...formData, patientId: e.target.value})} 
-                        className="w-full px-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl focus:border-[var(--accent-primary)]/50 focus:ring-4 focus:ring-[var(--accent-primary)]/5 outline-none transition-all cursor-pointer text-sm font-black text-[var(--text-primary)] shadow-sm appearance-none"
-                      >
-                        <option value="" disabled className="bg-[var(--bg-card)]">Seleccionar resultado...</option>
-                        {(patients || [])
-                          .filter(p => p && p.name && (
-                            p.name.toLowerCase().includes(patientSearch.toLowerCase()) || 
-                            (p.dni || '').includes(patientSearch) ||
-                            (p.nhc || '').toLowerCase().includes(patientSearch.toLowerCase())
-                          ))
-                          .map(p => <option key={p.id} value={p.id} className="bg-[var(--bg-card)]">{p.name} - {p.coverage || 'Particular'} {p.dni ? `(${p.dni})` : ''}</option>)
-                        }
-                      </select>
-                      {patientSearch && patients.filter(p => !p.name.toLowerCase().includes(patientSearch.toLowerCase()) && !(p.dni || '').includes(patientSearch)).length === (patients || []).length && (
-                        <p className="text-[10px] font-black text-rose-500 ml-4 flex items-center gap-1 uppercase tracking-wider animate-pulse">
-                          <AlertCircle size={12} /> No se encontraron coincidencias
-                        </p>
-                      )}
-                    </div>
+                     <div className="space-y-3">
+                       {/* Buscador moderno con autocomplete */}
+                       <div className="relative" id="patient-search-container">
+                         <div className="relative group/search">
+                           <Search
+                             className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-40 group-focus-within/search:text-[var(--accent-primary)] group-focus-within/search:opacity-100 transition-all z-10"
+                             size={17}
+                           />
+                           <input id="patientSearch" name="patientSearch"
+                             type="text"
+                             placeholder="Buscar por Nombre, DNI o NHC..."
+                             value={patientSearch}
+                             autoComplete="off"
+                             onChange={(e) => {
+                               setPatientSearch(e.target.value);
+                               setFormData({...formData, patientId: ''});
+                             }}
+                             onFocus={() => setPatientSearch(patientSearch)}
+                             className="w-full pl-11 pr-10 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] focus:border-[var(--accent-primary)]/70 focus:ring-4 focus:ring-[var(--accent-primary)]/8 transition-all outline-none shadow-sm placeholder:text-[var(--text-secondary)]/30"
+                           />
+                           {patientSearch && (
+                             <button
+                               type="button"
+                               onClick={() => { setPatientSearch(''); setFormData({...formData, patientId: ''}); }}
+                               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border-color)] transition-all"
+                             >
+                               <X size={14} />
+                             </button>
+                           )}
+                         </div>
+
+                         {/* Dropdown de resultados */}
+                         {patientSearch.trim().length >= 1 && !formData.patientId && (
+                           <div className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-card)] border border-[var(--glass-border)] rounded-2xl shadow-2xl z-[200] overflow-hidden animate-fade-in-quick">
+                             {(() => {
+                               const filtered = (patients || []).filter(p =>
+                                 p && p.name && (
+                                   p.name.toLowerCase().includes(patientSearch.toLowerCase()) ||
+                                   (p.dni || '').includes(patientSearch) ||
+                                   (p.nhc || '').toLowerCase().includes(patientSearch.toLowerCase())
+                                 )
+                               ).slice(0, 7);
+
+                               if (filtered.length === 0) return (
+                                 <div className="px-5 py-8 flex flex-col items-center gap-2 text-center">
+                                   <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center">
+                                     <Search size={16} className="text-rose-400" />
+                                   </div>
+                                   <p className="text-xs font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest">Sin resultados</p>
+                                   <p className="text-[10px] text-[var(--text-secondary)] opacity-30">Probá con otro nombre o DNI</p>
+                                 </div>
+                               );
+
+                               return (
+                                 <div className="max-h-[280px] overflow-y-auto custom-scrollbar py-1.5">
+                                   <p className="px-4 py-1.5 text-[9px] font-black text-[var(--text-secondary)] opacity-40 uppercase tracking-[0.2em]">
+                                     {filtered.length} resultado{filtered.length !== 1 ? 's' : ''}
+                                   </p>
+                                   {filtered.map((p) => {
+                                     const initials = (p.name || '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                                     const age = p.birthDate ? Math.floor((new Date() - new Date(p.birthDate)) / (365.25 * 24 * 60 * 60 * 1000)) : null;
+                                     const coverageColor = {
+                                       'OSDE': 'bg-blue-500/15 text-blue-400',
+                                       'PAMI': 'bg-emerald-500/15 text-emerald-400',
+                                       'Swiss Medical': 'bg-purple-500/15 text-purple-400',
+                                       'IOMA': 'bg-orange-500/15 text-orange-400',
+                                       'Galeno': 'bg-teal-500/15 text-teal-400',
+                                     }[p.coverage] || 'bg-[var(--accent-light)] text-[var(--accent-primary)]';
+
+                                     return (
+                                       <button
+                                         key={p.id}
+                                         type="button"
+                                         onClick={() => {
+                                           setFormData({...formData, patientId: p.id});
+                                           setPatientSearch(p.name);
+                                         }}
+                                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--accent-light)] transition-all group/item text-left"
+                                       >
+                                         {/* Avatar con iniciales */}
+                                         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--accent-primary)] to-sky-400 flex items-center justify-center shrink-0 text-white text-[11px] font-black shadow-md shadow-sky-500/20">
+                                           {initials}
+                                         </div>
+                                         {/* Info */}
+                                         <div className="flex-1 min-w-0">
+                                           <div className="flex items-center gap-2 flex-wrap">
+                                             <span className="text-sm font-black text-[var(--text-primary)] group-hover/item:text-[var(--accent-primary)] transition-colors truncate">
+                                               {p.name}
+                                             </span>
+                                             <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${coverageColor}`}>
+                                               {p.coverage || 'Particular'}
+                                             </span>
+                                           </div>
+                                           <div className="flex items-center gap-2 mt-0.5">
+                                             {p.dni && <span className="text-[10px] font-bold text-[var(--text-secondary)] opacity-50">DNI {p.dni}</span>}
+                                             {age !== null && <span className="text-[10px] font-bold text-[var(--text-secondary)] opacity-50">{age} años</span>}
+                                             {p.nhc && <span className="text-[10px] font-bold text-[var(--text-secondary)] opacity-30">NHC {p.nhc}</span>}
+                                           </div>
+                                         </div>
+                                         {/* Flecha hover */}
+                                         <div className="opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0">
+                                           <ChevronRight size={14} className="text-[var(--accent-primary)]" />
+                                         </div>
+                                       </button>
+                                     );
+                                   })}
+                                 </div>
+                               );
+                             })()}
+                           </div>
+                         )}
+                       </div>
+
+                       {/* Paciente seleccionado: preview card */}
+                       {formData.patientId && (() => {
+                         const sel = (patients || []).find(p => String(p.id) === String(formData.patientId));
+                         if (!sel) return null;
+                         const initials = (sel.name || '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                         const age = sel.birthDate ? Math.floor((new Date() - new Date(sel.birthDate)) / (365.25 * 24 * 60 * 60 * 1000)) : null;
+                         return (
+                           <div className="flex items-center gap-3 p-3.5 bg-[var(--accent-light)] border border-[var(--accent-primary)]/20 rounded-2xl animate-fade-in-quick">
+                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent-primary)] to-sky-400 flex items-center justify-center shrink-0 text-white text-[12px] font-black shadow-lg shadow-sky-500/25">
+                               {initials}
+                             </div>
+                             <div className="flex-1 min-w-0">
+                               <p className="text-sm font-black text-[var(--text-primary)] truncate">{sel.name}</p>
+                               <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                                 <span className="text-[10px] font-bold text-[var(--accent-primary)] opacity-70">{sel.coverage || 'Particular'}</span>
+                                 {sel.dni && <span className="text-[10px] font-bold text-[var(--text-secondary)] opacity-40">• DNI {sel.dni}</span>}
+                                 {age !== null && <span className="text-[10px] font-bold text-[var(--text-secondary)] opacity-40">• {age} años</span>}
+                               </div>
+                             </div>
+                             <div className="shrink-0 w-6 h-6 rounded-full bg-[var(--accent-primary)] flex items-center justify-center">
+                               <CheckCircle2 size={14} className="text-white" />
+                             </div>
+                           </div>
+                         );
+                       })()}
+
+                       {/* Campo hidden para mantener la validación required */}
+                       <input id="patientId" name="patientId" type="hidden" required={!isNewPatient} value={formData.patientId} />
+
+                       {patientSearch.trim().length >= 1 && !formData.patientId && (
+                         <p className="text-[10px] font-black text-[var(--text-secondary)] opacity-40 ml-1 flex items-center gap-1 uppercase tracking-wider">
+                           <AlertCircle size={11} /> Seleccioná un paciente de la lista
+                         </p>
+                       )}
+                     </div>
                   ) : (
                     <div className="space-y-6 animate-fade-in-quick">
                       {/* Sub-Bloque: Identidad */}
@@ -1315,42 +1673,65 @@ export default function AgendaPage() {
                         <h4 className="text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                            <User size={12} className="text-[var(--accent-primary)]" /> Identidad Personal
                         </h4>
-                        <div className="grid grid-cols-2 gap-4">
-                          <input type="text" required={isNewPatient} placeholder="Nombre Completo *" value={formData.newPatientName} onChange={(e) => setFormData({...formData, newPatientName: e.target.value})} className="col-span-2 w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 shadow-inner transition-all" />
-                          <input type="text" required={isNewPatient} placeholder="DNI / Pasaporte *" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value.replace(/[^0-9Aa-z]/g, '')})} className="w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 shadow-inner transition-all" />
-                          <div>
-                            <select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 shadow-inner cursor-pointer appearance-none transition-all">
-                              <option value="femenino" className="bg-[var(--bg-card)]">Femenino</option>
-                              <option value="masculino" className="bg-[var(--bg-card)]">Masculino</option>
-                              <option value="otro" className="bg-[var(--bg-card)]">Otro</option>
-                              <option value="prefiero_no_decir" className="bg-[var(--bg-card)]">Prefiero no decirlo</option>
-                            </select>
+                        <div className="grid grid-cols-1 gap-4">
+                          {/* Nombre: siempre ancho completo */}
+                          <div className="relative">
+                            <input type="text" id="newPatientName" required={isNewPatient} placeholder=" " value={formData.newPatientName} onChange={(e) => setFormData({...formData, newPatientName: e.target.value})} className="block px-5 pb-3 pt-6 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] peer transition-all shadow-sm" />
+                            <label htmlFor="newPatientName" className="absolute text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest duration-300 transform -translate-y-3 top-4 z-10 origin-[0] left-5 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-90 peer-focus:-translate-y-3 peer-focus:text-[var(--accent-primary)] opacity-60 pointer-events-none">Nombre Completo *</label>
                           </div>
-                          <div className="col-span-2">
-                             <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-1.5 ml-2">Fecha de Nacimiento *</label>
-                             <input type="date" required={isNewPatient} value={formData.birthDate} onChange={(e) => setFormData({...formData, birthDate: e.target.value})} className="w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 shadow-inner transition-all" />
+
+                          {/* DNI y Género: 2 columnas desde sm — ambos con label estático para consistencia visual */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1">
+                              <label htmlFor="dni" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">DNI / Pasaporte (Opcional)</label>
+                              <input type="text" id="dni" placeholder="Ej: 12345678" inputMode="numeric" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value.replace(/[^0-9Aa-z]/g, '')})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                              <label htmlFor="gender" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Género</label>
+                              <select id="gender" value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all cursor-pointer shadow-sm">
+                                <option value="femenino" className="bg-[var(--bg-card)]">Femenino</option>
+                                <option value="masculino" className="bg-[var(--bg-card)]">Masculino</option>
+                                <option value="otro" className="bg-[var(--bg-card)]">Otro</option>
+                                <option value="prefiero_no_decir" className="bg-[var(--bg-card)]">Prefiero no decirlo</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Fecha de nacimiento */}
+                          <div className="flex flex-col gap-1">
+                            <label htmlFor="birthDate" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Fecha de Nacimiento (Opcional)</label>
+                            <CustomDatePicker
+                              value={formData.birthDate}
+                              onChange={(val) => setFormData({...formData, birthDate: val})}
+                              className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl transition-all shadow-sm"
+                            />
                           </div>
                         </div>
                       </div>
 
                       {/* Sub-Bloque: Contacto */}
-                      <div className="bg-[var(--bg-card)] p-5 rounded-3xl border border-[var(--border-color)]/50 shadow-sm">
-                        <h4 className="text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                           <Calendar size={12} className="text-[var(--accent-primary)]" /> Contacto & Emergencia
+                      <div className="bg-[var(--bg-card)] p-5 rounded-[2rem] border border-[var(--border-color)]/50 shadow-sm relative overflow-hidden group/contacto">
+                        <div className="absolute bottom-0 left-0 w-32 h-32 bg-[var(--accent-primary)]/5 rounded-full -ml-16 -mb-16 transition-transform group-hover/contacto:scale-150 duration-700 pointer-events-none"></div>
+                        <h4 className="text-[11px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-[0.2em] mb-5 flex items-center gap-2">
+                           <Calendar size={14} className="text-[var(--accent-primary)]" /> Contacto & Emergencia
                         </h4>
-                        <div className="grid grid-cols-2 gap-4">
-                          <input type="tel" required={isNewPatient} placeholder="Celular (11223344) *" value={formData.newPatientPhone} onChange={(e) => setFormData({...formData, newPatientPhone: e.target.value.replace(/[^0-9]/g, '')})} className="w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 shadow-inner transition-all" />
-                          <input type="email" placeholder="Correo Electrónico" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 shadow-inner transition-all" />
-                          <input type="text" placeholder="Dirección Postal" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="col-span-2 w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 shadow-inner transition-all" />
-                          <div className="col-span-2 relative">
-                            <input 
-                              type="text" 
-                              required={isNewPatient} 
-                              placeholder="Contacto de Emergencia *" 
-                              value={formData.emergencyContact} 
-                              onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})} 
-                              className="w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 shadow-inner transition-all" 
-                            />
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className="flex flex-col gap-1">
+                             <label htmlFor="newPatientPhone" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Celular (Opcional)</label>
+                             <input type="tel" id="newPatientPhone" placeholder="Ej: 11 1234-5678" value={formData.newPatientPhone} onChange={(e) => setFormData({...formData, newPatientPhone: e.target.value.replace(/[^0-9]/g, '')})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                             <label htmlFor="email" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Correo Electrónico (Opcional)</label>
+                             <input type="email" id="email" placeholder="usuario@email.com" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                             <label htmlFor="address" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Dirección Postal</label>
+                             <input type="text" id="address" placeholder="Ej: Av. Corrientes 1234, CABA" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                             <label htmlFor="emergencyContact" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Contacto de Emergencia (Opcional)</label>
+                             <input type="text" id="emergencyContact" placeholder="Nombre y teléfono" value={formData.emergencyContact} onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
                           </div>
                         </div>
                       </div>
@@ -1362,7 +1743,7 @@ export default function AgendaPage() {
                          </h4>
                          <div className="grid grid-cols-1 gap-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                               <select value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-black text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 shadow-inner cursor-pointer appearance-none transition-all">
+                               <select id="coverage" name="coverage" value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-black text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 cursor-pointer appearance-none transition-all">
                                  <option value="Particular" className="bg-[var(--bg-card)]">Particular / Privado</option>
                                  <option value="OSDE" className="bg-[var(--bg-card)]">OSDE</option>
                                  <option value="Swiss Medical" className="bg-[var(--bg-card)]">Swiss Medical</option>
@@ -1374,17 +1755,18 @@ export default function AgendaPage() {
                                  <option value="Medifé" className="bg-[var(--bg-card)]">Medifé</option>
                                  <option value="Omint" className="bg-[var(--bg-card)]">Omint</option>
                                  <option value="Unión Personal" className="bg-[var(--bg-card)]">Unión Personal</option>
+                                 <option value="O.S.PE.C.O.M" className="bg-[var(--bg-card)]">O.S.PE.C.O.M</option>
                                </select>
 
                                {formData.coverage !== 'Particular' && (
                                  <div className="relative group">
-                                   <input 
+                                   <input id="coverageNumber" name="coverageNumber" 
                                      type="text" 
                                      required 
                                      placeholder="Nº Afiliado *" 
                                      value={formData.coverageNumber} 
                                      onChange={(e) => setFormData({...formData, coverageNumber: e.target.value})} 
-                                     className="w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 shadow-inner transition-all pr-12" 
+                                     className="w-full px-5 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]/50 transition-all pr-12" 
                                    />
                                    <button 
                                      type="button"
@@ -1417,17 +1799,125 @@ export default function AgendaPage() {
                     <h4 className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                        <Plus size={12} /> Motivo y Triaje Clínico
                     </h4>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="col-span-2">
-                         <input type="text" placeholder="Profesional derivante (Opcional)" value={formData.referrer} onChange={(e) => setFormData({...formData, referrer: e.target.value})} className="w-full px-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] shadow-sm transition-all" />
+                        <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-3 ml-2 text-center">Modalidad de Atención</label>
+                        <div className="grid grid-cols-2 gap-1 p-1 bg-[var(--bg-sidebar)]/50 border border-[var(--border-color)]/30 rounded-2xl">
+                          {[
+                            { id: 'presencial', label: 'Presencial', icon: '🏥' },
+                            { id: 'virtual', label: 'Virtual', icon: '💻' }
+                          ].map(t => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setFormData({...formData, modalidad: t.id})}
+                              className={`py-3 text-[8px] sm:text-[10px] font-black uppercase tracking-tighter sm:tracking-widest rounded-xl transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
+                                formData.modalidad === t.id 
+                                  ? 'bg-[var(--accent-primary)] text-white shadow-md' 
+                                  : 'text-[var(--text-secondary)] opacity-40 hover:opacity-100 hover:bg-[var(--bg-main)]'
+                              }`}
+                            >
+                              <span className="text-xs sm:text-sm">{t.icon}</span>
+                              <span className="truncate w-full text-center sm:w-auto">{t.label}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        {formData.modalidad === 'virtual' && editingAppointmentId && (formData.meetLink || formData.codigoAcceso) && (
+                          <div className="mt-4 p-4 bg-[var(--accent-primary)]/5 border border-[var(--accent-primary)]/20 rounded-2xl flex flex-col gap-3 shadow-inner">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-2">
+                                <Video size={16} className="text-[var(--accent-primary)]" />
+                                <span className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest">Datos de Videollamada</span>
+                              </div>
+                              {userRole === 'medico' && formData.meetLink && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      await store.updateAppointmentVideoStatus(editingAppointmentId, 'activa');
+                                      setFormData({ ...formData, estadoVideollamada: 'activa' });
+                                      window.open(formData.meetLink, '_blank');
+                                      toast.success('Videollamada iniciada. El paciente será redirigido.');
+                                    } catch (err) {
+                                      toast.error('Error al iniciar videollamada');
+                                    }
+                                  }}
+                                  className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm ${
+                                    formData.estadoVideollamada === 'activa'
+                                      ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                  }`}
+                                >
+                                  {formData.estadoVideollamada === 'activa' ? 'Reconectar' : 'Iniciar Consulta'}
+                                </button>
+                              )}
+                            </div>
+                            
+
+
+                            {userRole !== 'medico' && formData.codigoAcceso && (
+                              <div className="flex flex-col gap-1 mt-1">
+                                <label className="text-[9px] font-black text-[var(--text-secondary)] opacity-70 uppercase tracking-wider">Código de Acceso (Paciente)</label>
+                                <div className="flex items-center gap-2">
+                                  <code className="px-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-color)]/50 rounded-xl text-sm font-black tracking-widest text-[var(--text-primary)] select-all">
+                                    {formData.codigoAcceso}
+                                  </code>
+                                  <button 
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(formData.codigoAcceso);
+                                      toast.success('Código copiado al portapapeles');
+                                    }}
+                                    className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded-lg transition-colors"
+                                    title="Copiar código"
+                                  >
+                                    <Copy size={16} />
+                                  </button>
+                                </div>
+                                <p className="text-[10px] text-[var(--text-secondary)] opacity-60 mt-1 font-medium">El paciente debe ingresar este código en la sala de espera virtual.</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div>
+                      <div className="col-span-2 sm:col-span-1">
                          <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-1.5 ml-2">Motivo / Tratamiento</label>
-                         <input type="text" required placeholder="Ej: Psicoterapia" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full px-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] shadow-sm transition-all" />
+                         <div className="space-y-3">
+                           <input id="title" name="title" 
+                             type="text" 
+                             required 
+                             placeholder="Ej: Psicoterapia" 
+                             value={formData.title} 
+                             onChange={(e) => setFormData({...formData, title: e.target.value})} 
+                             className="w-full px-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] shadow-sm transition-all" 
+                           />
+                           <div className="grid grid-cols-3 gap-2">
+                             {['Psiquiatría', 'Psicología', 'Control'].map(tag => (
+                               <button
+                                 key={tag}
+                                 type="button"
+                                 onClick={() => setFormData({...formData, title: tag})}
+                                 className={`px-1 py-2 text-[8px] sm:text-[10px] font-black uppercase rounded-xl border transition-all truncate ${
+                                   formData.title === tag 
+                                     ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-md' 
+                                     : 'bg-[var(--bg-main)] text-[var(--text-secondary)] border-[var(--border-color)] hover:border-[var(--accent-primary)] opacity-60 hover:opacity-100'
+                                 }`}
+                               >
+                                 {tag}
+                               </button>
+                             ))}
+                           </div>
+                         </div>
                       </div>
-                      <div>
+                      <div className="col-span-2 sm:col-span-1">
                          <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-1.5 ml-2">Notas Clínicas</label>
-                         <input type="text" placeholder="Observaciones..." value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="w-full px-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] shadow-sm transition-all" />
+                         <textarea id="notes" name="notes" 
+                           placeholder="Observaciones..." 
+                           value={formData.notes} 
+                           onChange={(e) => setFormData({...formData, notes: e.target.value})} 
+                           className="w-full px-5 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] shadow-sm transition-all h-[88px] resize-none" 
+                         />
                       </div>
                     </div>
                   </div>
@@ -1441,7 +1931,7 @@ export default function AgendaPage() {
                   <label className="block text-xs font-black text-[var(--text-primary)] uppercase tracking-[0.2em] mb-3 ml-1 flex items-center gap-2">
                     <Lock size={14} className="text-rose-500" /> Evento Restringido (Bloqueo)
                   </label>
-                  <input type="text" required placeholder="Ej: Almuerzo, Reunión, Ausencia" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full px-6 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl focus:border-rose-400 focus:ring-8 focus:ring-rose-500/5 outline-none transition-all shadow-md font-bold text-[var(--text-primary)] tracking-tight text-lg" />
+                  <input id="title" name="title" type="text" required placeholder="Ej: Almuerzo, Reunión, Ausencia" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full px-6 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl focus:border-rose-400 focus:ring-8 focus:ring-rose-500/5 outline-none transition-all shadow-md font-bold text-[var(--text-primary)] tracking-tight text-lg" />
                 </div>
               )}
 
@@ -1450,42 +1940,45 @@ export default function AgendaPage() {
                 <div className="grid grid-cols-2 gap-6">
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-2 ml-2">Profesional Responsable</label>
-                    <select required value={formData.doctorId} onChange={(e) => setFormData({...formData, doctorId: Number(e.target.value)})} className="w-full px-6 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-3xl focus:border-[var(--accent-primary)]/50 outline-none font-black cursor-pointer shadow-lg shadow-indigo-500/5 transition-all text-base appearance-none">
+                    <select id="doctorId" name="doctorId" required value={formData.doctorId} onChange={(e) => setFormData({...formData, doctorId: Number(e.target.value)})} className="w-full px-6 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-3xl focus:border-[var(--accent-primary)]/50 outline-none font-black cursor-pointer shadow-lg shadow-indigo-500/5 transition-all text-base appearance-none">
                       {(doctors || []).filter(d => d && d.id).map(d => <option key={d.id} value={d.id} className="bg-[var(--bg-card)]">Dr. {d.name || 'Sin nombre'} — {d.specialty || 'General'}</option>)}
                     </select>
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-2 ml-2">Fecha</label>
-                    <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="w-full px-4 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl outline-none focus:border-[var(--accent-primary)] text-sm font-black text-center text-[var(--text-primary)] transition-all" />
+                {/* Fecha / Hora / Duración: en móvil se apilan, en desktop van en 3 columnas */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest ml-2">Fecha</label>
+                    <CustomDatePicker 
+                      value={formData.date} 
+                      onChange={(val) => setFormData({...formData, date: val})} 
+                      isDateDisabled={isDateDisabled}
+                      className="w-full px-4 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl transition-all"
+                    />
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-2 ml-2">Hora Inicio</label>
-                    <input type="time" required min="06:00" max="22:00" value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className="w-full px-4 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl outline-none focus:border-[var(--accent-primary)] text-sm font-black text-center text-[var(--text-primary)] transition-all" />
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest ml-2">Hora Inicio</label>
+                    <CustomTimePicker 
+                      value={formData.time} 
+                      onChange={(val) => setFormData({...formData, time: val})} 
+                      min={currentDayConfig.start}
+                      max={currentDayConfig.end}
+                      className="w-full px-4 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl transition-all"
+                    />
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-2 ml-2">Duración</label>
-                    <select value={formData.duration} onChange={(e) => setFormData({...formData, duration: Number(e.target.value)})} className="w-full px-2 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl outline-none focus:border-[var(--accent-primary)] text-sm font-black cursor-pointer text-center text-[var(--text-primary)] appearance-none transition-all">
-                      <option value={0.5} className="bg-[var(--bg-card)]">30M</option>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest ml-2">Duración</label>
+                    <select id="duration" name="duration" value={formData.duration} onChange={(e) => setFormData({...formData, duration: Number(e.target.value)})} className="w-full px-4 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl outline-none focus:border-[var(--accent-primary)] text-sm font-black cursor-pointer text-left text-[var(--text-primary)] appearance-none transition-all">
+                      <option value={0.5} className="bg-[var(--bg-card)]">30 Minutos</option>
                       <option value={1} className="bg-[var(--bg-card)]">1 Hora</option>
-                      <option value={1.5} className="bg-[var(--bg-card)]">1.5 Hrs</option>
-                      <option value={2} className="bg-[var(--bg-card)]">2 Hrs</option>
+                      <option value={1.5} className="bg-[var(--bg-card)]">1 Hora 30 Min</option>
+                      <option value={2} className="bg-[var(--bg-card)]">2 Horas</option>
                     </select>
                   </div>
                 </div>
 
-                {!editingAppointmentId && (
-                  <div className="pt-2 border-t border-[var(--border-color)]/30 mt-2">
-                     <span className="text-[10px] font-black text-[var(--text-secondary)] opacity-40 uppercase tracking-[0.2em] block mb-3 ml-2">Recurrencia Programada</span>
-                     <select value={recurringWeeks} onChange={(e) => setRecurringWeeks(Number(e.target.value))} className="w-full px-4 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl outline-none text-[var(--text-primary)] font-black text-sm focus:border-[var(--accent-primary)] cursor-pointer appearance-none shadow-inner transition-all">
-                        <option value={0} className="bg-[var(--bg-card)]">Instancia única (Sin recurrencia)</option>
-                        <option value={3} className="bg-[var(--bg-card)]">Repetir semanalmente (1 Mes / 4 citas)</option>
-                        <option value={7} className="bg-[var(--bg-card)]">Repetir semanalmente (2 Meses / 8 citas)</option>
-                      </select>
-                  </div>
-                )}
+
               </div>
 
               {/* FACTURACIÓN Y PAGO (Solo si no es Bloqueo y NO es medico) */}
@@ -1500,7 +1993,7 @@ export default function AgendaPage() {
                     {/* Estado de Pago */}
                     <div className="col-span-full">
                       <label className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-3 ml-2">Gestión del Estado de Pago</label>
-                      <div className="flex gap-2 p-1.5 bg-[var(--bg-main)] border border-[var(--border-color)]/50 rounded-2xl shadow-inner">
+                      <div className="flex gap-2 p-1.5 bg-[var(--bg-main)] border border-[var(--border-color)]/50 rounded-2xl">
                         <button 
                           type="button" 
                           onClick={() => setFormData({...formData, paymentStatus: 'pendiente'})}
@@ -1530,7 +2023,7 @@ export default function AgendaPage() {
                       <label className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-2 ml-2">Monto del Arancel ($)</label>
                       <div className="relative group/amount">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-black text-emerald-500/30 group-focus-within/amount:text-emerald-500 transition-colors">$</span>
-                        <input 
+                        <input id="paymentAmount" name="paymentAmount" 
                           type="number" 
                           placeholder="0.00" 
                           value={formData.paymentAmount} 
@@ -1542,32 +2035,43 @@ export default function AgendaPage() {
 
                     {/* Medio de Pago Estilizado */}
                     <div className="col-span-full">
-                      <label className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-3 ml-2">Vía de Recepción del Cobro</label>
+                      <label className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-3 ml-2">
+                        {formData.paymentStatus === 'senado' ? 'Vía de Recepción de la Seña' : 'Vía de Recepción del Saldo'}
+                      </label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {[
                           { id: 'Efectivo', lbl: 'Papel Moneda', sub: 'Efectivo', icon: <Wallet size={16} />, color: 'emerald' },
-                          { id: 'Mercado-Pago', lbl: 'Billetera Digital', sub: 'MP / Virtual', icon: <Activity size={16} />, color: 'sky' },
-                          { id: 'Tarjeta', lbl: 'Plástico / Bank', sub: 'Deb / Cred', icon: <Landmark size={16} />, color: 'indigo' }
-                        ].map((m) => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => setFormData({...formData, paymentMethod: m.id})}
-                            className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left group/method ${
-                              formData.paymentMethod === m.id 
-                                ? `bg-${m.color}-500 text-white border-${m.color}-500 shadow-lg shadow-${m.color}-500/20 scale-[1.02]` 
-                                : `bg-[var(--bg-main)] border-[var(--border-color)]/50 text-[var(--text-secondary)] hover:border-${m.color}-400/50 hover:bg-${m.color}-500/5`
-                            }`}
-                          >
-                            <div className={`p-2.5 rounded-xl transition-colors ${formData.paymentMethod === m.id ? 'bg-white/20' : `bg-${m.color}-500/10 text-${m.color}-500`}`}>
-                              {m.icon}
-                            </div>
-                            <div className="min-w-0">
-                              <p className={`text-[10px] font-black uppercase tracking-wider leading-none ${formData.paymentMethod === m.id ? 'text-white' : 'text-[var(--text-primary)] opacity-80'}`}>{m.lbl}</p>
-                              <p className={`text-[9px] font-bold mt-1.5 opacity-60 ${formData.paymentMethod === m.id ? 'text-white' : ''}`}>{m.sub}</p>
-                            </div>
-                          </button>
-                        ))}
+                          { id: 'Tarjeta', lbl: 'Plástico / Bank', sub: 'Débito / Crédito', icon: <Landmark size={16} />, color: 'indigo' },
+                          { id: 'Transferencia', lbl: 'Digital / Bank', sub: 'Transferencia / MP', icon: <Activity size={16} />, color: 'sky' }
+                        ].map((m) => {
+                          const isSelected = formData.paymentStatus === 'senado' ? formData.paidMethod === m.id : formData.paymentMethod === m.id;
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                if (formData.paymentStatus === 'senado') {
+                                  setFormData({...formData, paidMethod: m.id});
+                                } else {
+                                  setFormData({...formData, paymentMethod: m.id});
+                                }
+                              }}
+                              className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left group/method ${
+                                isSelected 
+                                  ? `bg-${m.color}-500 text-white border-${m.color}-500 shadow-lg shadow-${m.color}-500/20 scale-[1.02]` 
+                                  : `bg-[var(--bg-main)] border-[var(--border-color)]/50 text-[var(--text-secondary)] hover:border-${m.color}-400/50 hover:bg-${m.color}-500/5`
+                              }`}
+                            >
+                              <div className={`p-2.5 rounded-xl transition-colors ${isSelected ? 'bg-white/20' : `bg-${m.color}-500/10 text-${m.color}-500`}`}>
+                                {m.icon}
+                              </div>
+                              <div className="min-w-0">
+                                <p className={`text-[10px] font-black uppercase tracking-wider leading-none ${isSelected ? 'text-white' : 'text-[var(--text-primary)] opacity-80'}`}>{m.lbl}</p>
+                                <p className={`text-[9px] font-bold mt-1.5 opacity-60 ${isSelected ? 'text-white' : ''}`}>{m.sub}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1575,12 +2079,12 @@ export default function AgendaPage() {
                     {formData.paymentStatus === 'senado' && (
                       <div className="col-span-full animate-fade-in-up">
                         <label className="block text-[10px] font-black [var(--accent-primary)] uppercase tracking-widest mb-2 ml-2 italic">Monto de la Seña (Registro parcial)</label>
-                        <input 
+                        <input id="paidAmount" name="paidAmount" 
                           type="number" 
                           placeholder="¿Cuánto abonó hoy?" 
                           value={formData.paidAmount} 
                           onChange={(e) => setFormData({...formData, paidAmount: e.target.value})} 
-                          className="w-full px-6 py-4 bg-[var(--accent-light)] border border-[var(--accent-primary)]/20 rounded-2xl text-xl font-black text-[var(--accent-primary)] outline-none focus:ring-8 focus:ring-[var(--accent-primary)]/5 shadow-inner transition-all" 
+                          className="w-full px-6 py-4 bg-[var(--accent-light)] border border-[var(--accent-primary)]/20 rounded-2xl text-xl font-black text-[var(--accent-primary)] outline-none focus:ring-8 focus:ring-[var(--accent-primary)]/5 transition-all" 
                         />
                       </div>
                     )}
@@ -1620,10 +2124,17 @@ export default function AgendaPage() {
                                       </div>
                                       <div className="flex justify-between items-center text-sm font-medium border-b border-white/5 pb-2">
                                         <span className="opacity-50">Señas / Pagos Previos</span>
-                                        <span className="text-rose-400 font-bold">-${alreadyPaid.toLocaleString()}</span>
+                                        <div className="text-right">
+                                          <span className="text-rose-400 font-bold">-${alreadyPaid.toLocaleString()}</span>
+                                          {alreadyPaid > 0 && (
+                                            <p className="text-[9px] opacity-40 uppercase font-black">Vía: {formData.paidMethod}</p>
+                                          )}
+                                        </div>
                                       </div>
                                       <div className="flex justify-between items-center pt-2">
-                                        <span className="text-xs font-black uppercase tracking-widest text-emerald-400">Neto a Cobrar Hoy</span>
+                                        <span className="text-xs font-black uppercase tracking-widest text-emerald-400">
+                                          Neto a Cobrar ({formData.paymentMethod})
+                                        </span>
                                         <span className="text-3xl font-black text-emerald-400 tracking-tighter">${saldoPendiente.toLocaleString()}</span>
                                       </div>
                                     </div>
@@ -1634,7 +2145,7 @@ export default function AgendaPage() {
                                         <div className="space-y-4">
                                           <div>
                                             <p className="text-[9px] font-bold text-emerald-400/60 mb-1 ml-1 uppercase">Paga con:</p>
-                                            <input 
+                                            <input id="cashReceived" name="cashReceived" 
                                               type="number" 
                                               placeholder="Monto..." 
                                               value={cashReceived} 
@@ -1668,13 +2179,13 @@ export default function AgendaPage() {
               )}
 
               {/* FOOTER ACTIONS */}
-              <div className="pt-6 flex gap-4 shrink-0 mt-4 border-t border-[var(--border-color)]/30">
-                <button type="button" onClick={closeModal} className={`${userRole === 'medico' ? 'w-full' : 'w-1/3'} py-4 text-xs font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-main)] hover:bg-[var(--accent-light)] rounded-2xl border border-[var(--border-color)] transition-all`}>{userRole === 'medico' ? 'Finalizar Vista' : 'Cancelar operacion'}</button>
+              <div className="pt-6 flex flex-col sm:flex-row gap-4 shrink-0 mt-4 border-t border-[var(--border-color)]/30">
+                <button type="button" onClick={closeModal} className={`${userRole === 'medico' ? 'w-full' : 'w-full sm:w-1/3'} py-4 text-xs font-black uppercase tracking-[0.2em] text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-main)] hover:bg-[var(--accent-light)] rounded-2xl border border-[var(--border-color)] transition-all`}>{userRole === 'medico' ? 'Finalizar Vista' : 'Cancelar operacion'}</button>
                 {userRole !== 'medico' && (
                   <button 
                     type="submit" 
                     disabled={isSaving}
-                    className={`w-2/3 py-4 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 ${isSaving ? 'bg-[var(--text-secondary)] opacity-50 cursor-not-allowed shadow-none' : 'bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] shadow-[var(--accent-primary)]/20'}`}
+                    className={`w-full sm:w-2/3 py-4 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 ${isSaving ? 'bg-[var(--text-secondary)] opacity-50 cursor-not-allowed shadow-none' : 'bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] shadow-[var(--accent-primary)]/20'}`}
                   >
                     {isSaving ? <RefreshCw className="animate-spin" size={18} /> : (editingAppointmentId ? '✓' : <Plus size={18} />)}
                     {isSaving ? "Procesando..." : (editingAppointmentId ? "Confirmar Cambios" : (isBlockMode ? "Registrar Bloqueo" : "Agendar y Guardar"))}
@@ -1684,7 +2195,7 @@ export default function AgendaPage() {
             </form>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* ConfirmDialog: Colisión al guardar */}
       <ConfirmDialog
@@ -1761,52 +2272,199 @@ export default function AgendaPage() {
       )}
 
       {/* GLOBAL MOBILE MENU - Desacoplado para evitar conflictos de eventos y remounting */}
-      {isMobile && menuApp && (
-        <div className="fixed inset-0 z-[9999] flex items-end justify-center">
+      {isMobile && menuApp && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-end justify-center">
           <div 
             className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" 
-            onClick={() => setMenuApp(null)}
+            onClick={() => { setMenuApp(null); setMobileSeñaInput({ active: false, value: '' }); }}
           ></div>
-          <div className="relative w-full bg-[var(--bg-card)] rounded-t-[32px] p-6 pb-12 animate-fade-in-up shadow-2xl space-y-2 border-t border-[var(--border-color)]">
-            <div className="w-12 h-1.5 bg-slate-400/20 rounded-full mx-auto mb-6"></div>
+          <div className="relative w-full bg-[var(--bg-card)] rounded-t-[32px] p-6 pb-12 animate-fade-in-up shadow-2xl border-t border-[var(--border-color)] max-h-[85vh] overflow-y-auto custom-scrollbar">
+            <div className="w-12 h-1.5 bg-slate-400/20 rounded-full mx-auto mb-4"></div>
             
-            <div className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-[var(--border-color)]/30 mb-2">
-              Acciones para {menuApp.patient}
+            {/* Encabezado del bottom sheet */}
+            <div className="px-2 pb-4 border-b border-[var(--border-color)]/30 mb-3">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Acciones rápidas</p>
+              <p className="text-base font-black text-[var(--text-primary)] mt-0.5 truncate">{menuApp.title} — {menuApp.patient}</p>
+              {menuApp.paymentStatus && menuApp.paymentStatus !== 'pendiente' && (
+                <span className={`inline-flex mt-1 px-2 py-0.5 text-[10px] font-black uppercase rounded-full ${
+                  menuApp.paymentStatus === 'pagado' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'
+                }`}>
+                  {menuApp.paymentStatus === 'pagado' ? '✅ Abonado' : `💰 Señado: $${Number(menuApp.paidAmount || 0).toLocaleString()}`}
+                </span>
+              )}
             </div>
-            
-            <button 
-              onClick={() => handleSendWhatsApp(menuApp)} 
-              className="w-full text-left px-5 py-4 text-sm font-bold text-emerald-500 hover:bg-emerald-500/10 flex items-center gap-4 transition-all rounded-xl"
-            >
-              <MessageCircle size={22} />
-              <span>Recordatorio WhatsApp</span>
-            </button>
-            
-            <button 
-              onClick={(e) => handleStatusChange(e, menuApp.id, 'en_espera')} 
-              className="w-full text-left px-5 py-4 text-sm font-bold text-sky-500 hover:bg-sky-500/10 flex items-center gap-4 transition-all rounded-xl"
-            >
-              <CalendarDays size={22} />
-              <span>Marcar como "Llegó a Sala"</span>
-            </button>
 
-            <button 
-              onClick={() => handleViewPatient(menuApp)} 
-              className="w-full text-left px-5 py-4 text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--accent-light)] flex items-center gap-4 transition-all rounded-xl"
-            >
-              <Eye size={22} />
-              <span>Ver Ficha Médica</span>
-            </button>
+            {/* ── SECCIÓN COBROS ── */}
+            {userRole !== 'medico' && (
+              <div className="mb-3">
+                <p className="px-2 py-1.5 text-[9px] font-black text-[var(--text-secondary)] opacity-40 uppercase tracking-widest">Caja / Cobros</p>
 
-            <button 
-              onClick={() => setMenuApp(null)} 
-              className="w-full py-4 text-sm font-black text-slate-400 mt-4 hover:text-[var(--text-primary)] transition-colors"
-            >
+                {/* Pendiente */}
+                <button
+                  onClick={() => {
+                    store.updateAppointmentPaymentStatus(menuApp.id, { paymentStatus: 'pendiente', paidAmount: 0 });
+                    setMenuApp(null);
+                  }}
+                  className={`w-full text-left px-5 py-3.5 text-sm font-bold flex items-center justify-between rounded-xl transition-all ${
+                    menuApp.paymentStatus === 'pendiente' ? 'text-rose-500 bg-rose-50' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'
+                  }`}
+                >
+                  <span className="flex items-center gap-3"><span className="text-lg">⏳</span> Pendiente</span>
+                  {menuApp.paymentStatus === 'pendiente' && <CheckCircle2 size={16} className="text-rose-500" />}
+                </button>
+
+                {/* Abonado */}
+                <button
+                  onClick={async () => {
+                    if (menuApp.paymentStatus === 'pagado') { setMenuApp(null); return; }
+                    const totalFee = Number(menuApp.paymentAmount) > 0 ? Number(menuApp.paymentAmount) : 35000;
+                    const prevPaid = Number(menuApp.paidAmount || 0);
+                    const amountToPay = totalFee - prevPaid;
+                    const token = localStorage.getItem('auth_token');
+                    const API = 'https://control.integrarsalud.me/api-integrar/api';
+                    toast('⏳ Procesando cobro...', { duration: 2000 });
+                    try {
+                      const r1 = await fetch(`${API}/appointments/${menuApp.id}/payment`, {
+                        method: 'PATCH',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee })
+                      });
+                      if (r1.ok) {
+                        store.updateAppointmentPaymentStatus(menuApp.id, { paymentStatus: 'pagado', paidAmount: totalFee }).catch(()=>{});
+                        if (amountToPay > 0) {
+                          await fetch(`${API}/transactions/`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ type: 'Ingreso', concept: `Cobro ${menuApp.title} — ${menuApp.patient}`, method: menuApp.paymentMethod || 'Efectivo', amount: amountToPay, date: nowForAPI(), notes: `Cobro desde Agenda mobile (Turno #${menuApp.id})`, doctor_id: menuApp.doctorId, patient_id: menuApp.patientId })
+                          });
+                          toast.success(`✅ $${amountToPay.toLocaleString()} registrado en Finanzas`);
+                        } else {
+                          toast('✅ Turno marcado como abonado');
+                        }
+                      } else { toast.error('❌ Error al actualizar el turno'); }
+                    } catch(e) { toast.error('❌ Error de red: ' + e.message); }
+                    setMenuApp(null);
+                  }}
+                  className={`w-full text-left px-5 py-3.5 text-sm font-bold flex items-center justify-between rounded-xl transition-all ${
+                    menuApp.paymentStatus === 'pagado' ? 'text-emerald-600 bg-emerald-50 cursor-default' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'
+                  }`}
+                >
+                  <span className="flex items-center gap-3"><span className="text-lg">✅</span> Abonado completo</span>
+                  {menuApp.paymentStatus === 'pagado' && <CheckCircle2 size={16} className="text-emerald-600" />}
+                </button>
+
+                {/* Señado */}
+                <button
+                  onClick={() => setMobileSeñaInput({ active: true, value: String(Math.floor(Number(menuApp.paymentAmount || 35000) / 2)) })}
+                  className={`w-full text-left px-5 py-3.5 text-sm font-bold flex items-center justify-between rounded-xl transition-all ${
+                    menuApp.paymentStatus === 'senado' ? 'text-indigo-600 bg-indigo-50' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'
+                  }`}
+                >
+                  <span className="flex items-center gap-3"><span className="text-lg">💰</span> Registrar Seña</span>
+                  {menuApp.paymentStatus === 'senado' && <CheckCircle2 size={16} className="text-indigo-600" />}
+                </button>
+
+                {/* Input de monto de seña */}
+                {mobileSeñaInput.active && (
+                  <div className="mx-2 mt-1 mb-3 p-4 bg-indigo-50 rounded-2xl border border-indigo-100" onClick={e => e.stopPropagation()}>
+                    <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-3">Monto de la seña</p>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-indigo-500">$</span>
+                        <input id="value" name="value"
+                          type="number"
+                          autoFocus
+                          value={mobileSeñaInput.value}
+                          onChange={e => setMobileSeñaInput(p => ({ ...p, value: e.target.value }))}
+                          className="w-full pl-7 pr-3 py-3 text-lg font-black text-indigo-700 bg-white border border-indigo-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200"
+                          placeholder="0"
+                        />
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const amount = Number(mobileSeñaInput.value);
+                          if (amount <= 0) { toast.error('Ingresá un monto válido'); return; }
+                          const token = localStorage.getItem('auth_token');
+                          const API = 'https://control.integrarsalud.me/api-integrar/api';
+                          toast('⏳ Registrando seña...', { duration: 2000 });
+                          try {
+                            const r1 = await fetch(`${API}/appointments/${menuApp.id}/payment`, {
+                              method: 'PATCH', credentials: 'include',
+                              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ paymentStatus: 'senado', paidAmount: amount })
+                            });
+                            if (r1.ok) {
+                              store.updateAppointmentPaymentStatus(menuApp.id, { paymentStatus: 'senado', paidAmount: amount }).catch(()=>{});
+                              await fetch(`${API}/transactions/`, {
+                                method: 'POST', credentials: 'include',
+                                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ type: 'Ingreso', concept: `Seña ${menuApp.title} — ${menuApp.patient}`, method: menuApp.paymentMethod || 'Efectivo', amount, date: nowForAPI(), notes: `Seña desde Agenda mobile (Turno #${menuApp.id})`, doctor_id: menuApp.doctorId, patient_id: menuApp.patientId })
+                              });
+                              toast.success(`✅ Seña $${amount.toLocaleString()} registrada`);
+                            } else { toast.error('❌ Error al actualizar'); }
+                          } catch(e) { toast.error('❌ Error de red'); }
+                          setMobileSeñaInput({ active: false, value: '' });
+                          setMenuApp(null);
+                        }}
+                        className="px-4 py-3 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 transition-colors text-sm"
+                      >
+                        OK
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── SECCIÓN ASISTENCIA ── */}
+            <div className="mb-3">
+              <p className="px-2 py-1.5 text-[9px] font-black text-[var(--text-secondary)] opacity-40 uppercase tracking-widest">Estado de Asistencia</p>
+              <button onClick={(e) => { handleStatusChange(e, menuApp.id, 'en_espera'); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-sky-500 hover:bg-sky-500/10 flex items-center gap-3 transition-all rounded-xl">
+                <CalendarDays size={20} /> Llegó a Sala
+              </button>
+              <button onClick={(e) => { handleStatusChange(e, menuApp.id, 'finalizado'); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-blue-500 hover:bg-blue-500/10 flex items-center gap-3 transition-all rounded-xl">
+                <CheckCircle2 size={20} /> Finalizado
+              </button>
+              <button onClick={(e) => { handleStatusChange(e, menuApp.id, 'ausente'); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 flex items-center gap-3 transition-all rounded-xl">
+                <UserX size={20} /> Ausente / Canceló
+              </button>
+            </div>
+
+            {/* ── OTRAS ACCIONES ── */}
+            <div className="border-t border-[var(--border-color)]/30 pt-3">
+              {store.globalConfig?.whatsappEnabled && (
+                <button onClick={() => { handleSendWhatsApp(menuApp); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-emerald-500 hover:bg-emerald-500/10 flex items-center gap-3 transition-all rounded-xl">
+                  <MessageCircle size={20} /> Recordatorio WhatsApp
+                </button>
+              )}
+              {menuApp.modalidad === 'virtual' && (
+                <button onClick={(e) => handleCopyVirtualLink(menuApp, e)} className="w-full text-left px-5 py-3.5 text-sm font-bold text-indigo-500 hover:bg-indigo-50 flex items-center gap-3 transition-all rounded-xl">
+                  <Copy size={20} /> Copiar Link (Paciente)
+                </button>
+              )}
+              <button onClick={() => { handleOpenEdit(menuApp); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--accent-light)] flex items-center gap-3 transition-all rounded-xl">
+                <Eye size={20} /> Editar Ficha del Turno
+              </button>
+              {(menuApp.paymentStatus === 'pagado' || menuApp.paymentStatus === 'senado') && (
+                <button onClick={() => { setReceiptApp(menuApp); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-[var(--accent-primary)] hover:bg-[var(--accent-light)] flex items-center gap-3 transition-all rounded-xl">
+                  <Receipt size={20} /> Imprimir Comprobante
+                </button>
+              )}
+              {userRole !== 'medico' && (
+                <button onClick={() => { setConfirmDelete(menuApp.id); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 flex items-center gap-3 transition-all rounded-xl">
+                  <Trash2 size={20} /> Eliminar Turno
+                </button>
+              )}
+            </div>
+
+            <button onClick={() => { setMenuApp(null); setMobileSeñaInput({ active: false, value: '' }); }} className="w-full py-4 text-sm font-black text-slate-400 mt-2 hover:text-[var(--text-primary)] transition-colors">
               Cancelar
             </button>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }

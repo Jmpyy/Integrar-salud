@@ -50,9 +50,13 @@ body {
   color: var(--text-primary);
   transition: background-color 0.4s ease, color 0.4s ease;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  /* 100dvh: viewport dinámico que respeta la barra de Safari en iOS */
   min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   overflow-x: hidden;
+  /* Evitar rebote/scroll horizontal en iOS */
+  overscroll-behavior-x: none;
 }
 
 body::before {
@@ -174,6 +178,30 @@ body::before {
     display: none;
   }
 
+  /* ── Touch: evitar doble-tap-zoom en iOS en botones e inputs ── */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* ── Safe-area utilities (notch / home indicator) ── */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* ── Viewport dinámico para iOS Safari ── */
+  .min-h-dvh {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
   @keyframes fadeInQuick {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -182,6 +210,27 @@ body::before {
   .animate-fade-in-quick {
     animation: fadeInQuick 0.8s ease-out forwards;
   }
+
+  /* --- FIX BUGS DE RENDERIZADO EN IOS SAFARI --- */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    background-clip: padding-box;
+  }
+
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    height: 1.5em;
+    margin: 0;
+  }
+
+  /* ------------------------------------------- */
 
   /* --- Patrones Visuales (Agenda) --- */
   .bg-stripes {
@@ -202,17 +251,27 @@ body::before {
       bottom: 0;
       left: 0;
       right: 0;
-      height: calc(68px + env(safe-area-inset-bottom));
+      /* Altura base + safe-area para Home Indicator de iPhone */
+      height: calc(60px + env(safe-area-inset-bottom, 0px));
       background: var(--glass-bg);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
       border-top: 1px solid var(--glass-border);
       justify-content: space-around;
       align-items: flex-start;
-      padding-top: 10px;
+      padding-top: 8px;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
       z-index: 1000;
-      padding-bottom: env(safe-area-inset-bottom);
       box-shadow: 0 -8px 24px rgba(0,0,0,0.1);
+    }
+    /* Links dentro del bottom nav: área táctil mínima 44px */
+    .mobile-bottom-nav a {
+      min-height: 44px;
+      min-width: 44px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
   }
 
@@ -235,11 +294,17 @@ body::before {
   /* Responsive Spacing Utilities */
   @media (max-width: 640px) {
     .container-responsive {
-      padding-left: 12px !important;
-      padding-right: 12px !important;
+      /* Safe-area en los laterales para dispositivos con notch horizontal (landscape) */
+      padding-left: max(12px, env(safe-area-inset-left)) !important;
+      padding-right: max(12px, env(safe-area-inset-right)) !important;
     }
     .card-premium {
       padding: 16px !important;
       border-radius: 16px !important;
     }
+  }
+
+  /* ── Mejoras de tap-highlight en mobile ── */
+  * {
+    -webkit-tap-highlight-color: rgba(14, 165, 233, 0.08);
   }

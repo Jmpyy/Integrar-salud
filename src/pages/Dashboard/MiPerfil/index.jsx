@@ -8,9 +8,10 @@ import {
 } from 'lucide-react';
 
 const ROLE_META = {
-  admin:     { label: 'Administrador',      color: 'bg-rose-500',    text: 'text-rose-500',    bg: 'bg-rose-500/10',    border: 'border-rose-500/20' },
-  medico:    { label: 'Médico / Terapeuta', color: 'bg-[var(--accent-primary)]',  text: 'text-[var(--accent-primary)]',  bg: 'bg-[var(--accent-light)]',  border: 'border-[var(--accent-primary)]/20' },
-  recepcion: { label: 'Recepcionista',      color: 'bg-emerald-500', text: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  admin:          { label: 'Administrador',      color: 'bg-rose-500',    text: 'text-rose-500',    bg: 'bg-rose-500/10',    border: 'border-rose-500/20' },
+  medico:         { label: 'Médico / Terapeuta', color: 'bg-[var(--accent-primary)]',  text: 'text-[var(--accent-primary)]',  bg: 'bg-[var(--accent-light)]',  border: 'border-[var(--accent-primary)]/20' },
+  recepcionista:  { label: 'Recepcionista',      color: 'bg-emerald-500', text: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+  administracion: { label: 'Administración',     color: 'bg-amber-500',   text: 'text-amber-500',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
 };
 
 const SECTIONS = [
@@ -19,9 +20,39 @@ const SECTIONS = [
   { id: 'seguridad',   label: 'Seguridad',           icon: Shield  },
 ];
 
+const INPUT_CLASS = `
+  w-full border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)]
+  outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--accent-light)] bg-[var(--bg-main)] transition-all
+  placeholder:text-[var(--text-secondary)]/30
+`;
+const LABEL_CLASS = 'block text-[11px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-wider mb-1.5';
+
+const PasswordField = ({ label, value, onChange, show, onToggle, placeholder = '••••••••' }) => (
+  <div>
+    <label className={LABEL_CLASS}>{label}</label>
+    <div className="relative">
+      <input id="value" name="value"
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className={`${INPUT_CLASS} pr-11`}
+        placeholder={placeholder}
+        autoComplete="new-password"
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
+      >
+        {show ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  </div>
+);
+
 export default function MiPerfilPage() {
   const { user, userRole, setUser } = useStore();
-  const role = ROLE_META[userRole] || ROLE_META.recepcion;
+  const role = ROLE_META[userRole] || ROLE_META.recepcionista;
 
   const initials = (user?.name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -98,35 +129,7 @@ export default function MiPerfilPage() {
   };
 
   // ── UI helpers ──
-  const inputClass = `
-    w-full border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)]
-    outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--accent-light)] bg-[var(--bg-main)] transition-all
-    placeholder:text-[var(--text-secondary)]/30
-  `;
-  const labelClass = 'block text-[11px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-wider mb-1.5';
 
-  const PasswordField = ({ label, value, onChange, show, onToggle, placeholder = '••••••••' }) => (
-    <div>
-      <label className={labelClass}>{label}</label>
-      <div className="relative">
-        <input
-          type={show ? 'text' : 'password'}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className={`${inputClass} pr-11`}
-          placeholder={placeholder}
-          autoComplete="new-password"
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"
-        >
-          {show ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6 max-w-4xl animate-fade-in-quick">
@@ -180,24 +183,24 @@ export default function MiPerfilPage() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className={labelClass}>Nombre completo</label>
-                  <input
+                  <label className={LABEL_CLASS}>Nombre completo</label>
+                  <input id="profileName" name="profileName"
                     type="text"
                     value={profileName}
                     onChange={e => setProfileName(e.target.value)}
-                    className={inputClass}
+                    className={INPUT_CLASS}
                     placeholder="Tu nombre y apellido"
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Correo electrónico</label>
+                  <label className={LABEL_CLASS}>Correo electrónico</label>
                   <div className="relative">
                     <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-30" />
-                    <input
+                    <input id="profileEmail" name="profileEmail"
                       type="email"
                       value={profileEmail}
                       disabled
-                      className={`${inputClass} pl-10 opacity-50 cursor-not-allowed bg-[var(--bg-sidebar)]/50`}
+                      className={`${INPUT_CLASS} pl-10 opacity-50 cursor-not-allowed bg-[var(--bg-sidebar)]/50`}
                     />
                   </div>
                   <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-2 flex items-center gap-1.5 opacity-60">
@@ -206,7 +209,7 @@ export default function MiPerfilPage() {
                   </p>
                 </div>
                 <div>
-                  <label className={labelClass}>Rol en el sistema</label>
+                  <label className={LABEL_CLASS}>Rol en el sistema</label>
                   <div className={`px-4 py-3 rounded-xl border text-sm font-bold ${role.bg} ${role.border} ${role.text}`}>
                     {role.label}
                   </div>

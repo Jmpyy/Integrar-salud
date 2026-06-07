@@ -7,6 +7,7 @@ import { staffService } from '../services/staff';
 import { transactionsService } from '../services/transactions';
 import { filesService } from '../services/files';
 import api from '../services/api';
+import logger from '../utils/logger';
 
 /**
  * Store global de la aplicación.
@@ -18,6 +19,18 @@ import api from '../services/api';
  *  - error (string|null)
  *  - acciones para fetch/create/update/delete
  */
+
+const getNormalizedRole = (role) => {
+  if (!role) return 'recepcionista';
+  const r = role.toLowerCase();
+  if (r.includes('admin') && r !== 'admin') return 'administracion';
+  if (r === 'admin') return 'admin';
+  if (r.includes('coordinación') || r.includes('coordinacion')) return 'administracion';
+  if (r.includes('secretaría') || r.includes('secretaria') || r.includes('recepción') || r.includes('recepcion') || r.includes('recepcionista')) return 'recepcionista';
+  if (r.includes('medico') || r.includes('médico') || r.includes('doctor')) return 'medico';
+  return role;
+};
+
 export const useStore = create((set, get) => ({
   // ─── Auth ───
   user: null,
@@ -47,14 +60,20 @@ export const useStore = create((set, get) => ({
   // Update user object in store (e.g. after profile name change)
   setUser: (updatedUser) => set({ user: updatedUser }),
 
+  // Jitsi Call State
+  activeCallApp: null,
+  setActiveCallApp: (app) => set({ activeCallApp: app }),
+  isJitsiMaximized: false,
+  setIsJitsiMaximized: (val) => set({ isJitsiMaximized: val }),
+
   auth: {
-    login: async (email, password) => {
+    login: async (email, password, rememberMe) => {
       set({ authLoading: true, authError: null });
       try {
-        const data = await authService.login(email, password);
+        const data = await authService.login(email, password, rememberMe);
         set({
           user: data.user,
-          userRole: data.user.role,
+          userRole: getNormalizedRole(data.user.role),
           isAuthenticated: true,
           authLoading: false,
         });
@@ -77,11 +96,13 @@ export const useStore = create((set, get) => ({
       if (!authService.isAuthenticated()) return;
       try {
         const user = await authService.getSession();
-        set({ user, userRole: user.role, isAuthenticated: true });
+        set({ user, userRole: getNormalizedRole(user.role), isAuthenticated: true });
       } catch {
-        // Token inválido o expirado → limpiar COMPLETAMENTE (estado + localStorage)
+        // Token inválido o expirado → limpiar COMPLETAMENTE (estado + storage)
         localStorage.removeItem('auth_token');
         localStorage.removeItem('refresh_token');
+        sessionStorage.removeItem('auth_token');
+        sessionStorage.removeItem('refresh_token');
         set({ user: null, userRole: null, isAuthenticated: false });
       }
     },
@@ -126,15 +147,17 @@ export const useStore = create((set, get) => ({
       }
       return patient;
     } catch (error) {
-      console.error('Error in createPatient store action:', error);
+      logger.error('Error in createPatient store action:', error);
       throw error;
     }
   },
 
+  setPatients: (patients) => set({ patients }),
+
   updatePatient: async (id, patientData) => {
     const patient = await patientsService.update(id, patientData);
     set((state) => ({
-      patients: state.patients.map((p) => (p.id === id ? patient : p)),
+      patients: state.patients.map((p) => (p.id === id ? { ...p, ...patient } : p)),
     }));
     return patient;
   },
@@ -184,6 +207,37 @@ export const useStore = create((set, get) => ({
       })
     }));
     return entry;
+  },
+
+  updateHistoryEntry: async (patientId, entryId, entryData) => {
+    const entry = await patientsService.updateHistoryEntry(patientId, entryId, entryData);
+    set((state) => ({
+      patients: state.patients.map((p) => {
+        if (p.id === patientId) {
+          return {
+            ...p,
+            history: (p.history || []).map((h) => (h.id === entryId ? entry : h))
+          };
+        }
+        return p;
+      })
+    }));
+    return entry;
+  },
+
+  deleteHistoryEntry: async (patientId, entryId) => {
+    await patientsService.deleteHistoryEntry(patientId, entryId);
+    set((state) => ({
+      patients: state.patients.map((p) => {
+        if (p.id === patientId) {
+          return {
+            ...p,
+            history: (p.history || []).filter((h) => h.id !== entryId)
+          };
+        }
+        return p;
+      })
+    }));
   },
 
   addMedication: async (patientId, medData) => {
@@ -251,7 +305,7 @@ export const useStore = create((set, get) => ({
       set((state) => ({ appointments: [...state.appointments, ...newApps] }));
       return newApps;
     } catch (error) {
-      console.error('Error in createAppointment store action:', error);
+      logger.error('Error in createAppointment store action:', error);
       throw error;
     }
   },
@@ -265,7 +319,7 @@ export const useStore = create((set, get) => ({
       }));
       return updated;
     } catch (error) {
-      console.error('Error in updateAppointment store action:', error);
+      logger.error('Error in updateAppointment store action:', error);
       throw error;
     }
   },
@@ -279,7 +333,21 @@ export const useStore = create((set, get) => ({
       }));
       return updated;
     } catch (error) {
-       console.error('Error in updateAppointmentStatus store action:', error);
+       logger.error('Error in updateAppointmentStatus store action:', error);
+       throw error;
+    }
+  },
+
+  updateAppointmentVideoStatus: async (id, estado_videollamada) => {
+    try {
+      const updated = await appointmentsService.updateVideoStatus(id, estado_videollamada);
+      if (!updated || !updated.id) return null;
+      set((state) => ({
+        appointments: state.appointments.map((a) => (a.id === id ? updated : a)),
+      }));
+      return updated;
+    } catch (error) {
+       logger.error('Error in updateAppointmentVideoStatus store action:', error);
        throw error;
     }
   },
@@ -294,7 +362,7 @@ export const useStore = create((set, get) => ({
       }));
       return updated;
     } catch (error) {
-       console.error('Error in updateAppointmentPaymentStatus store action:', error);
+       logger.error('Error in updateAppointmentPaymentStatus store action:', error);
        throw error;
     }
   },
@@ -391,9 +459,39 @@ export const useStore = create((set, get) => ({
   },
 
   createTransaction: async (transactionData) => {
-    const transaction = await transactionsService.create(transactionData);
-    set((state) => ({ transactions: [transaction, ...state.transactions] }));
-    return transaction;
+    try {
+      const transaction = await transactionsService.create(transactionData);
+      if (transaction) {
+        set((state) => ({ transactions: [transaction, ...state.transactions] }));
+      }
+      return transaction;
+    } catch (error) {
+      logger.error('[Store] Error al crear transacción:', error?.response?.data || error.message, transactionData);
+      throw error;
+    }
+  },
+  
+  deleteTransaction: async (id) => {
+    try {
+      await transactionsService.delete(id);
+      set((state) => ({
+        transactions: state.transactions.filter(t => t.id !== id)
+      }));
+      return true;
+    } catch (err) {
+      logger.error('Error deleting transaction:', err);
+      throw err;
+    }
+  },
+
+  updateTransaction: async (id, txData) => {
+    try {
+      await api.put(`/transactions/${id}`, txData);
+      get().fetchTransactions();
+    } catch (err) {
+      logger.error('Error updating transaction:', err);
+      throw err;
+    }
   },
 
   // ─── Dashboard Notes ───
@@ -403,7 +501,7 @@ export const useStore = create((set, get) => ({
       const res = await api.get('/notes/');
       set({ dashboardNote: res.data.content || '' });
     } catch (err) {
-      console.error('Error fetching note:', err);
+      logger.error('Error fetching note:', err);
     }
   },
 
@@ -412,7 +510,7 @@ export const useStore = create((set, get) => ({
       await api.post('/notes/', { content });
       set({ dashboardNote: content });
     } catch (err) {
-      console.error('Error updating note:', err);
+      logger.error('Error updating note:', err);
     }
   },
 
@@ -423,7 +521,7 @@ export const useStore = create((set, get) => ({
       const res = await api.get('/users');
       set({ users: res.data.users });
     } catch (err) {
-      console.error('Error fetching users:', err);
+      logger.error('Error fetching users:', err);
     }
   },
 
@@ -455,17 +553,34 @@ export const useStore = create((set, get) => ({
   },
 
   // --- GLOBAL CONFIG ---
-  setGlobalConfig: (config) => {
+  setGlobalConfig: async (config) => {
     localStorage.setItem('consultorio_config', JSON.stringify(config));
     set({ globalConfig: config });
+    try {
+      await api.post('/settings', config);
+    } catch (err) {
+      logger.error('Error persisting config to server:', err);
+    }
   },
 
-  fetchGlobalConfig: () => {
+  fetchGlobalConfig: async () => {
+    // 1. Carga rápida desde localStorage
     try {
       const saved = localStorage.getItem('consultorio_config');
       if (saved) set({ globalConfig: JSON.parse(saved) });
     } catch (err) {
-      console.error('Error fetching global config:', err);
+      logger.error('Error fetching local config:', err);
+    }
+
+    // 2. Sincronización real desde el servidor
+    try {
+      const res = await api.get('/settings');
+      if (res.data.config && Object.keys(res.data.config).length > 0) {
+        set({ globalConfig: res.data.config });
+        localStorage.setItem('consultorio_config', JSON.stringify(res.data.config));
+      }
+    } catch (err) {
+      logger.error('Error fetching server config:', err);
     }
   }
 }));

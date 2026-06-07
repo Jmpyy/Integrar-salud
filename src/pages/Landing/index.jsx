@@ -1,18 +1,18 @@
-import Navbar from '../../components/Navbar';
+import { useOutletContext } from 'react-router-dom';
 import Hero from './components/Hero';
+import QuickLinks from './components/QuickLinks';
 import Services from './components/Services';
+import Features from './components/Features';
 
 export default function Landing() {
-  return (
-    <div className="min-h-screen bg-white font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      <Navbar />
-      
-      <main>
-        {/* Aquí puedes ir colocando los componentes de tu Landing */}
-        <Hero />
-        <Services />
-      </main>
+  const { config } = useOutletContext();
 
-    </div>
+  return (
+    <>
+      <Hero config={config} />
+      <QuickLinks />
+      <Features config={config} />
+      <Services config={config} />
+    </>
   );
 }

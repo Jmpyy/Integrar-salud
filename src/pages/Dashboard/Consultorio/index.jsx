@@ -1,14 +1,16 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from '../../../stores/useStore';
 import {
   Users, Clock, UserCheck, FileText,
   HeartPulse, ShieldAlert, Search, AlertCircle,
   Stethoscope, CalendarDays, LayoutDashboard,
-  CalendarRange
+  CalendarRange, Video, X, Loader2, Maximize, Minimize
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import PatientHistoryViewer from '../../../components/PatientHistoryViewer';
 import { toLocalDateString } from '../../../utils/helpers';
 import { APPOINTMENT_STATUS } from '../../../config/constants';
+import JitsiMeeting from '../../../components/JitsiMeeting';
 
 export default function ConsultorioPage() {
   const store = useStore();
@@ -17,6 +19,7 @@ export default function ConsultorioPage() {
   const doctors      = store.doctors;
   const userRole     = store.userRole;
   const user         = store.user;
+  const isDoctorOrAdmin = ['medico', 'admin'].includes(userRole);
 
   const [selectedPatientId, setSelectedPatientId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,15 +29,27 @@ export default function ConsultorioPage() {
   const [fullPatient, setFullPatient] = useState(null);
   const [loadingPatient, setLoadingPatient] = useState(false);
 
+  // Estados para videollamada y demoras
+  const [delayModalApp, setDelayModalApp] = useState(null);
+  const [delayMinutes, setDelayMinutes] = useState('');
+
   const handleOpenPatient = async (patient) => {
     if (!patient?.id) return;
     setLoadingPatient(true);
     try {
       const { patientsService } = await import('../../../services/patients');
       const full = await patientsService.getById(patient.id);
+      
+      // IMPORTANTE: Actualizar el store global con la información completa (historia, medicación, etc)
+      // para que PatientHistoryViewer (que ahora usa el store como fuente de verdad) vea todo.
+      if (full) {
+        store.setPatients(store.patients.map(p => p.id === full.id ? full : p));
+      }
+      
       setFullPatient(full || patient);
       setShowPatientView(true);
-    } catch {
+    } catch (err) {
+      console.error("Error al abrir paciente:", err);
       setFullPatient(patient);
       setShowPatientView(true);
     } finally {
@@ -43,6 +58,7 @@ export default function ConsultorioPage() {
   };
   
   useEffect(() => {
+    // Carga inicial
     store.fetchAppointments();
     store.fetchPatients();
     store.fetchDoctors();
@@ -99,6 +115,7 @@ export default function ConsultorioPage() {
     );
   }, [activeTab, todaysAppointments, waitingRoomAppointments, monthlyAppointments, searchTerm]);
 
+  // Chequeo de alertas para el médico
   const stats = useMemo(() => {
     const total = todaysAppointments.length;
     const enCurso = todaysAppointments.filter(a => a.attendance === APPOINTMENT_STATUS.EN_CURSO).length;
@@ -108,8 +125,65 @@ export default function ConsultorioPage() {
     return { total, enCurso, finalizados, enEspera, pendientes };
   }, [todaysAppointments]);
 
-  const handleStatusChange = (appId, newStatus) => {
-    store.updateAppointmentStatus(appId, newStatus);
+  const handleStatusChange = async (appId, newStatus) => {
+    try {
+      await store.updateAppointmentStatus(appId, newStatus);
+      const app = appointments.find(a => a.id === appId);
+      if (app?.modalidad === 'virtual') {
+        if (newStatus === APPOINTMENT_STATUS.EN_CURSO) {
+          await store.updateAppointmentVideoStatus(appId, 'activa');
+          store.setActiveCallApp(app);
+        } else if (newStatus === APPOINTMENT_STATUS.FINALIZADO || newStatus === APPOINTMENT_STATUS.AUSENTE) {
+          await store.updateAppointmentVideoStatus(appId, newStatus === APPOINTMENT_STATUS.FINALIZADO ? 'finalizada' : 'ausente');
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCopyLink = (app, e) => {
+    e.stopPropagation();
+    if (!app.dni || !app.codigoAcceso) {
+      toast.error('Falta DNI del paciente o código de acceso.');
+      return;
+    }
+    const link = `https://integrarsalud.me/#/sala-virtual?dni=${app.dni}&codigo=${app.codigoAcceso}`;
+    navigator.clipboard.writeText(link);
+    toast.success('Link de acceso copiado al portapapeles');
+  };
+
+  const handleSetDelay = (app, e) => {
+    e.stopPropagation();
+    setDelayModalApp(app);
+    setDelayMinutes('');
+  };
+
+  const submitDelay = async () => {
+    if (!delayModalApp) return;
+    
+    let delayMessage = null;
+    if (delayMinutes.trim() !== '') {
+      delayMessage = `El profesional tuvo un imprevisto y está demorado aproximadamente ${delayMinutes} minutos. Gracias por tu paciencia.`;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      const res = await fetch(`https://control.integrarsalud.me/api-integrar/api/telemedicine/set_delay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ id: delayModalApp.id, delayMessage })
+      });
+      if (res.ok) {
+        toast.success(delayMessage ? 'Aviso de demora enviado al paciente' : 'Aviso de demora borrado');
+      } else {
+        toast.error('Error al actualizar demora');
+      }
+    } catch (err) {
+      toast.error('Error de red al actualizar demora');
+    } finally {
+      setDelayModalApp(null);
+    }
   };
 
   const getStatusBadge = (app) => {
@@ -154,6 +228,7 @@ export default function ConsultorioPage() {
     return (
       <PatientHistoryViewer
         patient={fullPatient}
+        showEditActions={true}
         onBack={() => { setShowPatientView(false); setSelectedPatientId(null); setFullPatient(null); }}
       />
     );
@@ -180,7 +255,7 @@ export default function ConsultorioPage() {
 
         <div className="relative group w-full sm:w-80">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-primary)] transition-colors" size={20} />
-          <input
+          <input id="searchTerm" name="searchTerm"
             type="text"
             placeholder="Buscar por paciente o motivo..."
             value={searchTerm}
@@ -190,25 +265,25 @@ export default function ConsultorioPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 p-1.5 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl w-full sm:w-fit shadow-sm">
+      <div className="flex flex-col sm:flex-row items-center gap-2 p-1.5 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl w-full sm:w-fit shadow-sm">
         <button
           onClick={() => setActiveTab('hoy')}
-          className={`flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'hoy' ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'hoy' ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
         >
           <Clock size={16} /> Hoy
         </button>
         <button
           onClick={() => setActiveTab('sala')}
-          className={`flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'sala' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'sala' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
         >
           <Users size={16} /> En Sala
           {waitingRoomAppointments.length > 0 && <span className="ml-1 w-5 h-5 flex items-center justify-center bg-white/20 rounded-full text-[10px]">{waitingRoomAppointments.length}</span>}
         </button>
         <button
           onClick={() => setActiveTab('mensual')}
-          className={`flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'mensual' ? 'bg-[var(--text-primary)] text-[var(--bg-main)] shadow-lg shadow-[var(--text-primary)]/10 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'mensual' ? 'bg-[var(--text-primary)] text-[var(--bg-main)] shadow-lg shadow-[var(--text-primary)]/10 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
         >
-          <CalendarRange size={16} /> mensual
+          <CalendarRange size={16} /> Mensual
         </button>
       </div>
 
@@ -300,9 +375,21 @@ export default function ConsultorioPage() {
                         {app.patient}
                       </h4>
                       {getStatusBadge(app)}
+                      {app.modalidad === 'virtual' && isWaiting && (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] uppercase font-black rounded-md border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute opacity-75"></span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative"></span>
+                          Paciente en Línea
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
+                    <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)] flex-wrap">
                       <span className="font-semibold opacity-80">{app.title}</span>
+                      {app.type && (
+                         <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/50 border border-[var(--border-color)]/30 text-[var(--text-primary)] text-[9px] font-black rounded-md uppercase">
+                            {app.type.toLowerCase().includes('virtual') ? '💻' : app.type.toLowerCase().includes('domicilio') ? '🏠' : '🏥'} {app.type}
+                         </span>
+                      )}
                       {patientData?.nhc && (
                         <span className="text-[10px] font-black text-[var(--text-secondary)] bg-[var(--bg-main)] px-2 py-0.5 rounded-md border border-[var(--border-color)]/30 font-mono">NHC: {patientData.nhc}</span>
                       )}
@@ -315,63 +402,148 @@ export default function ConsultorioPage() {
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 mt-2 sm:mt-0">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleOpenPatient(patientData); }}
-                      disabled={!patientData}
-                      className={`px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 transition-all
-                        ${patientData
-                          ? 'bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] shadow-sm'
-                          : 'bg-[var(--bg-sidebar)] text-[var(--text-secondary)]/30 border-[var(--border-color)]/20 cursor-not-allowed opacity-50'
-                        }`}
-                      title={patientData ? 'Abrir historia clínica completa' : 'Paciente sin registro básico'}
-                    >
-                      <FileText size={16} />
-                      <span className="hidden sm:inline">HISTORIA CLÍNICA</span>
-                    </button>
+                  {isDoctorOrAdmin && (
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 mt-2 sm:mt-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleOpenPatient(patientData); }}
+                        disabled={!patientData}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 transition-all
+                          ${patientData
+                            ? 'bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] shadow-sm'
+                            : 'bg-[var(--bg-sidebar)] text-[var(--text-secondary)]/30 border-[var(--border-color)]/20 cursor-not-allowed opacity-50'
+                          }`}
+                        title={patientData ? 'Abrir historia clínica completa' : 'Paciente sin registro básico'}
+                      >
+                        <FileText size={16} />
+                        <span className="hidden sm:inline">HISTORIA CLÍNICA</span>
+                      </button>
 
-                    {!isFinalizado && app.attendance !== APPOINTMENT_STATUS.AUSENTE && (
-                      <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                        {!isEnCurso ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleStatusChange(app.id, APPOINTMENT_STATUS.EN_CURSO); }}
-                            className={`flex-1 sm:flex-none px-5 py-3 rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 transition-all shadow-lg
-                              ${isWaiting 
-                                ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20 scale-[1.02]' 
-                                : 'bg-[var(--text-primary)] text-[var(--bg-main)] hover:opacity-90 shadow-[var(--text-primary)]/10'}
-                            `}
-                          >
-                            <HeartPulse size={16} />
-                            <span>INICIAR CONSULTA</span>
-                          </button>
-                        ) : (
-                          <div className="flex gap-2 w-full">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleOpenPatient(patientData); }}
-                              className="flex-1 sm:flex-none px-4 py-3 bg-emerald-600 text-white rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md shadow-emerald-500/20 transition-all"
-                            >
-                              <FileText size={16} />
-                              <span className="hidden sm:inline">EVOLUCIÓN</span>
-                              <span className="sm:hidden">EVOLUCION</span>
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleStatusChange(app.id, APPOINTMENT_STATUS.FINALIZADO); }}
-                              className="flex-1 sm:flex-none px-4 py-3 bg-[var(--accent-primary)] text-white rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] shadow-lg shadow-[var(--accent-primary)]/20 transition-all"
-                            >
-                              <UserCheck size={16} />
-                              <span>FINALIZAR</span>
-                            </button>
+                      {!isFinalizado && app.attendance !== APPOINTMENT_STATUS.AUSENTE && (
+                        <div className="flex flex-col gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                          <div className="flex gap-2 w-full flex-wrap sm:flex-nowrap">
+                            {!isEnCurso ? (
+                              <button
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  if (app.modalidad === 'virtual') {
+                                    store.setActiveCallApp(app);
+                                  } else {
+                                    handleStatusChange(app.id, APPOINTMENT_STATUS.EN_CURSO);
+                                  }
+                                }}
+                                className={`flex-1 sm:flex-none px-5 py-3 rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 transition-all shadow-lg
+                                  ${isWaiting && app.modalidad === 'virtual'
+                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20 scale-[1.02] ring-2 ring-offset-2 ring-emerald-500 ring-offset-[var(--bg-main)]'
+                                    : isWaiting 
+                                      ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20' 
+                                      : 'bg-[var(--text-primary)] text-[var(--bg-main)] hover:opacity-90 shadow-[var(--text-primary)]/10'}
+                                `}
+                              >
+                                {app.modalidad === 'virtual' ? <Video size={16} className={isWaiting ? "animate-pulse" : ""} /> : <HeartPulse size={16} />}
+                                <span>{app.modalidad === 'virtual' ? 'INICIAR VIDEOLLAMADA' : 'INICIAR CONSULTA'}</span>
+                              </button>
+                            ) : (
+                              <div className="flex gap-2 w-full flex-wrap sm:flex-nowrap">
+                                {app.modalidad === 'virtual' && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); store.setActiveCallApp(app); }}
+                                    className="flex-1 sm:flex-none px-4 py-3 bg-indigo-600 text-white rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-md shadow-indigo-500/20 transition-all"
+                                  >
+                                    <Video size={16} />
+                                    <span>VOLVER AL VIDEO</span>
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleOpenPatient(patientData); }}
+                                  className="flex-1 sm:flex-none px-4 py-3 bg-emerald-600 text-white rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md shadow-emerald-500/20 transition-all"
+                                >
+                                  <FileText size={16} />
+                                  <span className="hidden sm:inline">EVOLUCIÓN</span>
+                                  <span className="sm:hidden">EVOLUCION</span>
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleStatusChange(app.id, APPOINTMENT_STATUS.FINALIZADO); }}
+                                  className="flex-1 sm:flex-none px-4 py-3 bg-[var(--accent-primary)] text-white rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] shadow-lg shadow-[var(--accent-primary)]/20 transition-all"
+                                >
+                                  <UserCheck size={16} />
+                                  <span>FINALIZAR</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+
+                          {app.modalidad === 'virtual' && (
+                            <div className="flex gap-2 w-full mt-1">
+                              <button
+                                onClick={(e) => handleSetDelay(app, e)}
+                                className="flex-1 px-3 py-2 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-amber-100 transition-colors"
+                              >
+                                <AlertCircle size={14} /> Avisar Demora
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* MODAL: Avisar Demora */}
+      {delayModalApp && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in-quick">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 animate-scale-in">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+                  <AlertCircle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">Avisar Demora</h3>
+                  <p className="text-xs text-slate-500">{delayModalApp.patient}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setDelayModalApp(null)}
+                className="w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <p className="text-sm font-medium text-slate-600 mb-4 leading-relaxed">
+              Ingresá los minutos aproximados de demora. Se le mostrará un aviso al paciente en la sala de espera. (Dejá en blanco para borrar un aviso anterior)
+            </p>
+
+            <input id="delayMinutes" name="delayMinutes"
+              type="number"
+              placeholder="Ej: 15"
+              value={delayMinutes}
+              onChange={(e) => setDelayMinutes(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 rounded-xl font-bold text-slate-800 transition-all mb-6"
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDelayModalApp(null)}
+                className="flex-1 py-3 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitDelay}
+                className="flex-1 py-3 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-lg shadow-amber-500/20 transition-all"
+              >
+                Enviar Aviso
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

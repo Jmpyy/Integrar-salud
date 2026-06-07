@@ -1,18 +1,26 @@
+import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
 
 export default function ConfirmDialog({
   isOpen,
   onConfirm,
   onCancel,
+  onClose, // Alias para onCancel
   title = 'Confirmar acción',
   description = '¿Estás seguro de que querés continuar?',
+  message, // Alias para description
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
   variant = 'danger', // 'danger' | 'warning' | 'info'
+  type, // Alias para variant
   isLoading = false,
   showCancel = true,
 }) {
   if (!isOpen) return null;
+
+  const displayDescription = message || description;
+  const handleCancel = onCancel || onClose;
+  const displayVariant = type || variant;
 
   const variantConfig = {
     danger: {
@@ -38,14 +46,14 @@ export default function ConfirmDialog({
     },
   };
 
-  const cfg = variantConfig[variant] || variantConfig.danger;
+  const cfg = variantConfig[displayVariant] || variantConfig.danger;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm animate-fade-in-quick"
-        onClick={isLoading ? undefined : onCancel}
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm animate-fade-in-quick"
+        onClick={isLoading ? undefined : handleCancel}
       />
 
       {/* Modal */}
@@ -53,8 +61,8 @@ export default function ConfirmDialog({
         {/* Close button */}
         {!isLoading && (
           <button
-            onClick={onCancel}
-            className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            onClick={handleCancel}
+            className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors p-2"
           >
             <X size={20} />
           </button>
@@ -67,15 +75,15 @@ export default function ConfirmDialog({
 
         {/* Content */}
         <h3 className="text-lg font-black text-[var(--text-primary)] text-center mb-2">{title}</h3>
-        <p className="text-sm text-[var(--text-secondary)] text-center leading-relaxed mb-6 opacity-70">{description}</p>
+        <p className="text-sm text-[var(--text-secondary)] text-center leading-relaxed mb-6 opacity-70">{displayDescription}</p>
 
         {/* Actions */}
         <div className="flex gap-3">
           {showCancel && (
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
               disabled={isLoading}
-              className="flex-1 px-4 py-3 bg-[var(--bg-main)] text-[var(--text-secondary)] rounded-xl font-bold text-sm hover:bg-[var(--accent-light)] hover:text-[var(--accent-primary)] border border-[var(--border-color)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-4 bg-[var(--bg-main)] text-[var(--text-secondary)] rounded-xl font-bold text-sm hover:bg-[var(--accent-light)] hover:text-[var(--accent-primary)] border border-[var(--border-color)] transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
             >
               {cancelText}
             </button>
@@ -83,7 +91,7 @@ export default function ConfirmDialog({
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className={`flex-1 px-4 py-3 text-white rounded-xl font-extrabold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${cfg.confirmBg}`}
+            className={`flex-1 px-4 py-4 text-white rounded-xl font-extrabold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 ${cfg.confirmBg}`}
           >
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
@@ -91,7 +99,7 @@ export default function ConfirmDialog({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Procesando...
+                ...
               </span>
             ) : (
               confirmText
@@ -99,6 +107,7 @@ export default function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

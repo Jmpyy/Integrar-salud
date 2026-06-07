@@ -39,26 +39,26 @@ export default function PersonalPage() {
 
   // Form state
   const [form, setForm] = useState({
-    name: '', specialty: '', license: '', color: 'indigo', phone: '',
-    adminRole: 'Recepcionista', shift: 'Mañana', remuneration: '',
+    name: '', specialty: '', license: '', color: 'indigo', phone: '', meetLink: '',
+    adminRole: 'recepcionista', shift: 'Mañana', remuneration: '',
     email: '', password: '' // Para creación de admin
   });
 
-  const BLANK_FORM = { name: '', specialty: '', license: '', color: 'indigo', phone: '', adminRole: 'Recepcionista', shift: 'Mañana', remuneration: '', remunerationType: 'fijo' };
+  const BLANK_FORM = { name: '', specialty: '', license: '', color: 'indigo', phone: '', meetLink: '', email: '', adminRole: 'recepcionista', shift: 'Mañana', remuneration: '', remunerationType: 'fijo' };
 
   const openNewEmployee = () => { setEditingId(null); setForm(BLANK_FORM); setShowModal(true); };
 
   const openEditDoctor = (doc) => {
     setModalRole('medico');
     setEditingId(doc.id);
-    setForm({ name: doc.name, specialty: doc.specialty || '', license: doc.license || '', color: doc.color || 'indigo', phone: doc.phone || '', adminRole: 'Recepcionista', shift: 'Mañana', remuneration: doc.remuneration || '', remunerationType: doc.remunerationType || 'fijo' });
+    setForm({ name: doc.name, specialty: doc.specialty || '', license: doc.license || '', color: doc.color || 'indigo', phone: doc.phone || '', meetLink: doc.meet_link || '', adminRole: 'recepcionista', shift: 'Mañana', remuneration: doc.remuneration || '', remunerationType: doc.remunerationType || 'fijo' });
     setShowModal(true);
   };
 
   const openEditAdmin = (emp) => {
     setModalRole('recepcion');
     setEditingId(emp.id);
-    setForm({ name: emp.name, specialty: '', license: '', color: 'indigo', phone: emp.phone || '', adminRole: emp.role || 'Recepcionista', shift: emp.shift || 'Mañana', remuneration: emp.remuneration || '', remunerationType: emp.remunerationType || 'fijo' });
+    setForm({ name: emp.name, specialty: '', license: '', color: 'indigo', phone: emp.phone || '', adminRole: emp.role || 'recepcionista', shift: emp.shift || 'Mañana', remuneration: emp.remuneration || '', remunerationType: emp.remunerationType || 'fijo' });
     setShowModal(true);
   };
 
@@ -88,7 +88,7 @@ export default function PersonalPage() {
       if (modalRole === 'medico') {
         const remuData = { remuneration: form.remuneration, remunerationType: form.remunerationType };
         if (editingId !== null) {
-          await store.updateDoctor(editingId, { name: form.name, specialty: form.specialty, license: form.license, color: form.color, phone: form.phone, ...remuData });
+          await store.updateDoctor(editingId, { name: form.name, specialty: form.specialty, license: form.license, color: form.color, phone: form.phone, meetLink: form.meetLink, ...remuData });
           showToast(`✓ Datos de ${form.name} actualizados.`);
         } else {
           const newDoc = {
@@ -97,6 +97,8 @@ export default function PersonalPage() {
             license: form.license,
             color: form.color,
             phone: form.phone,
+            meetLink: form.meetLink,
+            email: form.email || undefined,
             ...remuData,
             schedule: { 1: { start: 9, end: 18 }, 3: { start: 9, end: 18 }, 5: { start: 9, end: 18 } }
           };
@@ -112,7 +114,7 @@ export default function PersonalPage() {
           await store.updateStaff(editingId, { name: form.name, role: form.adminRole, shift: form.shift, phone: form.phone, ...remuData });
           showToast(`✓ Datos de ${form.name} actualizados.`);
         } else {
-          const created = await store.createStaff({ name: form.name, role: form.adminRole, shift: form.shift, phone: form.phone, ...remuData });
+          const created = await store.createStaff({ name: form.name, role: form.adminRole, shift: form.shift, phone: form.phone, email: form.email || undefined, ...remuData });
           createdEntityId = created.staff.id;
           await store.fetchAdminStaff();
           setCreatedCredentials({ name: form.name, email: created.email, password: created.password, role: 'Administrativo' });
@@ -205,24 +207,41 @@ export default function PersonalPage() {
             <form onSubmit={handleSave} className="space-y-6">
               <div>
                 <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Identificación / Nombre Completo *</label>
-                <input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition-all" placeholder="Ej: Lic. Laura Gómez" />
+                <input id="name" name="name" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition-all" placeholder="Ej: Lic. Laura Gómez" />
               </div>
 
               <div>
                 <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Línea de Contacto Directo</label>
-                <input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition-all" placeholder="Ej: 11 5000-0000" />
+                <input id="phone" name="phone" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition-all" placeholder="Ej: 11 5000-0000" />
               </div>
+
+              {/* Email — solo al crear, no al editar */}
+              {!editingId && modalRole !== 'admin' && (
+                <div>
+                  <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">
+                    Correo Electrónico de Acceso
+                    <span className="ml-2 normal-case font-semibold opacity-50">(opcional — si no ponés uno se genera automáticamente)</span>
+                  </label>
+                  <input id="email" name="email"
+                    type="email"
+                    value={form.email}
+                    onChange={e => setForm({...form, email: e.target.value})}
+                    className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition-all"
+                    placeholder="Ej: drvargas@gmail.com"
+                  />
+                </div>
+              )}
 
               {modalRole === 'medico' ? (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                      <div>
                        <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Especialidad *</label>
-                       <input required value={form.specialty} onChange={e => setForm({...form, specialty: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all" placeholder="Ej: Psicología" />
+                       <input id="specialty" name="specialty" required value={form.specialty} onChange={e => setForm({...form, specialty: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all" placeholder="Ej: Psicología" />
                      </div>
                      <div>
                        <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Matrícula</label>
-                       <input value={form.license} onChange={e => setForm({...form, license: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all" placeholder="Ej: MN-12345" />
+                       <input id="license" name="license" value={form.license} onChange={e => setForm({...form, license: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all" placeholder="Ej: MN-12345" />
                      </div>
                   </div>
                   <div>
@@ -245,16 +264,14 @@ export default function PersonalPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Rol Asignado</label>
-                    <select value={form.adminRole} onChange={e => setForm({...form, adminRole: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all">
-                      <option className="bg-[var(--bg-card)]">Recepcionista</option>
-                      <option className="bg-[var(--bg-card)]">Secretaría</option>
-                      <option className="bg-[var(--bg-card)]">Administración</option>
-                      <option className="bg-[var(--bg-card)]">Coordinación</option>
+                    <select id="adminRole" name="adminRole" value={form.adminRole} onChange={e => setForm({...form, adminRole: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all">
+                      <option className="bg-[var(--bg-card)]" value="recepcionista">Recepcionista</option>
+                      <option className="bg-[var(--bg-card)]" value="administracion">Administración</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70 flex items-center gap-1.5"><Clock size={11} /> Turno Horario</label>
-                    <select value={form.shift} onChange={e => setForm({...form, shift: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all">
+                    <select id="shift" name="shift" value={form.shift} onChange={e => setForm({...form, shift: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all">
                       <option className="bg-[var(--bg-card)]">Mañana</option>
                       <option className="bg-[var(--bg-card)]">Tarde</option>
                       <option className="bg-[var(--bg-card)]">Doble Turno</option>
@@ -268,11 +285,11 @@ export default function PersonalPage() {
                    </p>
                    <div>
                      <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase opacity-70 tracking-widest">Email Corporativo</label>
-                     <input required type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-500/10" placeholder="admin@consultorio.com" />
+                     <input id="email" name="email" required type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-500/10" placeholder="admin@consultorio.com" />
                    </div>
                    <div>
                      <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase opacity-70 tracking-widest">Token / Password Temporal</label>
-                     <input required type="text" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-500/10" placeholder="Min. 6 caracteres" />
+                     <input id="password" name="password" required type="text" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-500/10" placeholder="Min. 6 caracteres" />
                    </div>
                 </div>
               )}
@@ -300,12 +317,12 @@ export default function PersonalPage() {
                 {form.remunerationType === 'porcentaje' ? (
                   <div className="space-y-4 animate-fade-in-quick">
                     <div className="relative flex items-center">
-                      <input type="number" min="0" max="100" step="1"
-                        value={form.remuneration}
-                        onChange={e => setForm({...form, remuneration: e.target.value})}
-                        className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl pl-6 pr-12 py-3.5 text-xl font-black text-emerald-500 outline-none focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 transition-all"
-                        placeholder="0" />
-                      <span className="absolute right-6 top-1/2 -translate-y-1/2 text-2xl font-black text-emerald-500/50">%</span>
+                        <input id="remuneration" name="remuneration" type="number" min="0" max="100" step="0.01"
+                          value={form.remuneration}
+                          onChange={e => setForm({...form, remuneration: e.target.value})}
+                          className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl pl-6 pr-12 py-3.5 text-xl font-black text-emerald-500 outline-none focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/5 transition-all"
+                          placeholder="0.00" />
+                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-2xl font-black text-emerald-500/50">%</span>
                     </div>
                     <p className="text-[10px] text-[var(--text-secondary)] font-bold px-1 opacity-60 leading-relaxed uppercase tracking-wider">Compensación por producción variable. No impacta de forma automática en el Libro Diario.</p>
                   </div>
@@ -313,11 +330,11 @@ export default function PersonalPage() {
                   <div className="space-y-4 animate-fade-in-quick">
                     <div className="relative flex items-center">
                       <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-sky-500/50">$</span>
-                      <input type="number" min="0" step="1000"
-                        value={form.remuneration}
-                        onChange={e => setForm({...form, remuneration: e.target.value})}
-                        className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl pl-12 pr-6 py-3.5 text-xl font-black text-sky-500 outline-none focus:border-sky-500/50 focus:ring-4 focus:ring-sky-500/5 transition-all"
-                        placeholder="0.00" />
+                        <input id="remuneration" name="remuneration" type="number" min="0" step="0.01"
+                          value={form.remuneration}
+                          onChange={e => setForm({...form, remuneration: e.target.value})}
+                          className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl pl-12 pr-6 py-3.5 text-xl font-black text-sky-500 outline-none focus:border-sky-500/50 focus:ring-4 focus:ring-sky-500/5 transition-all"
+                          placeholder="0.00" />
                     </div>
                     <p className="text-[10px] text-[var(--text-secondary)] font-bold px-1 opacity-60 leading-relaxed uppercase tracking-wider">Carga fija operativa. Al guardar, se inyectará el movimiento contable en el Dashboard de Finanzas.</p>
                   </div>
@@ -391,7 +408,7 @@ export default function PersonalPage() {
           </div>
           <div className="relative pb-4 sm:pb-4 group">
             <Search size={16} className="absolute left-4 top-[45%] -translate-y-1/2 text-[var(--text-secondary)] opacity-50 group-hover:text-[var(--accent-primary)] transition-colors" />
-            <input
+            <input id="searchQuery" name="searchQuery"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Buscar por nombre o ID..."
@@ -532,7 +549,7 @@ export default function PersonalPage() {
                       <span className="text-[11px] font-mono font-black text-[var(--text-secondary)] bg-[var(--bg-main)] px-3 py-1.5 rounded-xl border border-[var(--border-color)]/30">{doc.license || 'GEN-CLINIC'}</span>
                     </td>
                     <td className="py-5 px-2 hidden md:table-cell border-y border-[var(--border-color)]/20">
-                      <div className="flex flex-col">
+                      <div className="flex flex-col gap-1">
                         <span className="text-xs font-black text-[var(--text-primary)] flex items-center gap-2 opacity-80"><Phone size={14} className="text-[var(--accent-primary)]"/> {doc.phone || '+54 --- ---'}</span>
                       </div>
                     </td>
@@ -658,7 +675,7 @@ export default function PersonalPage() {
             <div className="space-y-6">
               <div className="relative group">
                 <Lock size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-40 group-focus-within:text-[var(--accent-primary)] transition-colors" />
-                <input
+                <input id="resetPasswordValue" name="resetPasswordValue"
                   type="text"
                   autoFocus
                   value={resetPasswordValue}

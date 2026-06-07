@@ -13,6 +13,7 @@
     "@tailwindcss/vite": "^4.2.1",
     "axios": "^1.14.0",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -36,7 +37,8 @@
     "globals": "^16.5.0",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.1",
-    "vite": "^6.3.4"
+    "vite": "^6.3.4",
+    "vite-plugin-pwa": "^1.2.0"
   },
   "overrides": {
     "vite": "^6.3.4"

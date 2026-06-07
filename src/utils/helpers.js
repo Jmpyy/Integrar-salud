@@ -9,6 +9,17 @@ export function toLocalDateString(date) {
 }
 
 /**
+ * Devuelve la fecha y hora LOCAL actual en formato "YYYY-MM-DD HH:MM:SS"
+ * para enviar al backend (que ahora usa timezone Argentina).
+ * Reemplaza el workaround: new Date(Date.now() - getTimezoneOffset() * 60000).toISOString()
+ */
+export function nowForAPI() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/**
  * Formatea una fecha para display en español
  */
 export function formatDate(date, options = {}) {

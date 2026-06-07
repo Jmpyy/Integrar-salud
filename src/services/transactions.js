@@ -35,4 +35,9 @@ export const transactionsService = {
 
   // exportPDF — TODO: implementar generación de PDF en el backend.
   // El endpoint actual solo soporta format=csv.
+
+  async delete(id) {
+    await api.delete(`/transactions/${id}`);
+    return true;
+  }
 };
