@@ -24,6 +24,10 @@ jobs:
         run: npm ci || npm install
         
       - name: Build Project
+        env:
+          VITE_API_BASE_URL: https://integrarsalud.me/api-integrar/api
+          VITE_APP_NAME: Integrar Salud
+          VITE_NODE_ENV: production
         run: npm run build
         
       - name: Deploy to VPS
