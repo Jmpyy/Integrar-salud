@@ -65,7 +65,7 @@ export default function NotificationCenter() {
         Icon:     Clock,
         title:    `${a.patient} está esperando`,
         detail:   `${a.time} hs — ${a.title}`,
-        to:       '/consultorio',
+        to:       '/dashboard/consultorio',
         cta:      'Ir a Consultorio',
       });
     });
@@ -94,7 +94,7 @@ export default function NotificationCenter() {
         Icon:     CalendarDays,
         title:    `${a.patient} en ${diff} min`,
         detail:   `${a.time} hs — ${a.title}`,
-        to:       '/agenda',
+        to:       '/dashboard/agenda',
         cta:      'Ver Agenda',
       });
     });
@@ -113,7 +113,7 @@ export default function NotificationCenter() {
         title:    `${unpaid.length} turno${unpaid.length > 1 ? 's' : ''} sin cobrar`,
         detail:   unpaid.slice(0, 3).map(a => a.patient).join(', ')
                     + (unpaid.length > 3 ? ` y ${unpaid.length - 3} más` : ''),
-        to:       '/consultorio',
+        to:       '/dashboard/consultorio',
         cta:      'Ir a Consultorio',
       });
     }
@@ -128,7 +128,7 @@ export default function NotificationCenter() {
         Icon:     CheckCheck,
         title:    `${done} / ${todayApps.length} turnos finalizados`,
         detail:   'Todo al día — sin alertas pendientes.',
-        to:       '/consultorio',
+        to:       '/dashboard/consultorio',
         cta:      'Ver Consultorio',
       });
     }
@@ -299,7 +299,7 @@ export default function NotificationCenter() {
               )}
 
               <Link
-                to="/consultorio"
+                to="/dashboard/consultorio"
                 onClick={() => setIsOpen(false)}
                 className="text-xs font-black text-[var(--accent-primary)] hover:text-[var(--accent-hover)] transition-all flex items-center justify-center gap-1.5 group"
               >
