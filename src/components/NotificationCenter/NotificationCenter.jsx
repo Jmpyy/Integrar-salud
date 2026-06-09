@@ -303,8 +303,8 @@ export default function NotificationCenter() {
                 onClick={() => setIsOpen(false)}
                 className="text-xs font-black text-[var(--accent-primary)] hover:text-[var(--accent-hover)] transition-all flex items-center justify-center gap-1.5 group"
               >
-                <AlertTriangle size={12} className="group-hover:animate-pulse" />
-                Ver sala de espera completa
+                <Bell size={12} className="group-hover:animate-pulse" />
+                Ir al centro de notificaciones
                 <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>

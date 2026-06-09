@@ -127,7 +127,7 @@ export default function AgendaPage() {
     date: currentSelectedDateString,
     time: '12:00',
     duration: 1,
-    type: 'psicologia',
+    type: '',
     modalidad: 'presencial',
     doctorId: doctors && doctors.length > 0 && doctors[0] ? doctors[0].id : '',
     patientId: '',
@@ -583,6 +583,37 @@ export default function AgendaPage() {
     window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  const handleStartVirtualCall = (e, app) => {
+    if (e) e.stopPropagation();
+    
+    // Validar tiempo (solo permitir iniciar 10 mins antes)
+    const now = new Date();
+    const appDateStr = app.date; // YYYY-MM-DD
+    const appTimeStr = app.time; // HH:mm
+    
+    if (appDateStr && appTimeStr) {
+      const [year, month, day] = appDateStr.split('-').map(Number);
+      const [hour, minute] = appTimeStr.split(':').map(Number);
+      
+      const appDateTime = new Date(year, month - 1, day, hour, minute);
+      const diffMs = appDateTime.getTime() - now.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      
+      if (diffMins > 10) {
+        toast.error('No podés iniciar una consulta con tanta anticipación. Solo se permite 10 minutos antes del turno.', {
+          icon: '⏳',
+          duration: 5000,
+        });
+        return;
+      }
+    }
+    
+    // Ir a la sala
+    navigate(`/sala-virtual/medico/${app.id}`);
+    setActiveDropdown(null);
+    setMenuApp(null);
+  };
+
   const handleCopyVirtualLink = (app, e) => {
     if (e) e.stopPropagation();
     const patientRecord = store.patients.find(p => p.id === app.patientId || p.name === app.patient);
@@ -629,7 +660,7 @@ export default function AgendaPage() {
       date: app.date || '',
       time: app.time || '',
       duration: app.duration || 1,
-      type: app.type || 'psicologia',
+      type: app.type || (app.title && ['Psiquiatría', 'Psicología', 'Control'].includes(app.title) ? app.title.toLowerCase() : ''),
       modalidad: app.modalidad || 'presencial',
       doctorId: app.doctorId,
       patientId: existing ? existing.id : '',
@@ -797,10 +828,10 @@ export default function AgendaPage() {
                         <Stethoscope size={12} />
                         <span>{doctors.find(d => d.id === app.doctorId)?.name?.split(' ')[0] || 'Doc'}</span>
                       </div>
-                      {app.type && (
+                      {app.modalidad && (
                         <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/40 rounded-lg">
-                          <span>{app.type.toLowerCase().includes('virtual') ? '💻' : app.type.toLowerCase().includes('domicilio') ? '🏠' : '🏥'}</span>
-                          <span>{app.type}</span>
+                          <span>{app.modalidad === 'virtual' ? '💻' : app.modalidad === 'domicilio' ? '🏠' : '🏥'}</span>
+                          <span className="capitalize">{app.modalidad}</span>
                         </div>
                       )}
                     </div>
@@ -1105,10 +1136,10 @@ export default function AgendaPage() {
                                   {app.attendance === 'en_curso' && <span className="inline-block px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-md shadow-md border border-emerald-400 animate-pulse">ATENDIENDO</span>}
                                   {app.attendance === 'en_espera' && <span className="inline-block px-1.5 py-0.5 bg-indigo-600 text-white text-[10px] font-bold uppercase rounded-md animate-pulse shadow-sm shadow-indigo-300">Sala: {app.waitTicket || "Llamar"}</span>}
                                   
-                                  {/* Tipo de Consulta */}
-                                  {app.type && (
+                                  {/* Modalidad de Consulta */}
+                                  {app.modalidad && (
                                     <span className="inline-block px-1.5 py-0.5 bg-white/80 text-slate-700 text-[10px] font-black uppercase rounded-md shadow-sm border border-slate-200/50 flex items-center gap-1">
-                                      {app.type.toLowerCase().includes('virtual') ? '💻' : app.type.toLowerCase().includes('domicilio') ? '🏠' : '🏥'} {app.type}
+                                      {app.modalidad === 'virtual' ? '💻' : app.modalidad === 'domicilio' ? '🏠' : '🏥'} {app.modalidad}
                                     </span>
                                   )}
                                 </div>
@@ -1897,7 +1928,7 @@ export default function AgendaPage() {
                                <button
                                  key={tag}
                                  type="button"
-                                 onClick={() => setFormData({...formData, title: tag})}
+                                 onClick={() => setFormData({...formData, title: tag, type: tag.toLowerCase()})}
                                  className={`px-1 py-2 text-[8px] sm:text-[10px] font-black uppercase rounded-xl border transition-all truncate ${
                                    formData.title === tag 
                                      ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-md' 

@@ -19,6 +19,14 @@ Este repositorio contiene la interfaz de usuario (Frontend) de **Integrar Salud*
 
 ---
 
+## 🛠️ Correcciones y Mejoras Recientes
+- **Resolución de estado en Agenda:** Corrección en la persistencia de datos (Modalidad Virtual/Presencial y Tipo de Consulta Psiquiatría/Psicología), garantizando precisión y actualización en tiempo real en la UI.
+- **Validación de Consultas Virtuales:** Sistema de seguridad y validación de horarios que impide el ingreso prematuro a la videollamada (más de 10 min de antelación), con alertas profesionales.
+- **Accesibilidad Móvil (Responsive):** Corrección en el módulo de Personal para habilitar el desplazamiento (scroll) nativo fluido en vistas de dispositivos móviles.
+- **Actualización de Interfaz:** Optimización de menús orientados al nuevo Centro de Notificaciones integrado.
+
+---
+
 ## 🛠️ Stack Tecnológico
 - **Framework:** [React 19](https://react.dev/)
 - **Bundler:** [Vite 6](https://vitejs.dev/)

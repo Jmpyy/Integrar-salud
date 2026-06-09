@@ -156,7 +156,7 @@ export default function PersonalPage() {
   const filteredAdmin = adminStaff.filter(a => a && a.name && a.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="flex flex-col min-h-0 h-[calc(100vh-12rem)] animate-fade-in-quick px-2 sm:px-6 py-2 sm:py-4 overflow-y-auto print:overflow-visible custom-scrollbar relative bg-[var(--bg-main)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-[2.5rem]">
+    <div className="flex flex-col gap-6 h-full animate-fade-in-quick px-2 sm:px-6 py-2 sm:py-4 print:overflow-visible relative bg-[var(--bg-main)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-[2.5rem]">
 
       {/* TOAST */}
       {toastMsg && (
