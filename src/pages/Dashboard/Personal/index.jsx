@@ -393,15 +393,15 @@ export default function PersonalPage() {
       {/* TABLA PRINCIPAL */}
       <div className="card-premium rounded-3xl border border-[var(--border-color)]/50 shadow-xl flex flex-1 min-h-[600px] flex-col overflow-hidden">
         {/* TABS + SEARCH */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--border-color)]/50 px-6 pt-6 pb-0 gap-4 bg-[var(--bg-sidebar)]/30">
-          <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--border-color)]/50 px-6 pt-6 pb-0 gap-4 bg-[var(--bg-sidebar)]/30 overflow-hidden">
+          <div className="flex gap-2 w-full sm:w-auto overflow-x-auto custom-scrollbar-horizontal pb-1 sm:pb-0">
             {[ ['medicos', Stethoscope, 'Clínico'], ['admin', Monitor, 'Soporte'], ['seguridad', ShieldCheck, 'Sistemas'] ].map(([tabId, TabIcon, label]) => (
               <button key={tabId} 
                 onClick={() => {
                   setStaffTab(tabId);
                   if (tabId === 'seguridad') store.fetchUsers();
                 }} 
-                className={`px-6 py-4 rounded-t-2xl font-black text-[10px] uppercase tracking-[0.15em] flex items-center gap-2 transition-all ${staffTab === tabId ? 'bg-[var(--bg-card)] text-[var(--accent-primary)] border border-[var(--border-color)] border-b-transparent relative top-[1px] shadow-[0_-5px_15px_rgba(0,0,0,0.03)]' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-main)]'}`}>
+                className={`shrink-0 px-6 py-4 rounded-t-2xl font-black text-[10px] uppercase tracking-[0.15em] flex items-center gap-2 transition-all ${staffTab === tabId ? 'bg-[var(--bg-card)] text-[var(--accent-primary)] border border-[var(--border-color)] border-b-transparent relative top-[1px] shadow-[0_-5px_15px_rgba(0,0,0,0.03)]' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-main)]'}`}>
                 <TabIcon size={16} /> {label}
               </button>
             ))}
