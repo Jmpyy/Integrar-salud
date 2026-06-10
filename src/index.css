@@ -64,11 +64,12 @@ body::before {
   position: fixed;
   top: -10%; left: -10%;
   width: 120%; height: 120%;
-  background: radial-gradient(circle at center, var(--accent-light) 0%, transparent 70%);
+  /* Gradiente más suave para no necesitar el filtro de desenfoque */
+  background: radial-gradient(circle at center, var(--accent-light) 0%, transparent 60%);
   z-index: -1;
   animation: ambientLight 15s ease-in-out infinite alternate;
   pointer-events: none;
-  filter: blur(60px);
+  /* Eliminado: filter: blur(60px); -> Esto colapsaba la GPU de teléfonos gama media/baja */
 }
 
 /* --- Glassmorphism Utils --- */
