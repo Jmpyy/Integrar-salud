@@ -72,6 +72,7 @@ export default function DashboardLayout({ onLogout }) {
   const location  = useLocation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
   const dragControls = useDragControls();
 
   const { 
@@ -439,6 +440,8 @@ export default function DashboardLayout({ onLogout }) {
           dragControls={dragControls}
           dragListener={false}
           dragMomentum={false}
+          onDragStart={() => setIsDragging(true)}
+          onDragEnd={() => setIsDragging(false)}
           animate={isJitsiMaximized ? { x: 0, y: 0 } : undefined}
           className={`fixed flex flex-col bg-slate-900 shadow-2xl overflow-hidden border border-slate-700 animate-fade-in-quick transition-all duration-300 z-[99999] ${
             isJitsiMaximized 
@@ -484,6 +487,8 @@ export default function DashboardLayout({ onLogout }) {
           </div>
           {/* Jitsi Meeting */}
           <div className="flex-1 relative bg-black">
+            {/* Este overlay transparente captura los eventos del mouse mientras se arrastra, evitando que el iframe de Jitsi se los trague y el movimiento se corte */}
+            {isDragging && <div className="absolute inset-0 z-10 cursor-move" />}
             <JitsiMeeting
               roomName={`integrarsalud-${activeCallApp.id}-${activeCallApp.codigoAcceso}`}
               displayName={user?.name || "Médico"}
