@@ -22,7 +22,9 @@ Este repositorio contiene la interfaz de usuario (Frontend) de **Integrar Salud*
 ## 🛠️ Correcciones y Mejoras Recientes
 - **Resolución de estado en Agenda:** Corrección en la persistencia de datos (Modalidad Virtual/Presencial y Tipo de Consulta Psiquiatría/Psicología), garantizando precisión y actualización en tiempo real en la UI.
 - **Validación de Consultas Virtuales:** Sistema de seguridad y validación de horarios que impide el ingreso prematuro a la videollamada (más de 10 min de antelación), con alertas profesionales.
-- **Accesibilidad Móvil (Responsive):** Corrección en el módulo de Personal para habilitar el desplazamiento (scroll) nativo fluido en vistas de dispositivos móviles.
+- **Accesibilidad y Estándares W3C:** Corrección sistemática de etiquetas HTML, atributos `htmlFor` huérfanos, y `autocomplete` faltantes en los módulos de LoginPage, Agenda, Medicamentos, Finanzas y Personal.
+- **Formato Monetario Universal:** Estandarización de divisas usando la API `Intl.NumberFormat('es-AR')` para asegurar la correcta legibilidad de valores con dos decimales ($1.500,50) en toda la UI y comprobantes de pago.
+- **Responsividad Avanzada (Mobile):** Adaptación profunda de las vistas de Finanzas y Personal, implementando tablas desplazables horizontalmente (`overflow-x-auto`), y auto-ocultamiento y apilamiento inteligente en tarjetas KPI.
 - **Actualización de Interfaz:** Optimización de menús orientados al nuevo Centro de Notificaciones integrado.
 
 ---

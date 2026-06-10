@@ -41,7 +41,7 @@ export default function QuickPaymentModal({ appointment, doctor, onClose, onPaid
   };
 
   const fmt = (v) =>
-    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(v || 0);
+    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(v || 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -211,46 +211,46 @@ export default function ConfiguracionPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="sm:col-span-2">
-                  <label className={labelClass}>Nombre Institucional</label>
-                  <input id="businessName" name="businessName" type="text" value={config.businessName} onChange={e => update('businessName', e.target.value)} className={fieldClass} placeholder="Ej: Clínica Central" />
+                  <label htmlFor="businessName" className={labelClass}>Nombre Institucional</label>
+                  <input id="businessName" name="businessName" type="text" autoComplete="organization" value={config.businessName} onChange={e => update('businessName', e.target.value)} className={fieldClass} placeholder="Ej: Clínica Central" />
                 </div>
                 <div>
-                  <label className={labelClass}>Color Principal de la Marca</label>
+                  <label htmlFor="primaryColor" className={labelClass}>Color Principal de la Marca</label>
                   <div className="flex items-center gap-4">
-                    <input id="primaryColor" name="primaryColor" type="color" value={config.primaryColor} onChange={e => update('primaryColor', e.target.value)} className="w-12 h-12 rounded-xl cursor-pointer border-none p-0 outline-none" />
-                    <input id="primaryColor" name="primaryColor" type="text" value={config.primaryColor} onChange={e => update('primaryColor', e.target.value)} className={fieldClass} placeholder="#f43f5e" />
+                    <input id="primaryColorPicker" name="primaryColorPicker" type="color" value={config.primaryColor} onChange={e => update('primaryColor', e.target.value)} className="w-12 h-12 rounded-xl cursor-pointer border-none p-0 outline-none" />
+                    <input id="primaryColor" name="primaryColor" type="text" autoComplete="off" value={config.primaryColor} onChange={e => update('primaryColor', e.target.value)} className={fieldClass} placeholder="#f43f5e" />
                   </div>
                 </div>
                 <div>
-                  <label className={labelClass}>URL del Logo Institucional</label>
-                  <input id="logoUrl" name="logoUrl" type="text" value={config.logoUrl} onChange={e => update('logoUrl', e.target.value)} className={fieldClass} placeholder="/pwa-192x192.png o https://..." />
+                  <label htmlFor="logoUrl" className={labelClass}>URL del Logo Institucional</label>
+                  <input id="logoUrl" name="logoUrl" type="text" autoComplete="url" value={config.logoUrl} onChange={e => update('logoUrl', e.target.value)} className={fieldClass} placeholder="/pwa-192x192.png o https://..." />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className={labelClass}>Domicilio Físico</label>
-                  <input id="address" name="address" type="text" value={config.address} onChange={e => update('address', e.target.value)} className={fieldClass} placeholder="Ciudad, Provincia, Dirección" />
+                  <label htmlFor="address" className={labelClass}>Domicilio Físico</label>
+                  <input id="address" name="address" type="text" autoComplete="street-address" value={config.address} onChange={e => update('address', e.target.value)} className={fieldClass} placeholder="Ciudad, Provincia, Dirección" />
                 </div>
                 <div>
-                  <label className={labelClass}>Línea Telefónica</label>
-                  <input id="phone" name="phone" type="tel" value={config.phone} onChange={e => update('phone', e.target.value)} className={fieldClass} placeholder="+54 11 0000 0000" />
+                  <label htmlFor="phone" className={labelClass}>Línea Telefónica</label>
+                  <input id="phone" name="phone" type="tel" autoComplete="tel" value={config.phone} onChange={e => update('phone', e.target.value)} className={fieldClass} placeholder="+54 11 0000 0000" />
                 </div>
                 <div>
-                  <label className={labelClass}>Correo Electrónico Corporativo</label>
-                  <input id="email" name="email" type="email" value={config.email} onChange={e => update('email', e.target.value)} className={fieldClass} placeholder="admin@consultorio.com" />
+                  <label htmlFor="email" className={labelClass}>Correo Electrónico Corporativo</label>
+                  <input id="email" name="email" type="email" autoComplete="email" value={config.email} onChange={e => update('email', e.target.value)} className={fieldClass} placeholder="admin@consultorio.com" />
                 </div>
                 <div className="sm:col-span-2 pt-4 border-t border-[var(--border-color)]/30 mt-4">
                   <h4 className="text-[11px] font-black text-[var(--text-primary)] uppercase tracking-widest mb-4">Redes Sociales</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                      <label className={labelClass}>Instagram URL</label>
-                      <input id="instagram" name="instagram" type="url" value={config.instagram || ''} onChange={e => update('instagram', e.target.value)} className={fieldClass} placeholder="https://instagram.com/tu_usuario" />
+                      <label htmlFor="instagram" className={labelClass}>Instagram URL</label>
+                      <input id="instagram" name="instagram" type="url" autoComplete="url" value={config.instagram || ''} onChange={e => update('instagram', e.target.value)} className={fieldClass} placeholder="https://instagram.com/tu_usuario" />
                     </div>
                     <div>
-                      <label className={labelClass}>Facebook URL</label>
-                      <input id="facebook" name="facebook" type="url" value={config.facebook || ''} onChange={e => update('facebook', e.target.value)} className={fieldClass} placeholder="https://facebook.com/tu_pagina" />
+                      <label htmlFor="facebook" className={labelClass}>Facebook URL</label>
+                      <input id="facebook" name="facebook" type="url" autoComplete="url" value={config.facebook || ''} onChange={e => update('facebook', e.target.value)} className={fieldClass} placeholder="https://facebook.com/tu_pagina" />
                     </div>
                     <div>
-                      <label className={labelClass}>LinkedIn URL</label>
-                      <input id="linkedin" name="linkedin" type="url" value={config.linkedin || ''} onChange={e => update('linkedin', e.target.value)} className={fieldClass} placeholder="https://linkedin.com/in/tu_perfil" />
+                      <label htmlFor="linkedin" className={labelClass}>LinkedIn URL</label>
+                      <input id="linkedin" name="linkedin" type="url" autoComplete="url" value={config.linkedin || ''} onChange={e => update('linkedin', e.target.value)} className={fieldClass} placeholder="https://linkedin.com/in/tu_perfil" />
                     </div>
                   </div>
                 </div>
@@ -316,8 +316,8 @@ export default function ConfiguracionPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 <div>
-                  <label className={labelClass}>Espaciado de Turnos</label>
-                  <select id="defaultDuration" name="defaultDuration" value={config.defaultDuration} onChange={e => update('defaultDuration', Number(e.target.value))} className={fieldClass}>
+                  <label htmlFor="defaultDuration" className={labelClass}>Espaciado de Turnos</label>
+                  <select id="defaultDuration" name="defaultDuration" autoComplete="off" value={config.defaultDuration} onChange={e => update('defaultDuration', Number(e.target.value))} className={fieldClass}>
                     <option value={0.5} className="bg-[var(--bg-card)]">Intervalo de 30 minutos</option>
                     <option value={1} className="bg-[var(--bg-card)]">Bloques de 1 hora</option>
                     <option value={1.5} className="bg-[var(--bg-card)]">Bloques de 1:30 hs</option>
@@ -325,22 +325,22 @@ export default function ConfiguracionPage() {
                   </select>
                 </div>
                 <div>
-                  <label className={labelClass}>Caja Predeterminada</label>
-                  <select id="defaultPaymentMethod" name="defaultPaymentMethod" value={config.defaultPaymentMethod} onChange={e => update('defaultPaymentMethod', e.target.value)} className={fieldClass}>
+                  <label htmlFor="defaultPaymentMethod" className={labelClass}>Caja Predeterminada</label>
+                  <select id="defaultPaymentMethod" name="defaultPaymentMethod" autoComplete="off" value={config.defaultPaymentMethod} onChange={e => update('defaultPaymentMethod', e.target.value)} className={fieldClass}>
                     {['Efectivo', 'Transferencia', 'Tarjeta', 'Débito', 'Crédito'].map(m => <option key={m} className="bg-[var(--bg-card)]">{m}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className={labelClass}>Divisa Transaccional</label>
-                  <select id="currency" name="currency" value={config.currency} onChange={e => update('currency', e.target.value)} className={fieldClass}>
+                  <label htmlFor="currency" className={labelClass}>Divisa Transaccional</label>
+                  <select id="currency" name="currency" autoComplete="transaction-currency" value={config.currency} onChange={e => update('currency', e.target.value)} className={fieldClass}>
                     <option value="ARS" className="bg-[var(--bg-card)]">ARS — Peso Argentino</option>
                     <option value="USD" className="bg-[var(--bg-card)]">USD — Dólar Estadounidense</option>
                     <option value="UYU" className="bg-[var(--bg-card)]">UYU — Peso Uruguayo</option>
                   </select>
                 </div>
                 <div>
-                  <label className={labelClass}>Huso Horario</label>
-                  <select id="timezone" name="timezone" value={config.timezone} onChange={e => update('timezone', e.target.value)} className={fieldClass}>
+                  <label htmlFor="timezone" className={labelClass}>Huso Horario</label>
+                  <select id="timezone" name="timezone" autoComplete="off" value={config.timezone} onChange={e => update('timezone', e.target.value)} className={fieldClass}>
                     <option value="America/Argentina/Buenos_Aires" className="bg-[var(--bg-card)]">Buenos Aires (UTC-3)</option>
                     <option value="America/Montevideo" className="bg-[var(--bg-card)]">Montevideo (UTC-3)</option>
                     <option value="America/Santiago" className="bg-[var(--bg-card)]">Santiago (UTC-4)</option>
@@ -376,8 +376,9 @@ export default function ConfiguracionPage() {
 
                 {config.whatsappEnabled && (
                   <div className="mt-6 p-8 bg-emerald-500/5 border border-emerald-500/20 rounded-[2.5rem] animate-fade-in-quick">
-                    <label className={labelClass}>Plantilla de Mensaje (Recordatorio)</label>
+                    <label htmlFor="whatsappTemplate" className={labelClass}>Plantilla de Mensaje (Recordatorio)</label>
                     <textarea id="whatsappTemplate" name="whatsappTemplate" 
+                      autoComplete="off"
                       value={config.whatsappTemplate}
                       onChange={e => update('whatsappTemplate', e.target.value)}
                       className={`${fieldClass} h-32 resize-none mt-2`}
@@ -412,8 +413,8 @@ export default function ConfiguracionPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 <div>
-                  <label className={labelClass}>Auto-Cierre de Sesión</label>
-                  <select id="sessionTimeout" name="sessionTimeout" value={config.sessionTimeout} onChange={e => update('sessionTimeout', Number(e.target.value))} className={fieldClass}>
+                  <label htmlFor="sessionTimeout" className={labelClass}>Auto-Cierre de Sesión</label>
+                  <select id="sessionTimeout" name="sessionTimeout" autoComplete="off" value={config.sessionTimeout} onChange={e => update('sessionTimeout', Number(e.target.value))} className={fieldClass}>
                     <option value={30} className="bg-[var(--bg-card)]">Inactividad: 30 minutos</option>
                     <option value={60} className="bg-[var(--bg-card)]">Inactividad: 1 hora</option>
                     <option value={120} className="bg-[var(--bg-card)]">Inactividad: 2 horas</option>
@@ -422,8 +423,8 @@ export default function ConfiguracionPage() {
                   </select>
                 </div>
                 <div>
-                  <label className={labelClass}>Ciclo de Cifrado (Password)</label>
-                  <select id="requirePasswordChangeDays" name="requirePasswordChangeDays" value={config.requirePasswordChangeDays} onChange={e => update('requirePasswordChangeDays', Number(e.target.value))} className={fieldClass}>
+                  <label htmlFor="requirePasswordChangeDays" className={labelClass}>Ciclo de Cifrado (Password)</label>
+                  <select id="requirePasswordChangeDays" name="requirePasswordChangeDays" autoComplete="off" value={config.requirePasswordChangeDays} onChange={e => update('requirePasswordChangeDays', Number(e.target.value))} className={fieldClass}>
                     <option value={30} className="bg-[var(--bg-card)]">Rotar cada 30 días</option>
                     <option value={60} className="bg-[var(--bg-card)]">Rotar cada 60 días</option>
                     <option value={90} className="bg-[var(--bg-card)]">Rotar cada 90 días</option>
@@ -479,9 +480,10 @@ export default function ConfiguracionPage() {
                   {/* CUIT Y PV */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div>
-                      <label className={labelClass}>CUIT del Emisor</label>
+                      <label htmlFor="cuit" className={labelClass}>CUIT del Emisor</label>
                       <input id="cuit" name="cuit" 
                         type="text" 
+                        autoComplete="off"
                         value={afipConfig.cuit || ''} 
                         onChange={e => setAfipConfig({...afipConfig, cuit: e.target.value})} 
                         className={fieldClass} 
@@ -489,17 +491,19 @@ export default function ConfiguracionPage() {
                       />
                     </div>
                     <div>
-                      <label className={labelClass}>Punto de Venta</label>
+                      <label htmlFor="punto_venta" className={labelClass}>Punto de Venta</label>
                       <input id="punto_venta" name="punto_venta" 
                         type="number" 
+                        autoComplete="off"
                         value={afipConfig.punto_venta} 
                         onChange={e => setAfipConfig({...afipConfig, punto_venta: parseInt(e.target.value)})} 
                         className={fieldClass} 
                       />
                     </div>
                     <div>
-                      <label className={labelClass}>Condición Tributaria</label>
+                      <label htmlFor="tax_condition" className={labelClass}>Condición Tributaria</label>
                       <select id="tax_condition" name="tax_condition" 
+                        autoComplete="off"
                         value={afipConfig.tax_condition} 
                         onChange={e => setAfipConfig({...afipConfig, tax_condition: e.target.value})} 
                         className={fieldClass}

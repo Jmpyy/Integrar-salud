@@ -272,7 +272,7 @@ export default function MedicamentosPage() {
              <form onSubmit={handleSubmit} className="p-8 space-y-6">
                 <div className="grid grid-cols-1 gap-4">
                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre Comercial</label>
+                      <label htmlFor="name" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre Comercial</label>
                       <input id="name" name="name" 
                         required
                         type="text" 
@@ -283,7 +283,7 @@ export default function MedicamentosPage() {
                       />
                    </div>
                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dosis Disponibles (Separadas por guion o coma)</label>
+                      <label htmlFor="doses" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dosis Disponibles (Separadas por guion o coma)</label>
                       <input id="doses" name="doses" 
                         type="text" 
                         value={formData.doses}
@@ -294,7 +294,7 @@ export default function MedicamentosPage() {
                    </div>
 
                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Descripción / Notas</label>
+                      <label htmlFor="description" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Descripción / Notas</label>
                       <textarea id="description" name="description" 
                         rows="3"
                         value={formData.description}

@@ -29,7 +29,7 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
     : '—';
 
   const formatMoney = (v) =>
-    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(v || 0);
+    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(v || 0);
 
   /* ── Print handler — opens a dedicated print window ── */
   const handlePrint = () => {

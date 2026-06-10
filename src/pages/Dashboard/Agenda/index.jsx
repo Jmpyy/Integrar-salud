@@ -1716,7 +1716,7 @@ export default function AgendaPage() {
                         <div className="grid grid-cols-1 gap-4">
                           {/* Nombre: siempre ancho completo */}
                           <div className="relative">
-                            <input type="text" id="newPatientName" required={isNewPatient} placeholder=" " value={formData.newPatientName} onChange={(e) => setFormData({...formData, newPatientName: e.target.value})} className="block px-5 pb-3 pt-6 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] peer transition-all shadow-sm" />
+                            <input type="text" id="newPatientName" autoComplete="name" required={isNewPatient} placeholder=" " value={formData.newPatientName} onChange={(e) => setFormData({...formData, newPatientName: e.target.value})} className="block px-5 pb-3 pt-6 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] peer transition-all shadow-sm" />
                             <label htmlFor="newPatientName" className="absolute text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest duration-300 transform -translate-y-3 top-4 z-10 origin-[0] left-5 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-90 peer-focus:-translate-y-3 peer-focus:text-[var(--accent-primary)] opacity-60 pointer-events-none">Nombre Completo *</label>
                           </div>
 
@@ -1724,7 +1724,7 @@ export default function AgendaPage() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="flex flex-col gap-1">
                               <label htmlFor="dni" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">DNI / Pasaporte (Opcional)</label>
-                              <input type="text" id="dni" placeholder="Ej: 12345678" inputMode="numeric" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value.replace(/[^0-9Aa-z]/g, '')})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                              <input type="text" id="dni" autoComplete="off" placeholder="Ej: 12345678" inputMode="numeric" value={formData.dni} onChange={(e) => setFormData({...formData, dni: e.target.value.replace(/[^0-9Aa-z]/g, '')})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
                             </div>
 
                             <div className="flex flex-col gap-1">
@@ -1740,7 +1740,7 @@ export default function AgendaPage() {
 
                           {/* Fecha de nacimiento */}
                           <div className="flex flex-col gap-1">
-                            <label htmlFor="birthDate" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Fecha de Nacimiento (Opcional)</label>
+                            <span className="block text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Fecha de Nacimiento (Opcional)</span>
                             <CustomDatePicker
                               value={formData.birthDate}
                               onChange={(val) => setFormData({...formData, birthDate: val})}
@@ -1759,19 +1759,19 @@ export default function AgendaPage() {
                         <div className="grid grid-cols-1 gap-4">
                           <div className="flex flex-col gap-1">
                              <label htmlFor="newPatientPhone" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Celular (Opcional)</label>
-                             <input type="tel" id="newPatientPhone" placeholder="Ej: 11 1234-5678" value={formData.newPatientPhone} onChange={(e) => setFormData({...formData, newPatientPhone: e.target.value.replace(/[^0-9]/g, '')})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                             <input type="tel" id="newPatientPhone" autoComplete="tel" placeholder="Ej: 11 1234-5678" value={formData.newPatientPhone} onChange={(e) => setFormData({...formData, newPatientPhone: e.target.value.replace(/[^0-9]/g, '')})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
                           </div>
                           <div className="flex flex-col gap-1">
                              <label htmlFor="email" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Correo Electrónico (Opcional)</label>
-                             <input type="email" id="email" placeholder="usuario@email.com" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                             <input type="email" id="email" autoComplete="email" placeholder="usuario@email.com" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
                           </div>
                           <div className="flex flex-col gap-1">
                              <label htmlFor="address" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Dirección Postal</label>
-                             <input type="text" id="address" placeholder="Ej: Av. Corrientes 1234, CABA" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                             <input type="text" id="address" autoComplete="street-address" placeholder="Ej: Av. Corrientes 1234, CABA" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
                           </div>
                           <div className="flex flex-col gap-1">
                              <label htmlFor="emergencyContact" className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 pl-1">Contacto de Emergencia (Opcional)</label>
-                             <input type="text" id="emergencyContact" placeholder="Nombre y teléfono" value={formData.emergencyContact} onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
+                             <input type="text" id="emergencyContact" autoComplete="off" placeholder="Nombre y teléfono" value={formData.emergencyContact} onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})} className="block px-5 py-4 w-full text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl appearance-none focus:outline-none focus:ring-0 focus:border-[var(--accent-primary)] transition-all shadow-sm" />
                           </div>
                         </div>
                       </div>
@@ -1841,7 +1841,7 @@ export default function AgendaPage() {
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="col-span-2">
-                        <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-3 ml-2 text-center">Modalidad de Atención</label>
+                        <span className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-3 ml-2 text-center">Modalidad de Atención</span>
                         <div className="grid grid-cols-2 gap-1 p-1 bg-[var(--bg-sidebar)]/50 border border-[var(--border-color)]/30 rounded-2xl">
                           {[
                             { id: 'presencial', label: 'Presencial', icon: '🏥' },
@@ -1922,7 +1922,7 @@ export default function AgendaPage() {
 
                             {userRole !== 'medico' && formData.codigoAcceso && (
                               <div className="flex flex-col gap-1 mt-1">
-                                <label className="text-[9px] font-black text-[var(--text-secondary)] opacity-70 uppercase tracking-wider">Código de Acceso (Paciente)</label>
+                                <span className="text-[9px] font-black text-[var(--text-secondary)] opacity-70 uppercase tracking-wider block mb-1">Código de Acceso (Paciente)</span>
                                 <div className="flex items-center gap-2">
                                   <code className="px-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border-color)]/50 rounded-xl text-sm font-black tracking-widest text-[var(--text-primary)] select-all">
                                     {formData.codigoAcceso}
@@ -1946,7 +1946,7 @@ export default function AgendaPage() {
                         )}
                       </div>
                       <div className="col-span-2 sm:col-span-1">
-                         <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-1.5 ml-2">Motivo / Tratamiento</label>
+                         <label htmlFor="title" className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-1.5 ml-2">Motivo / Tratamiento</label>
                          <div className="space-y-3">
                            <input id="title" name="title" 
                              type="text" 
@@ -1975,7 +1975,7 @@ export default function AgendaPage() {
                          </div>
                       </div>
                       <div className="col-span-2 sm:col-span-1">
-                         <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-1.5 ml-2">Notas Clínicas</label>
+                         <label htmlFor="notes" className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-1.5 ml-2">Notas Clínicas</label>
                          <textarea id="notes" name="notes" 
                            placeholder="Observaciones..." 
                            value={formData.notes} 
@@ -1992,7 +1992,7 @@ export default function AgendaPage() {
               {isBlockMode && (
                 <div className="bg-[var(--bg-main)] p-7 rounded-[2rem] border border-[var(--border-color)] border-dashed relative group/block">
                   <div className="absolute top-0 left-0 w-1 h-full bg-rose-500 opacity-20"></div>
-                  <label className="block text-xs font-black text-[var(--text-primary)] uppercase tracking-[0.2em] mb-3 ml-1 flex items-center gap-2">
+                  <label htmlFor="title" className="block text-xs font-black text-[var(--text-primary)] uppercase tracking-[0.2em] mb-3 ml-1 flex items-center gap-2">
                     <Lock size={14} className="text-rose-500" /> Evento Restringido (Bloqueo)
                   </label>
                   <input id="title" name="title" type="text" required placeholder="Ej: Almuerzo, Reunión, Ausencia" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full px-6 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl focus:border-rose-400 focus:ring-8 focus:ring-rose-500/5 outline-none transition-all shadow-md font-bold text-[var(--text-primary)] tracking-tight text-lg" />
@@ -2003,7 +2003,7 @@ export default function AgendaPage() {
               <div className="bg-[var(--bg-sidebar)]/30 border border-[var(--border-color)] p-6 rounded-[2rem] shadow-sm flex flex-col gap-6 relative overflow-hidden">
                 <div className="grid grid-cols-2 gap-6">
                   <div className="col-span-2">
-                    <label className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-2 ml-2">Profesional Responsable</label>
+                    <label htmlFor="doctorId" className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest mb-2 ml-2">Profesional Responsable</label>
                     <select id="doctorId" name="doctorId" required value={formData.doctorId} onChange={(e) => setFormData({...formData, doctorId: Number(e.target.value)})} className="w-full px-6 py-4 bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-3xl focus:border-[var(--accent-primary)]/50 outline-none font-black cursor-pointer shadow-lg shadow-indigo-500/5 transition-all text-base appearance-none">
                       {(doctors || []).filter(d => d && d.id).map(d => <option key={d.id} value={d.id} className="bg-[var(--bg-card)]">Dr. {d.name || 'Sin nombre'} — {d.specialty || 'General'}</option>)}
                     </select>
@@ -2013,7 +2013,7 @@ export default function AgendaPage() {
                 {/* Fecha / Hora / Duración: en móvil se apilan, en desktop van en 3 columnas */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1 relative">
-                    <label className="text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest ml-2">Fecha</label>
+                    <span className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest ml-2">Fecha</span>
                     <CustomDatePicker 
                       value={formData.date} 
                       onChange={(val) => setFormData({...formData, date: val})} 
@@ -2022,7 +2022,7 @@ export default function AgendaPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-1 relative">
-                    <label className="text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest ml-2">Hora Inicio</label>
+                    <span className="block text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest ml-2">Hora Inicio</span>
                     <CustomTimePicker 
                       value={formData.time} 
                       onChange={(val) => setFormData({...formData, time: val})} 
@@ -2032,7 +2032,7 @@ export default function AgendaPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest ml-2">Duración</label>
+                    <label htmlFor="duration" className="text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-widest ml-2 block">Duración</label>
                     <select id="duration" name="duration" value={formData.duration} onChange={(e) => setFormData({...formData, duration: Number(e.target.value)})} className="w-full px-4 py-3.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl outline-none focus:border-[var(--accent-primary)] text-sm font-black cursor-pointer text-left text-[var(--text-primary)] appearance-none transition-all">
                       <option value={0.5} className="bg-[var(--bg-card)]">30 Minutos</option>
                       <option value={1} className="bg-[var(--bg-card)]">1 Hora</option>
@@ -2056,7 +2056,7 @@ export default function AgendaPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {/* Estado de Pago */}
                     <div className="col-span-full">
-                      <label className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-3 ml-2">Gestión del Estado de Pago</label>
+                      <span className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-3 ml-2">Gestión del Estado de Pago</span>
                       <div className="flex gap-2 p-1.5 bg-[var(--bg-main)] border border-[var(--border-color)]/50 rounded-2xl">
                         <button 
                           type="button" 
@@ -2084,7 +2084,7 @@ export default function AgendaPage() {
 
                     {/* Monto Total */}
                     <div>
-                      <label className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-2 ml-2">Monto del Arancel ($)</label>
+                      <label htmlFor="paymentAmount" className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-2 ml-2">Monto del Arancel ($)</label>
                       <div className="relative group/amount">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-black text-emerald-500/30 group-focus-within/amount:text-emerald-500 transition-colors">$</span>
                         <input id="paymentAmount" name="paymentAmount" 
@@ -2099,9 +2099,9 @@ export default function AgendaPage() {
 
                     {/* Medio de Pago Estilizado */}
                     <div className="col-span-full">
-                      <label className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-3 ml-2">
+                      <span className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-3 ml-2">
                         {formData.paymentStatus === 'senado' ? 'Vía de Recepción de la Seña' : 'Vía de Recepción del Saldo'}
-                      </label>
+                      </span>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {[
                           { id: 'Efectivo', lbl: 'Papel Moneda', sub: 'Efectivo', icon: <Wallet size={16} />, color: 'emerald' },
@@ -2142,7 +2142,7 @@ export default function AgendaPage() {
                     {/* Campos Condicionales: Seña */}
                     {formData.paymentStatus === 'senado' && (
                       <div className="col-span-full animate-fade-in-up">
-                        <label className="block text-[10px] font-black [var(--accent-primary)] uppercase tracking-widest mb-2 ml-2 italic">Monto de la Seña (Registro parcial)</label>
+                        <label htmlFor="paidAmount" className="block text-[10px] font-black [var(--accent-primary)] uppercase tracking-widest mb-2 ml-2 italic">Monto de la Seña (Registro parcial)</label>
                         <input id="paidAmount" name="paidAmount" 
                           type="number" 
                           placeholder="¿Cuánto abonó hoy?" 
@@ -2205,7 +2205,7 @@ export default function AgendaPage() {
 
                                     {formData.paymentMethod === 'Efectivo' && (
                                       <div className="bg-white/5 rounded-3xl p-6 border border-white/10 backdrop-blur-sm">
-                                        <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-4">Calculadora de Vuelto</label>
+                                        <span className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-4">Calculadora de Vuelto</span>
                                         <div className="space-y-4">
                                           <div>
                                             <p className="text-[9px] font-bold text-emerald-400/60 mb-1 ml-1 uppercase">Paga con:</p>

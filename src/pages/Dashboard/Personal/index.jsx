@@ -206,24 +206,25 @@ export default function PersonalPage() {
 
             <form onSubmit={handleSave} className="space-y-6">
               <div>
-                <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Identificación / Nombre Completo *</label>
-                <input id="name" name="name" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition-all" placeholder="Ej: Lic. Laura Gómez" />
+                <label htmlFor="name" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Identificación / Nombre Completo *</label>
+                <input id="name" name="name" autoComplete="name" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition-all" placeholder="Ej: Lic. Laura Gómez" />
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Línea de Contacto Directo</label>
-                <input id="phone" name="phone" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition-all" placeholder="Ej: 11 5000-0000" />
+                <label htmlFor="phone" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Línea de Contacto Directo</label>
+                <input id="phone" name="phone" autoComplete="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition-all" placeholder="Ej: 11 5000-0000" />
               </div>
 
               {/* Email — solo al crear, no al editar */}
               {!editingId && modalRole !== 'admin' && (
                 <div>
-                  <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">
+                  <label htmlFor="email" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">
                     Correo Electrónico de Acceso
                     <span className="ml-2 normal-case font-semibold opacity-50">(opcional — si no ponés uno se genera automáticamente)</span>
                   </label>
                   <input id="email" name="email"
                     type="email"
+                    autoComplete="email"
                     value={form.email}
                     onChange={e => setForm({...form, email: e.target.value})}
                     className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/10 transition-all"
@@ -236,16 +237,16 @@ export default function PersonalPage() {
                 <>
                   <div className="grid grid-cols-2 gap-4">
                      <div>
-                       <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Especialidad *</label>
+                       <label htmlFor="specialty" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Especialidad *</label>
                        <input id="specialty" name="specialty" required value={form.specialty} onChange={e => setForm({...form, specialty: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all" placeholder="Ej: Psicología" />
                      </div>
                      <div>
-                       <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Matrícula</label>
+                       <label htmlFor="license" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Matrícula</label>
                        <input id="license" name="license" value={form.license} onChange={e => setForm({...form, license: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all" placeholder="Ej: MN-12345" />
                      </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-[0.2em] flex items-center gap-2 opacity-70"><Palette size={12} /> Personalización Agenda</label>
+                    <span className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-[0.2em] flex items-center gap-2 opacity-70"><Palette size={12} /> Personalización Agenda</span>
                     <div className="flex gap-3 flex-wrap bg-[var(--bg-main)]/50 p-4 rounded-2xl border border-[var(--border-color)]/30">
                       {COLOR_OPTIONS.map(c => (
                         <button
@@ -263,14 +264,14 @@ export default function PersonalPage() {
               ) : modalRole === 'recepcion' ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Rol Asignado</label>
+                    <label htmlFor="adminRole" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Rol Asignado</label>
                     <select id="adminRole" name="adminRole" value={form.adminRole} onChange={e => setForm({...form, adminRole: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all">
                       <option className="bg-[var(--bg-card)]" value="recepcionista">Recepcionista</option>
                       <option className="bg-[var(--bg-card)]" value="administracion">Administración</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70 flex items-center gap-1.5"><Clock size={11} /> Turno Horario</label>
+                    <label htmlFor="shift" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70 flex items-center gap-1.5"><Clock size={11} /> Turno Horario</label>
                     <select id="shift" name="shift" value={form.shift} onChange={e => setForm({...form, shift: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all">
                       <option className="bg-[var(--bg-card)]">Mañana</option>
                       <option className="bg-[var(--bg-card)]">Tarde</option>
@@ -284,19 +285,19 @@ export default function PersonalPage() {
                      <ShieldCheck size={14} /> Credenciales Maestro
                    </p>
                    <div>
-                     <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase opacity-70 tracking-widest">Email Corporativo</label>
-                     <input id="email" name="email" required type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-500/10" placeholder="admin@consultorio.com" />
+                     <label htmlFor="email" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase opacity-70 tracking-widest">Email Corporativo</label>
+                     <input id="email" name="email" autoComplete="email" required type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-500/10" placeholder="admin@consultorio.com" />
                    </div>
                    <div>
-                     <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase opacity-70 tracking-widest">Token / Password Temporal</label>
-                     <input id="password" name="password" required type="text" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-500/10" placeholder="Min. 6 caracteres" />
+                     <label htmlFor="password" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase opacity-70 tracking-widest">Token / Password Temporal</label>
+                     <input id="password" name="password" autoComplete="new-password" required type="text" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-500/10" placeholder="Min. 6 caracteres" />
                    </div>
                 </div>
               )}
 
               {/* REMUNERACIÓN - universal con toggle % / Monto Fijo */}
               <div className="border-t border-[var(--border-color)]/30 pt-6 space-y-4">
-                <label className="block text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] opacity-80 flex items-center gap-2">💰 Modelo de Contraprestación</label>
+                <span className="block text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] opacity-80 flex items-center gap-2">💰 Modelo de Contraprestación</span>
                 
                 {/* Toggle tipo */}
                 <div className="flex bg-[var(--bg-main)] rounded-xl p-1.5 gap-1.5 border border-[var(--border-color)]/30">

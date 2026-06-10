@@ -69,7 +69,7 @@ export default function VirtualRoomPage() {
       interval = setInterval(async () => {
         try {
           const API = 'https://control.integrarsalud.me/api-integrar/api';
-          const res = await fetch(`${API}/telemedicine/check_status?id=${appointmentData.appointmentId}&_t=${Date.now()}`, { cache: 'no-store' });
+          const res = await fetch(`${API}/telemedicine/check_status?id=${appointmentData.appointmentId}&codigo=${codigo}&_t=${Date.now()}`, { cache: 'no-store' });
           
           if (res.ok) {
             const data = await res.json();
@@ -94,7 +94,8 @@ export default function VirtualRoomPage() {
     }
 
       // Listener para cuando el paciente cierra la pestaña o el navegador
-      const handleUnload = () => {
+      const handleUnload = (e) => {
+        if (e && e.type === 'visibilitychange' && document.visibilityState !== 'hidden') return;
         if (appointmentData?.appointmentId) {
           const leaveUrl = `https://control.integrarsalud.me/api-integrar/api/telemedicine/leave_room?id=${appointmentData.appointmentId}`;
           navigator.sendBeacon(leaveUrl);
@@ -102,12 +103,14 @@ export default function VirtualRoomPage() {
       };
       
       window.addEventListener('beforeunload', handleUnload);
-      window.addEventListener('unload', handleUnload);
+      window.addEventListener('pagehide', handleUnload);
+      document.addEventListener('visibilitychange', handleUnload);
 
       return () => {
         clearInterval(interval);
         window.removeEventListener('beforeunload', handleUnload);
-        window.removeEventListener('unload', handleUnload);
+        window.removeEventListener('pagehide', handleUnload);
+        document.removeEventListener('visibilitychange', handleUnload);
       };
   }, [roomState, appointmentData]);
 
@@ -217,7 +220,7 @@ export default function VirtualRoomPage() {
             </AnimatePresence>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--text-secondary)] pl-1">Tu DNI</label>
+              <label htmlFor="dni" className="text-xs font-semibold text-[var(--text-secondary)] pl-1">Tu DNI</label>
               <div className="relative">
                 <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-70" size={20} />
                 <input 
@@ -234,7 +237,7 @@ export default function VirtualRoomPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--text-secondary)] pl-1">Código de Acceso</label>
+              <label htmlFor="codigo" className="text-xs font-semibold text-[var(--text-secondary)] pl-1">Código de Acceso</label>
               <div className="relative">
                 <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-70" size={20} />
                 <input 

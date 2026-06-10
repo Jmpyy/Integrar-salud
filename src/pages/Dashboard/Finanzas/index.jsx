@@ -226,7 +226,7 @@ export default function FinanzasPage() {
       setTimeout(() => setToastMsg(''), 4000);
    };
 
-   const formatMoney = (val) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
+   const formatMoney = (val) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(val);
 
    return (
       <div className="flex flex-col h-[calc(100vh-12rem)] print:h-auto animate-fade-in-quick px-2 sm:px-6 py-2 sm:py-4 overflow-y-auto print:overflow-visible custom-scrollbar relative bg-[var(--bg-main)] print:bg-white text-[var(--text-primary)] border border-[var(--border-color)] rounded-[2.5rem]">
@@ -252,7 +252,7 @@ export default function FinanzasPage() {
                   <form onSubmit={handleAddExpense} className="space-y-4">
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                           <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Categoría o Concepto *</label>
+                           <label htmlFor="category" className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Categoría o Concepto *</label>
                            <input id="category" name="category" 
                               type="text" 
                               required 
@@ -271,14 +271,14 @@ export default function FinanzasPage() {
                            </datalist>
                         </div>
                         <div>
-                           <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Monto ($) *</label>
+                           <label htmlFor="amount" className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Monto ($) *</label>
                            <input id="amount" name="amount" type="number" required value={newExpense.amount} onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-black text-red-500 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-500/10 transition-all placeholder:text-[var(--text-secondary)]/30" placeholder="Ej: 45000" />
                         </div>
                      </div>
 
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                           <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Fecha</label>
+                           <span className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Fecha</span>
                            <CustomDatePicker 
                              value={newExpense.date} 
                              onChange={val => setNewExpense({ ...newExpense, date: val })} 
@@ -286,7 +286,7 @@ export default function FinanzasPage() {
                            />
                         </div>
                         <div>
-                           <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Método de Pago</label>
+                           <label htmlFor="method" className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Método de Pago</label>
                            <select id="method" name="method" value={newExpense.method} onChange={e => setNewExpense({ ...newExpense, method: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-red-400 transition-all">
                               <option value="Efectivo" className="bg-[var(--bg-card)]">Efectivo</option>
                               <option value="Tarjeta" className="bg-[var(--bg-card)]">Tarjeta (Débito/Crédito)</option>
@@ -296,12 +296,12 @@ export default function FinanzasPage() {
                      </div>
 
                      <div>
-                        <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">N° Comprobante / Factura</label>
+                        <label htmlFor="receipt" className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">N° Comprobante / Factura</label>
                         <input id="receipt" name="receipt" type="text" value={newExpense.receipt} onChange={e => setNewExpense({ ...newExpense, receipt: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-red-400 transition-all placeholder:text-[var(--text-secondary)]/30" placeholder="Opcional. Ej: FC-A-002-14002" />
                      </div>
 
                      <div>
-                        <label className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Detalles u Observaciones</label>
+                        <label htmlFor="notes" className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Detalles u Observaciones</label>
                         <textarea id="notes" name="notes" value={newExpense.notes} onChange={e => setNewExpense({ ...newExpense, notes: e.target.value })} rows="2" className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-red-400 transition-all resize-none placeholder:text-[var(--text-secondary)]/30" placeholder="Opcional. Motivo del gasto..."></textarea>
                      </div>
 
@@ -327,21 +327,23 @@ export default function FinanzasPage() {
                <p className="text-sm font-medium text-[var(--text-secondary)] mt-1 opacity-70">Control activo del flujo de caja, gastos operativos y análisis contable.</p>
             </div>
 
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 print:hidden">
-               <button onClick={() => setIsAddingExpense(true)} className="bg-red-500/10 text-red-500 border border-red-500/20 text-xs font-black uppercase tracking-widest px-5 py-2.5 rounded-2xl flex items-center gap-2 hover:bg-red-500 hover:text-white transition-all">
+            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 print:hidden w-full xl:w-auto mt-4 xl:mt-0">
+               <button onClick={() => setIsAddingExpense(true)} className="w-full sm:w-auto justify-center bg-red-500/10 text-red-500 border border-red-500/20 text-xs font-black uppercase tracking-widest px-5 py-2.5 rounded-2xl flex items-center gap-2 hover:bg-red-500 hover:text-white transition-all">
                   <Plus size={16} /> Añadir Gasto
                </button>
 
-               <button onClick={() => handleExport('CSV')} className="bg-[var(--bg-card)] text-[var(--accent-primary)] border border-[var(--border-color)] text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-2xl flex items-center gap-2 hover:bg-[var(--accent-light)] transition-all">
-                  <Download size={16} /> CSV
-               </button>
-               <button onClick={() => handleExport('PDF')} className="bg-[var(--bg-card)] text-[var(--accent-primary)] border border-[var(--border-color)] text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-2xl flex items-center gap-2 hover:bg-[var(--accent-light)] transition-all">
-                  <FileText size={16} /> PDF
-               </button>
+               <div className="flex gap-3 w-full sm:w-auto">
+                  <button onClick={() => handleExport('CSV')} className="flex-1 sm:flex-none justify-center bg-[var(--bg-card)] text-[var(--accent-primary)] border border-[var(--border-color)] text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-2xl flex items-center gap-2 hover:bg-[var(--accent-light)] transition-all">
+                     <Download size={16} /> CSV
+                  </button>
+                  <button onClick={() => handleExport('PDF')} className="flex-1 sm:flex-none justify-center bg-[var(--bg-card)] text-[var(--accent-primary)] border border-[var(--border-color)] text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-2xl flex items-center gap-2 hover:bg-[var(--accent-light)] transition-all">
+                     <FileText size={16} /> PDF
+                  </button>
+               </div>
 
                {/* DATE FILTER */}
-               <div className="relative min-w-[170px]">
-                  <button onClick={() => setIsDateMenuOpen(!isDateMenuOpen)} className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm text-xs font-black uppercase tracking-widest text-[var(--text-primary)] px-5 py-2.5 rounded-2xl flex items-center justify-between gap-3 hover:border-[var(--accent-primary)]/50 transition-all">
+               <div className="relative w-full sm:w-auto min-w-[170px]">
+                  <button onClick={() => setIsDateMenuOpen(!isDateMenuOpen)} className="w-full sm:w-auto bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm text-xs font-black uppercase tracking-widest text-[var(--text-primary)] px-5 py-2.5 rounded-2xl flex items-center justify-between gap-3 hover:border-[var(--accent-primary)]/50 transition-all">
                      {dateRange} <ChevronDown size={14} className={`text-[var(--text-secondary)] transition-transform ${isDateMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
 
@@ -389,7 +391,7 @@ export default function FinanzasPage() {
                </div>
             </div>
 
-            <div className="hidden lg:block bg-gradient-to-br from-emerald-500 to-emerald-600 p-6 rounded-[2rem] shadow-xl shadow-emerald-500/10 border border-white/10 relative overflow-hidden group text-white print:block print:bg-white print:text-slate-800 print:border-slate-200 print:shadow-none">
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-6 rounded-[2rem] shadow-xl shadow-emerald-500/10 border border-white/10 relative overflow-hidden group text-white print:block print:bg-white print:text-slate-800 print:border-slate-200 print:shadow-none">
                <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-bl-full -z-0 opacity-50 group-hover:scale-125 transition-transform duration-700 print:hidden"></div>
                <div className="relative z-10 flex items-start gap-4 print:gap-0">
                   <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md print:hidden"><Wallet size={24} className="text-white" /></div>
@@ -467,19 +469,20 @@ export default function FinanzasPage() {
 
          {/* SECCIÓN TABLAS */}
          <div className="card-premium border border-[var(--border-color)] shadow-xl rounded-[2rem] flex flex-col overflow-hidden min-h-[600px] print:block">
-            <div className="flex border-b border-[var(--border-color)]/50 px-6 pt-6 gap-4 bg-[var(--bg-sidebar)]/30 print:hidden">
-               <button onClick={() => setActiveTab('diario')} className={`px-6 py-4 rounded-t-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'diario' ? 'bg-[var(--bg-card)] text-[var(--accent-primary)] shadow-sm border border-[var(--border-color)] border-b-transparent relative top-[1px]' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-main)]'}`}>
+            <div className="flex overflow-x-auto hide-scrollbar border-b border-[var(--border-color)]/50 px-6 pt-6 gap-4 bg-[var(--bg-sidebar)]/30 print:hidden">
+               <button onClick={() => setActiveTab('diario')} className={`shrink-0 px-6 py-4 rounded-t-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'diario' ? 'bg-[var(--bg-card)] text-[var(--accent-primary)] shadow-sm border border-[var(--border-color)] border-b-transparent relative top-[1px]' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-main)]'}`}>
                   <List size={16} /> Libro Diario
                </button>
-               <button onClick={() => setActiveTab('profesionales')} className={`px-6 py-4 rounded-t-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'profesionales' ? 'bg-[var(--bg-card)] text-[var(--accent-primary)] shadow-sm border border-[var(--border-color)] border-b-transparent relative top-[1px]' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-main)]'}`}>
+               <button onClick={() => setActiveTab('profesionales')} className={`shrink-0 px-6 py-4 rounded-t-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'profesionales' ? 'bg-[var(--bg-card)] text-[var(--accent-primary)] shadow-sm border border-[var(--border-color)] border-b-transparent relative top-[1px]' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-main)]'}`}>
                   <Users size={16} /> Honorarios Personal
                </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-8 py-6 custom-scrollbar bg-[var(--bg-card)]">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 custom-scrollbar bg-[var(--bg-card)]">
 
                {activeTab === 'diario' && (
-                  <table className="w-full text-left border-collapse animate-fade-in-quick">
+                  <div className="overflow-x-auto pb-4">
+                  <table className="w-full min-w-[700px] text-left border-collapse animate-fade-in-quick">
                      <thead>
                         <tr className="border-b border-[var(--border-color)]/50">
                            <th className="py-5 px-3 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Fecha / Hora</th>
@@ -545,6 +548,7 @@ export default function FinanzasPage() {
                         ))}
                      </tbody>
                   </table>
+                  </div>
                )}
 
                {activeTab === 'profesionales' && (
@@ -553,7 +557,8 @@ export default function FinanzasPage() {
                         <h4 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-6 flex items-center gap-2 opacity-70">
                            <Activity size={14} className="text-[var(--accent-primary)]" /> Rendimiento Clínico (Médicos)
                         </h4>
-                        <table className="w-full text-left border-collapse">
+                        <div className="overflow-x-auto pb-4">
+                        <table className="w-full min-w-[700px] text-left border-collapse">
                            <thead>
                               <tr className="border-b border-[var(--border-color)]/50">
                                  <th className="py-4 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 w-1/3">Profesional</th>
@@ -610,13 +615,15 @@ export default function FinanzasPage() {
                               })}
                            </tbody>
                         </table>
+                        </div>
                      </div>
 
                      <div>
                         <h4 className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-6 flex items-center gap-2 opacity-70">
                            <Briefcase size={14} className="text-[var(--accent-primary)]" /> Personal Administrativo
                         </h4>
-                        <table className="w-full text-left border-collapse">
+                        <div className="overflow-x-auto pb-4">
+                        <table className="w-full min-w-[500px] text-left border-collapse">
                            <thead>
                               <tr className="border-b border-[var(--border-color)]/50">
                                  <th className="py-4 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 w-1/3">Empleado/a</th>
@@ -637,6 +644,7 @@ export default function FinanzasPage() {
                               ))}
                            </tbody>
                         </table>
+                        </div>
                      </div>
                   </div>
                )}

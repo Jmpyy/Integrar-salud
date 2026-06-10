@@ -169,7 +169,7 @@ export default function DashboardPage() {
   const progressPercentage = todaysPatientAppointments.length > 0 ? Math.round((completedCount / todaysPatientAppointments.length) * 100) : 0;
 
   // Cálculos dinámicos para Stats
-  const formatMoney = (val) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
+  const formatMoney = (val) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(val);
   
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();

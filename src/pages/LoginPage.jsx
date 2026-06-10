@@ -129,7 +129,7 @@ export default function LoginPage({ onLogin, isLoading = false }) {
 
             {/* Campo Email */}
             <div className="group relative">
-              <label className="block text-sm font-semibold text-slate-700 mb-2 transition-colors group-focus-within:text-indigo-600">
+              <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2 transition-colors group-focus-within:text-indigo-600">
                 Email Profesional <span className="text-indigo-500 ml-1" title="Campo requerido">*</span>
               </label>
 
@@ -178,7 +178,7 @@ export default function LoginPage({ onLogin, isLoading = false }) {
             {/* Campo Contraseña */}
             <div className="group relative mt-8 sm:mt-12">
               <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-semibold text-slate-700 transition-colors group-focus-within:text-indigo-600">
+                <label htmlFor="password" className="block text-sm font-semibold text-slate-700 transition-colors group-focus-within:text-indigo-600">
                   Contraseña <span className="text-indigo-500 ml-1" title="Campo requerido">*</span>
                 </label>
               </div>
