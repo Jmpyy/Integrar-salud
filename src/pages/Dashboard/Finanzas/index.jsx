@@ -4,11 +4,12 @@ import { nowForAPI, toLocalDateString } from '../../../utils/helpers';
 import {
    TrendingUp, DollarSign, Wallet, Clock, Users, ChevronDown,
    Briefcase, Activity, ArrowUpRight, ArrowDownRight,
-   Download, FileText, Plus, X, List, PieChart, BarChart2, Trash2, Pencil, Landmark
+   Download, FileText, Plus, X, List, PieChart, BarChart2, Trash2, Pencil, Landmark, Receipt
 } from 'lucide-react';
 
 import ConfirmDialog from '../../../components/ConfirmDialog/ConfirmDialog';
 import CustomDatePicker from '../../../components/ui/CustomDatePicker';
+import TransactionReceiptModal from '../../../components/TransactionReceiptModal/TransactionReceiptModal';
 
 export default function FinanzasPage() {
    const store = useStore();
@@ -23,9 +24,9 @@ export default function FinanzasPage() {
    const [isAddingExpense, setIsAddingExpense] = useState(false);
    const [newExpense, setNewExpense] = useState({ category: '', amount: '', method: 'Efectivo', date: toLocalDateString(new Date()), receipt: '', notes: '', doctor_id: '' });
 
-   // Estado para Liquidación Rápida
    const [settlementDoctor, setSettlementDoctor] = useState(null);
    const [editingTxId, setEditingTxId] = useState(null);
+   const [receiptTx, setReceiptTx] = useState(null);
    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, txId: null });
 
    // Cargar maestros al montar
@@ -518,6 +519,13 @@ export default function FinanzasPage() {
                               <td className="py-5 px-3 text-right">
                                  <div className="flex justify-end gap-2">
                                     <button
+                                      onClick={() => setReceiptTx(tx)}
+                                      className="p-2 text-slate-300 hover:text-[var(--accent-primary)] hover:bg-[var(--accent-light)] rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                      title="Ver Comprobante"
+                                    >
+                                      <Receipt size={16} />
+                                    </button>
+                                    <button
                                       onClick={() => {
                                          const parts = tx.concept.split(' (#');
                                          setNewExpense({
@@ -758,6 +766,12 @@ export default function FinanzasPage() {
             }}
             onCancel={() => setDeleteConfirm({ isOpen: false, txId: null })}
          />
+         {receiptTx && (
+            <TransactionReceiptModal
+               transaction={receiptTx}
+               onClose={() => setReceiptTx(null)}
+            />
+         )}
       </div>
    );
 }
