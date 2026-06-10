@@ -12,6 +12,8 @@ self.addEventListener('message', (event) => {
 });
 
 // Handle Push Events
+
+// Handle Push Events
 self.addEventListener('push', function(event) {
   if (event.data) {
     try {

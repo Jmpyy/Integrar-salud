@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import DashboardLayout from './components/Layout/DashboardLayout';
 import PublicLayout from './components/Layout/PublicLayout';
 import InstallPWA from './components/InstallPWA/InstallPWA';
+import ReloadPrompt from './components/ReloadPrompt/ReloadPrompt';
 
 // ── Code Splitting: cada página se carga solo cuando se necesita ──
 const LandingPage       = lazy(() => import('./pages/Landing'));
@@ -285,6 +286,7 @@ function App() {
         </Routes>
       </Suspense>
       <InstallPWA />
+      <ReloadPrompt />
     </Router>
   );
 }

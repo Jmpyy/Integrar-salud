@@ -35,16 +35,29 @@ const JitsiMeeting = ({ roomName, displayName, onReadyToClose, onJoined }) => {
         configOverwrite: {
           defaultLanguage: 'es', // Forzar español internamente
           disableDeepLinking: true,
-          prejoinPageEnabled: false,
-          prejoinConfig: { enabled: false }, // Para versiones nuevas de Jitsi
+          prejoinPageEnabled: true, // Mostrar lobby previo
+          prejoinConfig: { enabled: true }, // Mostrar lobby previo
           enableNoisyMicDetection: false,
           disableInviteFunctions: true,
+          stereo: false, // Forzar mono
+          p2p: { enabled: false }, // Deshabilitar P2P
+          
+          // Optimizaciones de Telemedicina (Estabilidad y UX)
+          resolution: 720, // Limitar a HD para evitar saturar conexiones de pacientes con datos móviles
+          requireDisplayName: true,
+          startWithAudioMuted: false,
+          startWithVideoMuted: false,
+          
+          // API Moderna (Las versiones recientes de Jitsi mueven los botones al configOverwrite)
+          toolbarButtons: [
+            'microphone', 'camera', 'desktop', 'chat', 'raisehand', 'tileview', 'settings', 'hangup'
+          ],
         },
         interfaceConfigOverwrite: {
           SHOW_JITSI_WATERMARK: false,
           SHOW_WATERMARK_FOR_GUESTS: false,
           TOOLBAR_BUTTONS: [
-            'microphone', 'camera', 'desktop', 'chat', 'raisehand', 'tileview', 'hangup'
+            'microphone', 'camera', 'desktop', 'chat', 'raisehand', 'tileview', 'settings', 'hangup'
           ],
         },
         userInfo: {
