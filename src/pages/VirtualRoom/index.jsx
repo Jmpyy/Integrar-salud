@@ -45,6 +45,7 @@ export default function VirtualRoomPage() {
   const [loading, setLoading] = useState(false);
   // roomState: 'login' | 'waiting' | 'early' | 'past'
   const [roomState, setRoomState] = useState('login');
+  const [paymentError, setPaymentError] = useState(null);
   const [appointmentData, setAppointmentData] = useState(null);
   const [earlyData, setEarlyData] = useState(null); // { appointmentDate, appointmentTime, doctorName, message }
   const [delayMessage, setDelayMessage] = useState(null);
@@ -131,6 +132,7 @@ export default function VirtualRoomPage() {
     if (!d || !c) return toast.error('Ingresá tu DNI y el código de acceso');
 
     setLoading(true);
+    setPaymentError(null);
     try {
       const API = 'https://control.integrarsalud.me/api-integrar/api';
       const res = await fetch(`${API}/telemedicine/verify_access`, {
@@ -144,6 +146,12 @@ export default function VirtualRoomPage() {
       if (res.status === 202) {
         setEarlyData(data.data);
         setRoomState(data.status === 'past' ? 'past' : 'early');
+        return;
+      }
+
+      // 402: turno no pagado
+      if (res.status === 402) {
+        setPaymentError(data.message);
         return;
       }
 
@@ -190,6 +198,24 @@ export default function VirtualRoomPage() {
         {/* ── ESTADO: Formulario de acceso ── */}
         {roomState === 'login' && (
           <form onSubmit={handleAccess} className="space-y-5">
+            
+            <AnimatePresence>
+              {paymentError && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }} 
+                  animate={{ opacity: 1, height: 'auto' }} 
+                  exit={{ opacity: 0, height: 0 }}
+                  className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex gap-3 text-left overflow-hidden"
+                >
+                  <AlertCircle className="text-rose-600 shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <h4 className="text-sm font-bold text-rose-800 mb-1">Pago Requerido</h4>
+                    <p className="text-xs text-rose-700 font-medium leading-relaxed">{paymentError}</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-[var(--text-secondary)] pl-1">Tu DNI</label>
               <div className="relative">
