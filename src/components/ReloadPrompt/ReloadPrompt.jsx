@@ -9,7 +9,11 @@ export default function ReloadPrompt() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r) {
-      // Registration complete
+      if (r) {
+        setInterval(() => {
+          r.update();
+        }, 60000);
+      }
     },
     onRegisterError(error) {
       console.error('SW registration error', error);
