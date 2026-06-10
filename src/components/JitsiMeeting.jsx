@@ -31,7 +31,9 @@ const JitsiMeeting = ({ roomName, displayName, onReadyToClose, onJoined }) => {
       const options = {
         roomName: roomName,
         parentNode: containerRef.current,
+        lang: 'es', // Forzar idioma español
         configOverwrite: {
+          defaultLanguage: 'es', // Forzar español internamente
           disableDeepLinking: true,
           prejoinPageEnabled: false,
           prejoinConfig: { enabled: false }, // Para versiones nuevas de Jitsi
