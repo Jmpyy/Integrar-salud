@@ -35,6 +35,14 @@ const updateSW = registerSW({
   onOfflineReady() {
     console.log('La aplicación está lista para usarse sin conexión.');
   },
+  onRegistered(r) {
+    // Revisar actualizaciones en segundo plano cada 60 segundos
+    if (r) {
+      setInterval(() => {
+        r.update();
+      }, 60000);
+    }
+  }
 })
 
 createRoot(document.getElementById('root')).render(
