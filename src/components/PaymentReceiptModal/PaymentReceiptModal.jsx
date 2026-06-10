@@ -98,16 +98,18 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
     .logo {
       width: 56px;
       height: 56px;
-      background: var(--primary);
+      background: white;
       border-radius: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: white;
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: -1px;
       box-shadow: 0 8px 16px rgba(30, 27, 75, 0.15);
+      overflow: hidden;
+    }
+    .logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
     .company-info { flex: 1; }
     .company-name {
@@ -319,7 +321,7 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
   
   <div class="receipt-content">
     <div class="header">
-      <div class="logo">${businessName.charAt(0).toUpperCase()}</div>
+      <div class="logo"><img src="${window.location.origin}/pwa-192x192.png" alt="Logo" /></div>
       <div class="company-info">
         <div class="company-name">${businessName}</div>
         <div class="company-contact">
@@ -432,8 +434,8 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
           {/* Business Info */}
           <div className="flex justify-between items-start">
              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-slate-900 rounded-[14px] flex items-center justify-center text-white font-bold text-xl shadow-md">
-                   {businessName.charAt(0).toUpperCase()}
+                <div className="w-12 h-12 bg-white rounded-[14px] flex items-center justify-center shadow-md overflow-hidden p-1 border border-slate-100">
+                   <img src="/pwa-192x192.png" alt="Logo" className="w-full h-full object-contain" />
                 </div>
                 <div>
                    <h2 className="text-lg font-extrabold text-slate-900 tracking-tight leading-none">{businessName}</h2>
