@@ -433,6 +433,24 @@ export default function ConsultorioPage() {
                                       });
                                       return;
                                     }
+                                    
+                                    // Validar tiempo (5 mins antes)
+                                    if (app.date && app.time) {
+                                      const now = new Date();
+                                      const [year, month, day] = app.date.split('-').map(Number);
+                                      const [hour, minute] = app.time.split(':').map(Number);
+                                      const appDateTime = new Date(year, month - 1, day, hour, minute);
+                                      const diffMins = Math.floor((appDateTime.getTime() - now.getTime()) / 60000);
+                                      
+                                      if (diffMins > 5) {
+                                        toast.error('No podés iniciar una consulta con tanta anticipación. Solo se permite 5 minutos antes del turno.', {
+                                          icon: '⏳',
+                                          duration: 5000,
+                                        });
+                                        return;
+                                      }
+                                    }
+                                    
                                     store.setActiveCallApp(app);
                                   } else {
                                     handleStatusChange(app.id, APPOINTMENT_STATUS.EN_CURSO);

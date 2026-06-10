@@ -595,7 +595,7 @@ export default function AgendaPage() {
       return;
     }
     
-    // Validar tiempo (solo permitir iniciar 10 mins antes)
+    // Validar tiempo (solo permitir iniciar 5 mins antes)
     const now = new Date();
     const appDateStr = app.date; // YYYY-MM-DD
     const appTimeStr = app.time; // HH:mm
@@ -608,8 +608,8 @@ export default function AgendaPage() {
       const diffMs = appDateTime.getTime() - now.getTime();
       const diffMins = Math.floor(diffMs / 60000);
       
-      if (diffMins > 10) {
-        toast.error('No podés iniciar una consulta con tanta anticipación. Solo se permite 10 minutos antes del turno.', {
+      if (diffMins > 5) {
+        toast.error('No podés iniciar una consulta con tanta anticipación. Solo se permite 5 minutos antes del turno.', {
           icon: '⏳',
           duration: 5000,
         });
@@ -1880,6 +1880,23 @@ export default function AgendaPage() {
                                         duration: 5000,
                                       });
                                       return;
+                                    }
+
+                                    // Validar tiempo (5 mins antes)
+                                    if (formData.date && formData.time) {
+                                      const now = new Date();
+                                      const [year, month, day] = formData.date.split('-').map(Number);
+                                      const [hour, minute] = formData.time.split(':').map(Number);
+                                      const appDateTime = new Date(year, month - 1, day, hour, minute);
+                                      const diffMins = Math.floor((appDateTime.getTime() - now.getTime()) / 60000);
+                                      
+                                      if (diffMins > 5) {
+                                        toast.error('No podés iniciar una consulta con tanta anticipación. Solo se permite 5 minutos antes del turno.', {
+                                          icon: '⏳',
+                                          duration: 5000,
+                                        });
+                                        return;
+                                      }
                                     }
                                     try {
                                       await store.updateAppointmentVideoStatus(editingAppointmentId, 'activa');
