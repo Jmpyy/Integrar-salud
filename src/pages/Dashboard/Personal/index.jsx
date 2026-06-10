@@ -394,7 +394,7 @@ export default function PersonalPage() {
       <div className="card-premium rounded-3xl border border-[var(--border-color)]/50 shadow-xl flex flex-1 min-h-[600px] flex-col overflow-hidden">
         {/* TABS + SEARCH */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--border-color)]/50 px-6 pt-6 pb-0 gap-4 bg-[var(--bg-sidebar)]/30 overflow-hidden">
-          <div className="flex gap-2 w-full sm:w-auto overflow-x-auto custom-scrollbar-horizontal pb-1 sm:pb-0">
+          <div className="flex gap-2 w-full sm:w-auto overflow-x-auto overflow-y-hidden hide-scrollbar pb-1 sm:pb-0">
             {[ ['medicos', Stethoscope, 'Clínico'], ['admin', Monitor, 'Soporte'], ['seguridad', ShieldCheck, 'Sistemas'] ].map(([tabId, TabIcon, label]) => (
               <button key={tabId} 
                 onClick={() => {
@@ -418,7 +418,7 @@ export default function PersonalPage() {
         </div>
 
         {/* TABLE CONTENT - SCOLL RESPONSIVO */}
-        <div className="flex-1 overflow-x-auto custom-scrollbar-horizontal bg-[var(--bg-card)]">
+        <div className="flex-1 overflow-x-auto custom-scrollbar bg-[var(--bg-card)]">
            <div className="min-w-[900px] sm:min-w-0 px-8 py-2">
 
           {/* SEGURIDAD Y CUENTAS */}

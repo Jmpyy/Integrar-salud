@@ -979,7 +979,7 @@ export default function AgendaPage() {
       </div>
 
       {/* VISTA MULTICOLUMNA DE AGENDA - RESPONSIVO & FULL SCREEN */}
-      <div className="card-premium overflow-x-auto flex flex-col h-[calc(100svh-14rem)] min-h-[500px] flex-1 custom-scrollbar-horizontal border border-[var(--glass-border)]">
+      <div className="card-premium overflow-x-auto flex flex-col h-[calc(100svh-14rem)] min-h-[500px] flex-1 custom-scrollbar border border-[var(--glass-border)]">
         
         {/* Cabeceras de Columnas */}
         <div className="flex border-b border-[var(--border-color)] bg-[var(--bg-sidebar)]">
