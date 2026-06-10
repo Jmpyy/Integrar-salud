@@ -443,14 +443,17 @@ export default function DashboardLayout({ onLogout }) {
           onDragStart={() => setIsDragging(true)}
           onDragEnd={() => setIsDragging(false)}
           animate={isJitsiMaximized ? { x: 0, y: 0 } : undefined}
-          className={`fixed flex flex-col bg-slate-900 shadow-2xl overflow-hidden border border-slate-700 animate-fade-in-quick transition-all duration-300 z-[99999] ${
+          className={`fixed flex flex-col bg-slate-900 shadow-2xl overflow-hidden border border-slate-700 animate-fade-in-quick z-[99999] ${
             isJitsiMaximized 
               ? 'inset-4 rounded-3xl' 
               : 'bottom-4 right-4 w-[420px] h-[550px] rounded-2xl top-auto left-auto'
           }`}
           style={{
             width: isJitsiMaximized ? 'auto' : undefined,
-            height: isJitsiMaximized ? 'auto' : undefined
+            height: isJitsiMaximized ? 'auto' : undefined,
+            transitionProperty: 'inset, width, height, border-radius',
+            transitionDuration: '300ms',
+            transitionTimingFunction: 'ease-in-out'
           }}
         >
           {/* Header de la videollamada */}
