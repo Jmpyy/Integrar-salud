@@ -32,6 +32,26 @@ export default function TransactionReceiptModal({ transaction, onClose }) {
   const statusLabel = transaction.type === 'Ingreso' ? 'COBRADO' : 'PAGADO';
   const statusColorHex = transaction.type === 'Ingreso' ? '#10b981' : '#f43f5e';
 
+  /* ── Honorarios Logic ── */
+  let receiptTitle = `Comprobante de ${transaction.type}`;
+  let isHonorarios = false;
+  let receptor = '—';
+
+  const conceptLower = (transaction.concept || '').toLowerCase();
+  if (transaction.type === 'Egreso' && (conceptLower.includes('honorario') || conceptLower.includes('sueldo') || conceptLower.includes('liquidaci'))) {
+    receiptTitle = 'Liquidación de Honorarios';
+    isHonorarios = true;
+    
+    // Extract name from "Cierre de Honorarios - Vargas Leonardo"
+    if (transaction.concept.includes(' - ')) {
+       receptor = transaction.concept.split(' - ')[1].trim();
+    } else if (transaction.concept.includes(' — ')) {
+       receptor = transaction.concept.split(' — ')[1].trim();
+    } else if (transaction.concept.includes(':')) {
+       receptor = transaction.concept.split(':')[1].trim();
+    }
+  }
+
   /* ── Print handler ── */
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=800,height=900,scrollbars=yes');
@@ -309,20 +329,20 @@ export default function TransactionReceiptModal({ transaction, onClose }) {
     </div>
 
     <div class="receipt-header">
-      <div class="title">Comprobante de ${transaction.type}</div>
+      <div class="title">${receiptTitle}</div>
       <div class="receipt-no">${receiptNumber}</div>
     </div>
 
     <div class="grid-2">
       <div>
-        <div class="info-label">Emisor</div>
+        <div class="info-label">${isHonorarios ? 'Entidad Pagadora' : 'Emisor'}</div>
         <div class="info-value">${businessName}</div>
         <div class="info-sub">Fecha de Registro: ${txDate}</div>
       </div>
       <div>
-        <div class="info-label">Categoría</div>
-        <div class="info-value">${transaction.type}</div>
-        <div class="info-sub" style="margin-top:4px;">Asiento Interno de Finanzas</div>
+        <div class="info-label">${isHonorarios ? 'A Favor De' : 'Categoría'}</div>
+        <div class="info-value">${isHonorarios ? receptor : transaction.type}</div>
+        <div class="info-sub" style="margin-top:4px;">${isHonorarios ? 'Liquidación Interna' : 'Asiento Interno de Finanzas'}</div>
       </div>
     </div>
 
@@ -365,6 +385,18 @@ export default function TransactionReceiptModal({ transaction, onClose }) {
     </div>
     ` : ''}
 
+    ${transaction.type === 'Egreso' ? `
+    <div style="margin-top: 60px; margin-bottom: 20px; display: flex; justify-content: flex-end;">
+      <div style="text-align: center; width: 250px;">
+        <div style="border-top: 1px solid var(--text-main); margin-bottom: 8px;"></div>
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">
+          Firma y Aclaración<br>
+          <span style="font-size: 9px; opacity: 0.7;">(Recibí Conforme)</span>
+        </div>
+      </div>
+    </div>
+    ` : ''}
+
     <div class="footer">
       <div class="disclaimer">
         Este documento es un comprobante de control interno.<br>
@@ -397,7 +429,7 @@ export default function TransactionReceiptModal({ transaction, onClose }) {
               <Receipt size={20} strokeWidth={2.5} />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-base tracking-tight">Comprobante de {transaction.type}</h3>
+              <h3 className="font-bold text-slate-900 text-base tracking-tight">{receiptTitle}</h3>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{receiptNumber}</p>
             </div>
           </div>
@@ -432,14 +464,14 @@ export default function TransactionReceiptModal({ transaction, onClose }) {
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-6">
              <div>
-                <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5">Categoría</p>
-                <p className="text-sm font-bold text-slate-800 leading-tight">{transaction.type}</p>
+                <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5">{isHonorarios ? 'Entidad Pagadora' : 'Categoría'}</p>
+                <p className="text-sm font-bold text-slate-800 leading-tight">{isHonorarios ? businessName : transaction.type}</p>
                 <p className="text-[11px] text-slate-500 mt-1 font-medium">{txDate}</p>
              </div>
              <div>
-                <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5">Concepto</p>
-                <p className="text-sm font-bold text-slate-800 leading-tight truncate">{transaction.concept}</p>
-                <p className="text-[11px] text-slate-500 mt-1 font-medium">Asiento Financiero</p>
+                <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5">{isHonorarios ? 'A favor de' : 'Concepto'}</p>
+                <p className="text-sm font-bold text-slate-800 leading-tight truncate" title={isHonorarios ? receptor : transaction.concept}>{isHonorarios ? receptor : transaction.concept}</p>
+                <p className="text-[11px] text-slate-500 mt-1 font-medium">{isHonorarios ? 'Liquidación Interna' : 'Asiento Financiero'}</p>
              </div>
           </div>
 
