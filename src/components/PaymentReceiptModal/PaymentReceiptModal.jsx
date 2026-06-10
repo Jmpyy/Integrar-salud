@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { X, Printer, CheckCircle2, Calendar, User, Stethoscope, CreditCard, Receipt } from 'lucide-react';
+import { X, Printer, CheckCircle2, Calendar, User, Stethoscope, CreditCard, Receipt, Landmark } from 'lucide-react';
 
 import { createPortal } from 'react-dom';
 
@@ -33,12 +33,11 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
 
   /* ── Print handler — opens a dedicated print window ── */
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank', 'width=480,height=700,scrollbars=yes');
+    const printWindow = window.open('', '_blank', 'width=800,height=900,scrollbars=yes');
     if (!printWindow) { alert('Habilitá las ventanas emergentes para imprimir.'); return; }
 
     const statusLabel = isPaid ? 'PAGADO' : isSenado ? 'SEÑADO' : appointment.paymentStatus?.toUpperCase() || '—';
-    const statusColor = isPaid ? '#16a34a' : isSenado ? '#7c3aed' : '#94a3b8';
-    const statusBg    = isPaid ? '#dcfce7' : isSenado ? '#ede9fe' : '#f1f5f9';
+    const statusColor = isPaid ? '#10b981' : isSenado ? '#8b5cf6' : '#94a3b8';
 
     printWindow.document.write(`<!DOCTYPE html>
 <html lang="es">
@@ -46,104 +45,360 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
   <meta charset="UTF-8">
   <title>Comprobante ${receiptNumber}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    :root {
+      --primary: #2563eb;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --bg-light: #f8fafc;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', Arial, sans-serif; background: #fff; color: #1e293b; font-size: 13px; }
-    .page { max-width: 420px; margin: 0 auto; padding: 32px 28px; }
-    /* Header */
-    .header { text-align: center; margin-bottom: 28px; }
-    .logo-box { width: 52px; height: 52px; background: #4f46e5; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
-    .logo-letter { color: white; font-size: 26px; font-weight: 900; line-height: 1; }
-    .biz-name { font-size: 18px; font-weight: 900; color: #0f172a; letter-spacing: -0.02em; }
-    .biz-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
-    .receipt-chip { display: inline-block; margin-top: 12px; padding: 5px 16px; background: #f1f5f9; border-radius: 999px; font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.06em; }
-    /* Divider */
-    .dashed { border: none; border-top: 2px dashed #e2e8f0; margin: 20px 0; }
-    /* Sections */
-    .section-label { font-size: 9px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 8px; }
-    .row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
-    .row .key { font-size: 12px; color: #64748b; }
-    .row .val { font-size: 12px; font-weight: 700; color: #1e293b; text-align: right; max-width: 60%; }
-    /* Amount block */
-    .amount-block { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 18px; margin: 22px 0; text-align: center; }
-    .amount-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; }
-    .amount-value { font-size: 36px; font-weight: 900; color: #4f46e5; letter-spacing: -0.03em; margin-top: 4px; }
-    .status-pill { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; padding: 4px 14px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; background: ${statusBg}; color: ${statusColor}; }
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: ${statusColor}; }
-    /* Footer */
-    .footer { margin-top: 28px; text-align: center; }
-    .sig-line { width: 180px; height: 1px; background: #cbd5e1; margin: 36px auto 8px; }
-    .sig-label { font-size: 10px; color: #94a3b8; }
-    .disclaimer { font-size: 9.5px; color: #cbd5e1; margin-top: 14px; line-height: 1.5; }
-    .print-date { font-size: 10px; color: #cbd5e1; margin-top: 6px; }
+    body { 
+      font-family: 'Inter', system-ui, sans-serif; 
+      background: #f1f5f9; 
+      color: var(--text-main); 
+      font-size: 14px; 
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .print-wrapper {
+      max-width: 800px;
+      margin: 40px auto;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+      padding: 60px;
+      position: relative;
+      overflow: hidden;
+    }
+    .watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 120px;
+      font-weight: 800;
+      color: rgba(0,0,0,0.02);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 50px;
+      border-bottom: 2px solid var(--text-main);
+      padding-bottom: 30px;
+      position: relative;
+      z-index: 1;
+    }
+    .company-info {
+      display: flex;
+      flex-direction: column;
+    }
+    .company-name {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+    .company-details {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 5px;
+    }
+    .receipt-title-box {
+      text-align: right;
+    }
+    .receipt-title {
+      font-size: 32px;
+      font-weight: 300;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .receipt-number {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-top: 5px;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 40px;
+      position: relative;
+      z-index: 1;
+    }
+    .info-section {
+      background: var(--bg-light);
+      padding: 20px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .info-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: block;
+    }
+    .info-row {
+      display: flex;
+      margin-bottom: 8px;
+    }
+    .info-row:last-child {
+      margin-bottom: 0;
+    }
+    .info-key {
+      width: 120px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .info-val {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      flex: 1;
+    }
+    table.details-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 40px;
+      position: relative;
+      z-index: 1;
+    }
+    table.details-table th {
+      background: var(--bg-light);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      padding: 12px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+    table.details-table td {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .td-service { color: var(--text-main); font-weight: 600; }
+    .td-amount { text-align: right; font-weight: 700; }
+    
+    .totals-section {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 50px;
+      position: relative;
+      z-index: 1;
+    }
+    .totals-box {
+      width: 350px;
+      background: var(--text-main);
+      color: white;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .total-row.grand-total {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }
+    .total-label { font-size: 14px; color: rgba(255,255,255,0.8); }
+    .total-value { font-size: 16px; font-weight: 600; }
+    .grand-total-label { font-size: 18px; font-weight: 700; }
+    .grand-total-value { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; }
+    
+    .payment-status-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      background: transparent;
+      color: ${statusColor};
+      border: 1px solid currentColor;
+      text-transform: uppercase;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-top: 60px;
+      padding-top: 30px;
+      border-top: 1px solid var(--border);
+      position: relative;
+      z-index: 1;
+    }
+    .signatures {
+      display: flex;
+      gap: 60px;
+    }
+    .signature-box {
+      text-align: center;
+      width: 200px;
+    }
+    .signature-line {
+      border-top: 1px solid var(--text-main);
+      margin-bottom: 8px;
+      height: 40px; /* Space for physical signature */
+    }
+    .signature-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .footer-notes {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: right;
+      max-width: 300px;
+    }
+    
+    .afip-box {
+      margin-top: 20px;
+      padding: 16px;
+      background: var(--bg-light);
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
     @media print {
-      body { padding: 0; }
-      .page { padding: 20px; }
+      body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .print-wrapper { margin: 0; padding: 20px; box-shadow: none; border-radius: 0; max-width: 100%; }
+      .watermark { color: rgba(0,0,0,0.03); } 
     }
   </style>
 </head>
 <body>
-<div class="page">
+<div class="print-wrapper">
+  <div class="watermark">${businessName.toUpperCase()}</div>
+  
   <div class="header">
-    <div class="logo-box"><div class="logo-letter">I</div></div>
-    <div class="biz-name">${businessName}</div>
-    ${businessAddress ? `<div class="biz-sub">${businessAddress}${businessPhone ? ' · ' + businessPhone : ''}</div>` : ''}
-    <div class="receipt-chip">COMPROBANTE DE PAGO · ${receiptNumber}</div>
+    <div class="company-info">
+      <div class="company-name">${businessName}</div>
+      ${businessAddress ? `<div class="company-details">${businessAddress}</div>` : ''}
+      ${businessPhone ? `<div class="company-details">Tel: ${businessPhone}</div>` : ''}
+    </div>
+    <div class="receipt-title-box">
+      <div class="receipt-title">RECIBO</div>
+      <div class="receipt-number">${receiptNumber}</div>
+    </div>
   </div>
 
-  <hr class="dashed">
-
-  <div class="section-label">Datos del Turno</div>
-  <div class="row"><span class="key">Fecha del turno</span><span class="val">${appointmentDate}</span></div>
-  <div class="row"><span class="key">Hora</span><span class="val">${appointment.time || '—'}</span></div>
-  <div class="row"><span class="key">Motivo / Servicio</span><span class="val">${appointment.title || '—'}</span></div>
-
-  <hr class="dashed">
-
-  <div class="section-label">Paciente</div>
-  <div class="row"><span class="key">Nombre</span><span class="val">${appointment.patient || '—'}</span></div>
-
-  <hr class="dashed">
-
-  <div class="section-label">Profesional</div>
-  <div class="row"><span class="key">Nombre</span><span class="val">${doctor?.name || '—'}</span></div>
-  ${doctor?.specialty ? `<div class="row"><span class="key">Especialidad</span><span class="val">${doctor.specialty}</span></div>` : ''}
-
-    <div class="amount-block">
-      <div class="amount-label">Total Abonado</div>
-      <div class="amount-value">${formatMoney(amount)}</div>
-      <div style="margin-top:8px;font-size:12px;font-weight:700;color:#475569;">📋 ${method}</div>
-      <div class="status-pill"><span class="status-dot"></span>${statusLabel}</div>
-    </div>
-
-    ${appointment.afip_cae ? `
-    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:15px; margin-top:20px; font-size:11px; color:#475569;">
-      <div style="font-weight:900; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:8px; display:flex; align-items:center; gap:5px;">
-        🏛️ Información Fiscal AFIP
+  <div class="info-grid">
+    <div class="info-section">
+      <span class="info-label">Facturado A</span>
+      <div class="info-row">
+        <span class="info-val" style="font-size:16px; margin-bottom: 4px;">${appointment.patient || '—'}</span>
       </div>
-      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-        <span>Comprobante:</span>
-        <span style="font-weight:700; color:#1e293b;">Factura N° ${String(appointment.afip_punto_venta || 1).padStart(5, '0')}-${String(appointment.afip_nro).padStart(8, '0')}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-        <span>CAE:</span>
-        <span style="font-weight:700; color:#1e293b;">${appointment.afip_cae}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between;">
-        <span>Vto. CAE:</span>
-        <span style="font-weight:700; color:#1e293b;">${appointment.afip_cae_vence || '—'}</span>
+      <div class="info-row">
+        <span class="info-key">Fecha de Emisión:</span>
+        <span class="info-val">${now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
       </div>
     </div>
-    ` : ''}
-
-    <div class="footer">
-    <div class="sig-line"></div>
-    <div class="sig-label">Firma del Profesional</div>
-    <div class="disclaimer">Este comprobante no tiene validez tributaria. Solo acredita el pago del servicio de salud prestado.</div>
-    <div class="print-date">Emitido el ${now.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })} a las ${now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</div>
+    
+    <div class="info-section">
+      <span class="info-label">Detalle del Turno</span>
+      <div class="info-row">
+        <span class="info-key">Profesional:</span>
+        <span class="info-val">${doctor?.name || '—'} ${doctor?.specialty ? `(${doctor.specialty})` : ''}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Fecha del Turno:</span>
+        <span class="info-val">${appointmentDate} - ${appointment.time || ''}</span>
+      </div>
+    </div>
   </div>
+
+  <table class="details-table">
+    <thead>
+      <tr>
+        <th style="width: 70%">Descripción del Servicio</th>
+        <th style="text-align: right">Importe</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="td-service">${appointment.title || 'Consulta Médica'}</td>
+        <td class="td-amount">${formatMoney(amount)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="totals-section">
+    <div class="totals-box">
+      <div class="total-row">
+        <span class="total-label">Subtotal</span>
+        <span class="total-value">${formatMoney(amount)}</span>
+      </div>
+      <div class="total-row">
+        <span class="total-label">Método de Pago</span>
+        <span class="total-value">${method}</span>
+      </div>
+      <div class="total-row grand-total">
+        <span class="grand-total-label">Total Abonado</span>
+        <span class="grand-total-value">${formatMoney(amount)}</span>
+      </div>
+      <div style="margin-top: 20px; text-align: center;">
+        <span class="payment-status-badge">${statusLabel}</span>
+      </div>
+    </div>
+  </div>
+
+  ${appointment.afip_cae ? `
+  <div class="afip-box">
+    <div><strong>Comprobante AFIP:</strong> Factura N° ${String(appointment.afip_punto_venta || 1).padStart(5, '0')}-${String(appointment.afip_nro).padStart(8, '0')}</div>
+    <div><strong>CAE:</strong> ${appointment.afip_cae}</div>
+    <div><strong>Vto. CAE:</strong> ${appointment.afip_cae_vence || '—'}</div>
+  </div>
+  ` : ''}
+
+  <div class="footer">
+    <div class="signatures">
+      <div class="signature-box">
+        <div class="signature-line"></div>
+        <div class="signature-text">Firma y Aclaración Paciente</div>
+      </div>
+      <div class="signature-box">
+        <div class="signature-line"></div>
+        <div class="signature-text">Firma Profesional / Institución</div>
+      </div>
+    </div>
+    <div class="footer-notes">
+      <p>Este documento acredita el pago del servicio prestado.</p>
+      <p style="margin-top: 4px; opacity: 0.7;">Generado el ${now.toLocaleDateString('es-AR')} ${now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</p>
+    </div>
+  </div>
+
 </div>
-<script>setTimeout(() => { window.print(); }, 400);</script>
+<script>
+  window.onload = function() {
+    setTimeout(() => { window.print(); }, 500);
+  }
+</script>
 </body>
 </html>`);
     printWindow.document.close();
