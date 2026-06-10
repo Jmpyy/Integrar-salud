@@ -585,6 +585,15 @@ export default function AgendaPage() {
 
   const handleStartVirtualCall = (e, app) => {
     if (e) e.stopPropagation();
+
+    // Bloquear si el paciente no pagó la consulta
+    if (app.paymentStatus !== 'pagado') {
+      toast.error('No podés iniciar la videollamada porque el paciente aún no ha abonado la consulta.', {
+        icon: '💳',
+        duration: 5000,
+      });
+      return;
+    }
     
     // Validar tiempo (solo permitir iniciar 10 mins antes)
     const now = new Date();
@@ -1865,6 +1874,13 @@ export default function AgendaPage() {
                                 <button
                                   type="button"
                                   onClick={async () => {
+                                    if (formData.paymentStatus !== 'pagado') {
+                                      toast.error('No podés iniciar la videollamada porque el paciente aún no ha abonado la consulta.', {
+                                        icon: '💳',
+                                        duration: 5000,
+                                      });
+                                      return;
+                                    }
                                     try {
                                       await store.updateAppointmentVideoStatus(editingAppointmentId, 'activa');
                                       setFormData({ ...formData, estadoVideollamada: 'activa' });
