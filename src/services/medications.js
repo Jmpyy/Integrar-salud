@@ -19,8 +19,8 @@ export const medicationsService = {
   },
 
   // Vademecum endpoints
-  async getAll() {
-    const { data } = await api.get('/vademecum');
+  async getAll(params = {}) {
+    const { data } = await api.get('/vademecum', { params });
     return data.medications;
   },
 
