@@ -205,8 +205,8 @@ function App() {
 
   if (!initialized) return null;
 
-  const handleLogin = async (email, password) => {
-    await auth.login(email, password);
+  const handleLogin = async (email, password, rememberMe) => {
+    await auth.login(email, password, rememberMe);
   };
 
   const handleLogout = () => {
