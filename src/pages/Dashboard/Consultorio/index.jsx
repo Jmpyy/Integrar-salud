@@ -426,6 +426,13 @@ export default function ConsultorioPage() {
                                 onClick={(e) => { 
                                   e.stopPropagation(); 
                                   if (app.modalidad === 'virtual') {
+                                    if (app.paymentStatus !== 'pagado') {
+                                      toast.error('No podés iniciar la videollamada porque el paciente aún no ha abonado la consulta.', {
+                                        icon: '💳',
+                                        duration: 5000,
+                                      });
+                                      return;
+                                    }
                                     store.setActiveCallApp(app);
                                   } else {
                                     handleStatusChange(app.id, APPOINTMENT_STATUS.EN_CURSO);
