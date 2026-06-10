@@ -34,6 +34,7 @@ const JitsiMeeting = ({ roomName, displayName, onReadyToClose, onJoined }) => {
         configOverwrite: {
           disableDeepLinking: true,
           prejoinPageEnabled: false,
+          prejoinConfig: { enabled: false }, // Para versiones nuevas de Jitsi
           enableNoisyMicDetection: false,
           disableInviteFunctions: true,
         },
@@ -41,11 +42,7 @@ const JitsiMeeting = ({ roomName, displayName, onReadyToClose, onJoined }) => {
           SHOW_JITSI_WATERMARK: false,
           SHOW_WATERMARK_FOR_GUESTS: false,
           TOOLBAR_BUTTONS: [
-            'microphone', 'camera', 'closedcaptions', 'desktop',
-            'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
-            'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
-            'videoquality', 'filmstrip', 'invite', 'feedback', 'stats', 'shortcuts',
-            'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone'
+            'microphone', 'camera', 'desktop', 'chat', 'raisehand', 'tileview', 'hangup'
           ],
         },
         userInfo: {
