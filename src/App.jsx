@@ -121,10 +121,10 @@ function App() {
       if (['admin', 'administracion'].includes(userRole)) fetchTransactions();
       fetchGlobalConfig();
 
-      // Polling global de turnos cada 10 segundos
+      // Polling global de turnos cada 60 segundos para evitar saturar el backend
       const poll = setInterval(() => {
         fetchAppointments();
-      }, 10000);
+      }, 60000);
 
       return () => clearInterval(poll);
     }
