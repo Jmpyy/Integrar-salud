@@ -10,7 +10,9 @@ import toast from 'react-hot-toast';
 import PatientHistoryViewer from '../../../components/PatientHistoryViewer';
 import { toLocalDateString } from '../../../utils/helpers';
 import { APPOINTMENT_STATUS } from '../../../config/constants';
+import { socket } from '../../../services/socket';
 import JitsiMeeting from '../../../components/JitsiMeeting';
+import api from '../../../services/api';
 
 export default function ConsultorioPage() {
   const store = useStore();
@@ -133,8 +135,13 @@ export default function ConsultorioPage() {
         if (newStatus === APPOINTMENT_STATUS.EN_CURSO) {
           await store.updateAppointmentVideoStatus(appId, 'activa');
           store.setActiveCallApp(app);
+          // Llamar al paciente automáticamente
+          socket.emit('call-started', `appointment-${appId}`);
         } else if (newStatus === APPOINTMENT_STATUS.FINALIZADO || newStatus === APPOINTMENT_STATUS.AUSENTE) {
           await store.updateAppointmentVideoStatus(appId, newStatus === APPOINTMENT_STATUS.FINALIZADO ? 'finalizada' : 'ausente');
+          if (newStatus === APPOINTMENT_STATUS.FINALIZADO) {
+            socket.emit('call-ended', `appointment-${appId}`);
+          }
         }
       }
     } catch (err) {
@@ -168,17 +175,9 @@ export default function ConsultorioPage() {
     }
 
     try {
-      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-      const res = await fetch(`https://control.integrarsalud.me/api-integrar/api/telemedicine/set_delay`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ id: delayModalApp.id, delayMessage })
-      });
-      if (res.ok) {
-        toast.success(delayMessage ? 'Aviso de demora enviado al paciente' : 'Aviso de demora borrado');
-      } else {
-        toast.error('Error al actualizar demora');
-      }
+      await api.post('/telemedicine/set_delay', { id: delayModalApp.id, delayMessage });
+      toast.success(delayMessage ? 'Aviso de demora enviado al paciente' : 'Aviso de demora borrado');
+      socket.emit('delay-updated', { room: `appointment-${delayModalApp.id}`, message: delayMessage });
     } catch (err) {
       toast.error('Error de red al actualizar demora');
     } finally {
@@ -452,6 +451,7 @@ export default function ConsultorioPage() {
                                     }
                                     
                                     store.setActiveCallApp(app);
+                                    // Eliminado: socket.emit('call-started', `appointment-${app.id}`);
                                   } else {
                                     handleStatusChange(app.id, APPOINTMENT_STATUS.EN_CURSO);
                                   }
@@ -487,7 +487,11 @@ export default function ConsultorioPage() {
                                   <span className="sm:hidden">EVOLUCION</span>
                                 </button>
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); handleStatusChange(app.id, APPOINTMENT_STATUS.FINALIZADO); }}
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    handleStatusChange(app.id, APPOINTMENT_STATUS.FINALIZADO); 
+                                    if (app.modalidad === 'virtual') socket.emit('call-ended', `appointment-${app.id}`);
+                                  }}
                                   className="flex-1 sm:flex-none px-4 py-3 bg-[var(--accent-primary)] text-white rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] shadow-lg shadow-[var(--accent-primary)]/20 transition-all"
                                 >
                                   <UserCheck size={16} />

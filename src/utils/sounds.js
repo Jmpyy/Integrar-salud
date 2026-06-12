@@ -29,7 +29,7 @@ export const playPopSound = () => {
     
     osc.start();
     osc.stop(audioCtx.currentTime + 0.1);
-  } catch (e) { /* silent fail on unsupported browsers */ }
+  } catch { /* silent fail on unsupported browsers */ }
 };
 
 export const playSuccessSound = () => {
@@ -56,7 +56,7 @@ export const playSuccessSound = () => {
     // Acorde feliz (C5 y luego E5 estilo "din-ding" de Apple Pay)
     playNote(523.25, now, 0.15, 0.15);
     playNote(659.25, now + 0.1, 0.3, 0.25);
-  } catch (e) {}
+  } catch { /* silent fail */ }
 };
 
 export const playErrorSound = () => {
@@ -77,7 +77,7 @@ export const playErrorSound = () => {
     
     osc.start();
     osc.stop(audioCtx.currentTime + 0.2);
-  } catch (e) {}
+  } catch { /* silent fail */ }
 };
 
 export const playCashSound = () => {
@@ -122,5 +122,31 @@ export const playCashSound = () => {
     osc.start(audioCtx.currentTime);
     osc.stop(audioCtx.currentTime + 0.1);
     playNoise(audioCtx.currentTime);
-  } catch(e) {}
+  } catch { /* silent fail */ }
+};
+
+export const playNotificationSound = () => {
+  try {
+    initAudio();
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5);
+
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 1);
+  } catch {
+    console.log("Audio play blocked by browser policies");
+  }
 };

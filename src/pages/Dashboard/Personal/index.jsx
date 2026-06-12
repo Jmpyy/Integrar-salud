@@ -40,25 +40,25 @@ export default function PersonalPage() {
   // Form state
   const [form, setForm] = useState({
     name: '', specialty: '', license: '', color: 'indigo', phone: '', meetLink: '',
-    adminRole: 'recepcionista', shift: 'Mañana', remuneration: '',
+    adminRole: 'recepcion', shift: 'Mañana', remuneration: '',
     email: '', password: '' // Para creación de admin
   });
 
-  const BLANK_FORM = { name: '', specialty: '', license: '', color: 'indigo', phone: '', meetLink: '', email: '', adminRole: 'recepcionista', shift: 'Mañana', remuneration: '', remunerationType: 'fijo' };
+  const BLANK_FORM = { name: '', specialty: '', license: '', color: 'indigo', phone: '', meetLink: '', email: '', adminRole: 'recepcion', shift: 'Mañana', remuneration: '', remunerationType: 'fijo' };
 
   const openNewEmployee = () => { setEditingId(null); setForm(BLANK_FORM); setShowModal(true); };
 
   const openEditDoctor = (doc) => {
     setModalRole('medico');
     setEditingId(doc.id);
-    setForm({ name: doc.name, specialty: doc.specialty || '', license: doc.license || '', color: doc.color || 'indigo', phone: doc.phone || '', meetLink: doc.meet_link || '', adminRole: 'recepcionista', shift: 'Mañana', remuneration: doc.remuneration || '', remunerationType: doc.remunerationType || 'fijo' });
+    setForm({ name: doc.name, specialty: doc.specialty || '', license: doc.license || '', color: doc.color || 'indigo', phone: doc.phone || '', meetLink: doc.meet_link || '', adminRole: 'recepcion', shift: 'Mañana', remuneration: doc.remuneration || '', remunerationType: doc.remunerationType || 'fijo' });
     setShowModal(true);
   };
 
   const openEditAdmin = (emp) => {
     setModalRole('recepcion');
     setEditingId(emp.id);
-    setForm({ name: emp.name, specialty: '', license: '', color: 'indigo', phone: emp.phone || '', adminRole: emp.role || 'recepcionista', shift: emp.shift || 'Mañana', remuneration: emp.remuneration || '', remunerationType: emp.remunerationType || 'fijo' });
+    setForm({ name: emp.name, specialty: '', license: '', color: 'indigo', phone: emp.phone || '', adminRole: emp.role || 'recepcion', shift: emp.shift || 'Mañana', remuneration: emp.remuneration || '', remunerationType: emp.remunerationType || 'fijo' });
     setShowModal(true);
   };
 
@@ -266,7 +266,7 @@ export default function PersonalPage() {
                   <div>
                     <label htmlFor="adminRole" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Rol Asignado</label>
                     <select id="adminRole" name="adminRole" value={form.adminRole} onChange={e => setForm({...form, adminRole: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all">
-                      <option className="bg-[var(--bg-card)]" value="recepcionista">Recepcionista</option>
+                      <option className="bg-[var(--bg-card)]" value="recepcion">Recepcion</option>
                       <option className="bg-[var(--bg-card)]" value="administracion">Administración</option>
                     </select>
                   </div>

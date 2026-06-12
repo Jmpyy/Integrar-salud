@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-const JitsiMeeting = ({ roomName, displayName, onReadyToClose, onJoined }) => {
+const JitsiMeeting = ({ roomName, displayName, password, isModerator, onReadyToClose, onJoined }) => {
   const containerRef = useRef(null);
   const apiRef = useRef(null);
 
@@ -13,21 +13,18 @@ const JitsiMeeting = ({ roomName, displayName, onReadyToClose, onJoined }) => {
   }, [onReadyToClose, onJoined]);
 
   useEffect(() => {
-    // Si el script ya existe, no lo volvemos a cargar
-    if (!window.JitsiMeetExternalAPI) {
-      const script = document.createElement('script');
-      script.src = 'https://meet.guifi.net/external_api.js';
-      script.async = true;
-      script.onload = initJitsi;
-      document.body.appendChild(script);
-    } else {
-      initJitsi();
-    }
+    let isMounted = true;
 
     function initJitsi() {
-      if (!containerRef.current) return;
+      if (!isMounted || !containerRef.current) return;
       
-      const domain = 'meet.guifi.net';
+      // Por si acaso, si ya hay una instancia, la destruimos antes de crear otra
+      if (apiRef.current) {
+        apiRef.current.dispose();
+        apiRef.current = null;
+      }
+      
+      const domain = 'meet.jit.si';
       const options = {
         roomName: roomName,
         parentNode: containerRef.current,
@@ -35,8 +32,8 @@ const JitsiMeeting = ({ roomName, displayName, onReadyToClose, onJoined }) => {
         configOverwrite: {
           defaultLanguage: 'es', // Forzar español internamente
           disableDeepLinking: true,
-          prejoinPageEnabled: true, // Mostrar lobby previo
-          prejoinConfig: { enabled: true }, // Mostrar lobby previo
+          prejoinPageEnabled: isModerator, // Mostrar lobby previo solo al médico
+          prejoinConfig: { enabled: isModerator }, // Mostrar lobby previo solo al médico
           enableNoisyMicDetection: false,
           disableInviteFunctions: true,
           stereo: false, // Forzar mono
@@ -79,14 +76,63 @@ const JitsiMeeting = ({ roomName, displayName, onReadyToClose, onJoined }) => {
         if (onReadyToCloseRef.current) onReadyToCloseRef.current();
       });
 
+      // Flag para que solo se envíe la contraseña una sola vez (evita bucles si el evento se dispara varias veces)
+      let passwordSent = false;
+      apiRef.current.addListener('passwordRequired', () => {
+        if (password && !passwordSent) {
+          passwordSent = true;
+          // Un pequeño delay asegura que Jitsi esté listo para recibir el comando y salte el popup
+          setTimeout(() => {
+            if (apiRef.current) {
+              apiRef.current.executeCommand('password', password);
+            }
+          }, 300);
+        }
+      });
+
       apiRef.current.addListener('videoConferenceJoined', () => {
         if (onJoinedRef.current) onJoinedRef.current();
+        
+        if (isModerator && password) {
+          // Aplicar contraseña siempre que el médico se une/vuelve a unirse
+          // Esto le devuelve el control de la sala aunque el paciente haya llegado primero
+          apiRef.current.executeCommand('password', password);
+        }
       });
     }
 
+    if (!window.JitsiMeetExternalAPI) {
+      let script = document.querySelector('script[src="https://meet.jit.si/external_api.js"]');
+      if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://meet.jit.si/external_api.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+      
+      const handleLoad = () => {
+        if (isMounted) initJitsi();
+      };
+      
+      script.addEventListener('load', handleLoad);
+      
+      return () => {
+        isMounted = false;
+        script.removeEventListener('load', handleLoad);
+        if (apiRef.current) {
+          apiRef.current.dispose();
+          apiRef.current = null;
+        }
+      };
+    } else {
+      initJitsi();
+    }
+
     return () => {
+      isMounted = false;
       if (apiRef.current) {
         apiRef.current.dispose();
+        apiRef.current = null;
       }
     };
   }, [roomName, displayName]);

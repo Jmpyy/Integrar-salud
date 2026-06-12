@@ -32,10 +32,10 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  const appointments = store.appointments || [];
-  const doctors = store.doctors || [];
-  const transactions = store.transactions || [];
-  const patients = store.patients || [];
+  const appointments = useMemo(() => store.appointments || [], [store.appointments]);
+  const doctors = useMemo(() => store.doctors || [], [store.doctors]);
+  const transactions = useMemo(() => store.transactions || [], [store.transactions]);
+  const patients = useMemo(() => store.patients || [], [store.patients]);
   const userRole = store.userRole;
   const dashboardNote = store.dashboardNote;
 
@@ -84,6 +84,7 @@ export default function DashboardPage() {
 
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sync initial note from store only once or when not dirty
@@ -485,7 +486,7 @@ export default function DashboardPage() {
                           <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActiveDropdown(null); }}></div>
                           <div className="absolute right-0 top-10 w-48 bg-[var(--bg-card)] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-[var(--border-color)] py-1 z-50 animate-fade-in-quick">
                             {/* WhatsApp */}
-                            {store.globalConfig?.whatsappEnabled && (
+                            {(!['medico'].includes(userRole) && store.globalConfig?.whatsappEnabled) && (
                                <button 
                                  onClick={(e) => {
                                    e.stopPropagation();
@@ -497,140 +498,142 @@ export default function DashboardPage() {
                                  <span>💬</span> Enviar WhatsApp
                                </button>
                             )}
-                            {/* Dropdown de Estados de Pago Expandido */}
-                            <div className="border-t border-slate-50 mt-1 pt-1">
-                              <div className="px-3 py-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">Estado de Pago</div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'pendiente' });
-                                  setActiveDropdown(null);
-                                }}
-                                className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors flex items-center justify-between ${app.paymentStatus === 'pendiente' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-600 hover:bg-slate-50'}`}
-                              >
-                                Pendiente
-                                {app.paymentStatus === 'pendiente' && <CheckCircle2 size={12} />}
-                              </button>
-                              
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (app.paymentStatus === 'pagado') {
+                            {/* Dropdown de Estados de Pago Expandido (Solo NO médicos) */}
+                            {!['medico'].includes(userRole) && (
+                              <div className="border-t border-slate-50 mt-1 pt-1">
+                                <div className="px-3 py-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">Estado de Pago</div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'pendiente' });
                                     setActiveDropdown(null);
-                                    return;
-                                  }
-                                  const totalFee = Number(app.paymentAmount || 35000);
-                                  store.updateAppointmentPaymentStatus(app.id, { 
-                                    paymentStatus: 'pagado',
-                                    paidAmount: totalFee
-                                  });
-                                  if (totalFee > 0) {
-                                    store.createTransaction({
-                                      id: Date.now(),
-                                      date: nowForAPI(),
-                                      type: 'Ingreso',
-                                      concept: `Cobro Total ${app.title} — ${app.patient}`,
-                                      method: app.paymentMethod || 'Efectivo',
-                                      amount: totalFee,
-                                      notes: `Desde Dashboard (Turno #${app.id})`,
-                                      doctor_id: app.doctorId,
-                                      patient_id: app.patientId
+                                  }}
+                                  className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors flex items-center justify-between ${app.paymentStatus === 'pendiente' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-600 hover:bg-slate-50'}`}
+                                >
+                                  Pendiente
+                                  {app.paymentStatus === 'pendiente' && <CheckCircle2 size={12} />}
+                                </button>
+                                
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (app.paymentStatus === 'pagado') {
+                                      setActiveDropdown(null);
+                                      return;
+                                    }
+                                    const totalFee = Number(app.paymentAmount || 35000);
+                                    store.updateAppointmentPaymentStatus(app.id, { 
+                                      paymentStatus: 'pagado',
+                                      paidAmount: totalFee
                                     });
-                                  }
-                                  setActiveDropdown(null);
-                                }}
-                                className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors flex items-center justify-between ${app.paymentStatus === 'pagado' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-600 hover:bg-slate-50'}`}
-                              >
-                                Abonado
-                                {app.paymentStatus === 'pagado' && <CheckCircle2 size={12} />}
-                              </button>
+                                    if (totalFee > 0) {
+                                      store.createTransaction({
+                                        id: Date.now(),
+                                        date: nowForAPI(),
+                                        type: 'Ingreso',
+                                        concept: `Cobro Total ${app.title} — ${app.patient}`,
+                                        method: app.paymentMethod || 'Efectivo',
+                                        amount: totalFee,
+                                        notes: `Desde Dashboard (Turno #${app.id})`,
+                                        doctor_id: app.doctorId,
+                                        patient_id: app.patientId
+                                      });
+                                    }
+                                    setActiveDropdown(null);
+                                  }}
+                                  className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors flex items-center justify-between ${app.paymentStatus === 'pagado' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-600 hover:bg-slate-50'}`}
+                                >
+                                  Abonado
+                                  {app.paymentStatus === 'pagado' && <CheckCircle2 size={12} />}
+                                </button>
 
-                              <button
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   const defaultAmount = app.paymentAmount || 35000;
-                                   setSenasInput({ appId: app.id, value: String(Math.floor(defaultAmount / 2)) });
-                                 }}
-                                 className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors flex items-center justify-between ${app.paymentStatus === 'senado' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-600 hover:bg-slate-50'}`}
-                               >
-                                 Señado
-                                 {app.paymentStatus === 'senado' && <CheckCircle2 size={12} />}
-                               </button>
+                                <button
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     const defaultAmount = app.paymentAmount || 35000;
+                                     setSenasInput({ appId: app.id, value: String(Math.floor(defaultAmount / 2)) });
+                                   }}
+                                   className={`w-full text-left px-4 py-2 text-xs font-bold transition-colors flex items-center justify-between ${app.paymentStatus === 'señado' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-600 hover:bg-slate-50'}`}
+                                 >
+                                   Señado
+                                   {app.paymentStatus === 'señado' && <CheckCircle2 size={12} />}
+                                 </button>
 
-                               {/* Inline seña input */}
-                               {senasInput.appId === app.id && (
-                                 <div className="px-3 py-2 border-t border-slate-50 bg-indigo-50/50" onClick={e => e.stopPropagation()}>
-                                   <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-2">Monto de la seña</p>
-                                   <div className="flex gap-2">
-                                     <div className="relative flex-1">
-                                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-indigo-500">$</span>
-                                       <input id="value" name="value"
-                                         type="number"
-                                         autoFocus
-                                         min="0"
-                                         value={senasInput.value}
-                                         onChange={e => setSenasInput(prev => ({ ...prev, value: e.target.value }))}
-                                         onKeyDown={e => {
-                                           if (e.key === 'Enter') {
-                                             const amount = Number(senasInput.value);
-                                             store.updateAppointmentPaymentStatus(app.id, { 
-                                               paymentStatus: 'senado', 
-                                               paidAmount: amount 
-                                             });
-                                             if (amount > 0) {
-                                               store.createTransaction({
-                                                 id: Date.now(),
-                                                 date: nowForAPI(),
-                                                 type: 'Ingreso',
-                                                 concept: `Seña ${app.title} — ${app.patient}`,
-                                                 method: app.paymentMethod || 'Efectivo',
-                                                 amount,
-                                                 notes: `Desde Dashboard (Seña #${app.id})`,
-                                                 doctor_id: app.doctorId,
-                                                 patient_id: app.patientId
+                                 {/* Inline seña input */}
+                                 {senasInput.appId === app.id && (
+                                   <div className="px-3 py-2 border-t border-slate-50 bg-indigo-50/50" onClick={e => e.stopPropagation()}>
+                                     <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-2">Monto de la seña</p>
+                                     <div className="flex gap-2">
+                                       <div className="relative flex-1">
+                                         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-indigo-500">$</span>
+                                         <input id="value" name="value"
+                                           type="number"
+                                           autoFocus
+                                           min="0"
+                                           value={senasInput.value}
+                                           onChange={e => setSenasInput(prev => ({ ...prev, value: e.target.value }))}
+                                           onKeyDown={e => {
+                                             if (e.key === 'Enter') {
+                                               const amount = Number(senasInput.value);
+                                               store.updateAppointmentPaymentStatus(app.id, { 
+                                                 paymentStatus: 'señado', 
+                                                 paidAmount: amount 
                                                });
+                                               if (amount > 0) {
+                                                 store.createTransaction({
+                                                   id: Date.now(),
+                                                   date: nowForAPI(),
+                                                   type: 'Ingreso',
+                                                   concept: `Seña ${app.title} — ${app.patient}`,
+                                                   method: app.paymentMethod || 'Efectivo',
+                                                   amount,
+                                                   notes: `Desde Dashboard (Seña #${app.id})`,
+                                                   doctor_id: app.doctorId,
+                                                   patient_id: app.patientId
+                                                 });
+                                               }
+                                               setSenasInput({ appId: null, value: '' });
+                                               setActiveDropdown(null);
                                              }
-                                             setSenasInput({ appId: null, value: '' });
-                                             setActiveDropdown(null);
-                                           }
-                                           if (e.key === 'Escape') setSenasInput({ appId: null, value: '' });
-                                         }}
-                                         className="w-full pl-6 pr-2 py-1.5 text-sm font-bold text-indigo-700 bg-white border border-indigo-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-200"
-                                         placeholder="0"
-                                       />
-                                     </div>
-                                     <button
-                                       onClick={e => {
-                                         e.stopPropagation();
-                                         const amount = Number(senasInput.value);
-                                         store.updateAppointmentPaymentStatus(app.id, { 
-                                           paymentStatus: 'senado', 
-                                           paidAmount: amount 
-                                         });
-                                         if (amount > 0) {
-                                           store.createTransaction({
-                                             id: Date.now(),
-                                             date: new Date().toISOString(),
-                                             type: 'Ingreso',
-                                             concept: `Seña ${app.title} — ${app.patient}`,
-                                             method: app.paymentMethod || 'Efectivo',
-                                             amount,
-                                             notes: `Desde Dashboard (Seña #${app.id})`,
-                                             doctor_id: app.doctorId,
-                                             patient_id: app.patientId
+                                             if (e.key === 'Escape') setSenasInput({ appId: null, value: '' });
+                                           }}
+                                           className="w-full pl-6 pr-2 py-1.5 text-sm font-bold text-indigo-700 bg-white border border-indigo-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-200"
+                                           placeholder="0"
+                                         />
+                                       </div>
+                                       <button
+                                         onClick={e => {
+                                           e.stopPropagation();
+                                           const amount = Number(senasInput.value);
+                                           store.updateAppointmentPaymentStatus(app.id, { 
+                                             paymentStatus: 'señado', 
+                                             paidAmount: amount 
                                            });
-                                         }
-                                         setSenasInput({ appId: null, value: '' });
-                                         setActiveDropdown(null);
-                                       }}
-                                       className="px-2.5 py-1.5 bg-indigo-600 text-white text-xs font-black rounded-lg hover:bg-indigo-700 transition-colors shrink-0"
-                                     >
-                                       OK
-                                     </button>
+                                           if (amount > 0) {
+                                             store.createTransaction({
+                                               id: Date.now(),
+                                               date: new Date().toISOString(),
+                                               type: 'Ingreso',
+                                               concept: `Seña ${app.title} — ${app.patient}`,
+                                               method: app.paymentMethod || 'Efectivo',
+                                               amount,
+                                               notes: `Desde Dashboard (Seña #${app.id})`,
+                                               doctor_id: app.doctorId,
+                                               patient_id: app.patientId
+                                             });
+                                           }
+                                           setSenasInput({ appId: null, value: '' });
+                                           setActiveDropdown(null);
+                                         }}
+                                         className="px-2.5 py-1.5 bg-indigo-600 text-white text-xs font-black rounded-lg hover:bg-indigo-700 transition-colors shrink-0"
+                                       >
+                                         OK
+                                       </button>
+                                     </div>
                                    </div>
-                                 </div>
-                               )}
-                            </div>
+                                 )}
+                              </div>
+                            )}
                             {/* Details Shortcut */}
                             <button 
                               onClick={(e) => {

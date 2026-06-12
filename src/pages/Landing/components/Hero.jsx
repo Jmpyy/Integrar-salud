@@ -5,7 +5,6 @@ import heroBg from '../../../assets/img/hero-bg.png';
 
 export default function Hero({ config }) {
   const businessName = config?.businessName || 'Integrar Salud';
-  const isDefaultName = businessName.toLowerCase().includes('integrar');
 
   return (
     <section className="relative min-h-[90vh] flex items-center pt-20 pb-20 overflow-hidden bg-slate-50">

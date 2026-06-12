@@ -23,6 +23,7 @@ export default function ReportesPage() {
       setLoading(false);
     };
     loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const now = new Date();
@@ -68,7 +69,7 @@ export default function ReportesPage() {
     ? (ausentesApps.length / thisMonthApps.length * 100).toFixed(1)
     : 0;
 
-  const paidApps = completedApps.filter(a => a.paymentStatus === 'pagado' || a.paymentStatus === 'senado');
+  const paidApps = completedApps.filter(a => a.paymentStatus === 'pagado' || a.paymentStatus === 'señado');
   const capacidadCobro = completedApps.length > 0 
     ? Math.round((paidApps.length / completedApps.length) * 100)
     : 0;

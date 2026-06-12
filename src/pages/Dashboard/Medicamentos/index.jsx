@@ -10,7 +10,6 @@ import { useStore } from '../../../stores/useStore';
 import ConfirmDialog from '../../../components/ConfirmDialog/ConfirmDialog';
 
 export default function MedicamentosPage() {
-  const store = useStore();
   const [meds, setMeds] = useState([]);
   const [activePrescriptions, setActivePrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,15 +55,7 @@ export default function MedicamentosPage() {
 
   // Las prescripciones activas ahora se cargan directamente desde el backend en loadMeds()
 
-  const handleUpdateStock = async (med, delta) => {
-    const newQty = Math.max(0, (med.quantity || 0) + delta);
-    try {
-      await medicationsService.update(med.id, { ...med, quantity: newQty });
-      setMeds(prev => prev.map(m => m.id === med.id ? { ...m, quantity: newQty } : m));
-    } catch (err) {
-      toast.error('Error al actualizar stock');
-    }
-  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();

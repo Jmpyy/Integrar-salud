@@ -32,5 +32,14 @@ export default defineConfig({
   build: {
     target: 'esnext',
     minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom', 'zustand'],
+          ui: ['lucide-react', 'react-hot-toast', 'framer-motion'],
+          charts: ['recharts']
+        }
+      }
+    }
   }
 })

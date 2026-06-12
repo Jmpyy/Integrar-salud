@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom';
 import { playPopSound, playSuccessSound, playCashSound, playErrorSound } from '../../../utils/sounds';
 import CustomDatePicker from '../../../components/ui/CustomDatePicker';
 import CustomTimePicker from '../../../components/ui/CustomTimePicker';
+import { socket } from '../../../services/socket';
 
 export default function AgendaPage() {
   const store = useStore();
@@ -395,7 +396,7 @@ export default function AgendaPage() {
       if (editingAppointmentId) {
         const mainApp = appointments.find(a => a.id === editingAppointmentId);
         const isStatusChangeToPaid = formData.paymentStatus === 'pagado' && (mainApp?.paymentStatus !== 'pagado');
-        const isStatusChangeToSenado = formData.paymentStatus === 'senado' && (mainApp?.paymentStatus !== 'senado');
+        const isStatusChangeToSenado = formData.paymentStatus === 'señado' && (mainApp?.paymentStatus !== 'señado');
 
         const updatedApp = {
           ...mainApp,
@@ -414,12 +415,12 @@ export default function AgendaPage() {
 
         // Inyectar en Finanzas si corresponde (Solo la diferencia)
         const prevPaid = Number(mainApp?.paidAmount || 0) + (mainApp?.paymentStatus === 'pagado' ? Number(mainApp?.paymentAmount - mainApp?.paidAmount) : 0);
-        const currPaidTotal = Number(formData.paymentStatus === 'pagado' ? formData.paymentAmount : (formData.paymentStatus === 'senado' ? formData.paidAmount : 0));
+        const currPaidTotal = Number(formData.paymentStatus === 'pagado' ? formData.paymentAmount : (formData.paymentStatus === 'señado' ? formData.paidAmount : 0));
         const netPaymentNow = currPaidTotal - prevPaid;
 
-        // Si el estado es 'senado', actualizamos paidMethod
+        // Si el estado es 'señado', actualizamos paidMethod
         // Si el estado es 'pagado', el nuevo método aplica al saldo
-        const currentTxMethod = formData.paymentStatus === 'senado' ? formData.paidMethod : formData.paymentMethod;
+        const currentTxMethod = formData.paymentStatus === 'señado' ? formData.paidMethod : formData.paymentMethod;
 
         if (netPaymentNow > 0) {
           toast(`⏳ Procesando... Total: $${currPaidTotal}, Pagado previo: $${prevPaid}, Resta: $${netPaymentNow}`, { duration: 3000 });
@@ -474,7 +475,7 @@ export default function AgendaPage() {
             throw new Error('Error al crear el turno en el servidor');
           }
 
-          if ((formData.paymentStatus === 'pagado' || formData.paymentStatus === 'senado') && created) {
+          if ((formData.paymentStatus === 'pagado' || formData.paymentStatus === 'señado') && created) {
             const amountValue = formData.paymentStatus === 'pagado' ? Number(formData.paymentAmount || 0) : Number(formData.paidAmount || 0);
             if (amountValue > 0) {
               await store.createTransaction({
@@ -482,7 +483,7 @@ export default function AgendaPage() {
                     date: nowForAPI(),
                 type: 'Ingreso',
                 concept: `${formData.paymentStatus === 'pagado' ? 'Cobro Total' : 'Seña'} ${formData.title} — ${finalPatientName}`,
-                method: (formData.paymentStatus === 'senado' ? formData.paidMethod : formData.paymentMethod) || 'Efectivo',
+                method: (formData.paymentStatus === 'señado' ? formData.paidMethod : formData.paymentMethod) || 'Efectivo',
                 amount: amountValue,
                 notes: `Registrado al crear turno (Turno #${newApp.id})`,
                 doctor_id: formData.doctorId,
@@ -706,7 +707,7 @@ export default function AgendaPage() {
   // Drag & Drop
   const handleDrop = (e, targetCol) => {
     e.preventDefault();
-    if (!draggedApp || ['medico', 'administracion'].includes(userRole)) return;
+    if (!draggedApp || ['medico'].includes(userRole)) return;
 
     const gridRect = e.currentTarget.getBoundingClientRect();
     const y = Math.max(0, e.clientY - gridRect.top);
@@ -895,7 +896,7 @@ export default function AgendaPage() {
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
           {/* Si es vista semanal, mostramos Selector de Doctor exclusivo (Premium Style) */}
-          {isWeekly && !['medico', 'administracion'].includes(userRole) && (
+          {isWeekly && !['medico'].includes(userRole) && (
              <div className="relative group w-full sm:w-64">
                <select id="selectedDoctorWeekly" name="selectedDoctorWeekly" 
                  value={selectedDoctorWeekly} 
@@ -970,7 +971,7 @@ export default function AgendaPage() {
             </button>
           )}
 
-          {!['medico', 'administracion'].includes(userRole) && (
+          {!['medico'].includes(userRole) && (
             <button 
               onClick={() => {
                 playPopSound();
@@ -1093,7 +1094,7 @@ export default function AgendaPage() {
                         }}
                       >
                         <div
-                          draggable={!['medico', 'administracion'].includes(userRole) && !isSuspended}
+                          draggable={!['medico'].includes(userRole) && !isSuspended}
                           onDragStart={(e) => {
                             if (userRole === 'medico' || isSuspended) { e.preventDefault(); return; }
                             setDraggedApp(app);
@@ -1132,7 +1133,7 @@ export default function AgendaPage() {
                                           💵 ABONADO: ${Number(app.paymentAmount || 0).toLocaleString()}
                                         </span>
                                       )}
-                                      {app.paymentStatus === 'senado' && (
+                                      {app.paymentStatus === 'señado' && (
                                         <span className="inline-block px-1.5 py-0.5 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-md shadow-md border border-indigo-500 flex items-center justify-center">
                                           💰 SEÑADO: ${Number(app.paidAmount || 0).toLocaleString()} (Saldar: ${Math.max(0, (Number(app.paymentAmount) || 0) - (Number(app.paidAmount) || 0))})
                                         </span>
@@ -1205,7 +1206,7 @@ export default function AgendaPage() {
                               <div className="w-12 h-1.5 bg-[var(--border-color)] rounded-full mx-auto mb-3 sm:hidden opacity-50 shrink-0"></div>
 
                               <div className="overflow-y-auto custom-scrollbar flex-1 pb-2 sm:pb-0">
-                              {!['medico', 'administracion'].includes(userRole) && !isBlock && (
+                              {!['medico'].includes(userRole) && !isBlock && (
                                 <>
                                   <div className="px-5 py-2.5 text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-[0.2em] bg-[var(--bg-sidebar)]/30 border-b border-[var(--border-color)]/30 sticky top-0 z-10 backdrop-blur-md">Caja / Cobros</div>
                                       <button
@@ -1230,55 +1231,38 @@ export default function AgendaPage() {
                                            const prevPaid = Number(app.paidAmount || 0);
                                            const amountToPay = totalFee - prevPaid;
                                            
-                                           const token = localStorage.getItem('auth_token');
-                                           const API = 'https://control.integrarsalud.me/api-integrar/api';
-                                           
                                            toast(`⏳ Procesando... Total: $${totalFee}, Pagado: $${prevPaid}, Resta: $${amountToPay}`, { duration: 3000 });
                                            let updateOk = false;
                                            
                                            try {
-                                              const r1 = await fetch(`${API}/appointments/${app.id}/payment`, {
-                                                method: 'PATCH',
-                                                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee })
-                                              });
-                                              if (r1.ok) {
-                                                updateOk = true;
-                                                playCashSound();
-                                                store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee }).catch(()=>{});
-                                              } else {
-                                                const d1 = await r1.json().catch(()=>({}));
-                                                toast.error(`❌ Error turno: ${d1.message || r1.status}`);
-                                              }
+                                             const { data: d1 } = await import('../../../services/api').then(m => m.default).then(api => api.patch(`/appointments/${app.id}/payment`, {
+                                               paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee
+                                             }));
+                                             updateOk = true;
+                                             playCashSound();
+                                             store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee }).catch(()=>{});
                                            } catch(err) {
-                                              toast.error(`❌ Error de red (turno): ${err.message}`);
+                                             const msg = err.response?.data?.message || err.message;
+                                             toast.error(`❌ Error turno: ${msg}`);
                                            }
 
                                            if (updateOk && amountToPay > 0) {
-                                              try {
-                                                const r2 = await fetch(`${API}/transactions/`, {
-                                                  method: 'POST',
-                                                  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                                                  body: JSON.stringify({
-                                                    type: 'Ingreso',
-                                                    concept: `Cobro Restante ${app.title} — ${app.patient}`,
-                                                    method: app.paymentMethod || 'Efectivo',
-                                                    amount: amountToPay,
-                                                    date: nowForAPI(),
-                                                    notes: `Cobro desde Agenda (Turno #${app.id})`,
-                                                    doctor_id: app.doctorId,
-                                                    patient_id: app.patientId
-                                                  })
-                                                });
-                                                if (r2.ok) {
-                                                  toast.success(`✅ Restante de $${amountToPay.toLocaleString()} registrado en Finanzas!`);
-                                                } else {
-                                                  const d2 = await r2.json().catch(()=>({}));
-                                                  toast.error(`❌ Error Finanzas: ${d2.message || r2.status}`);
-                                                }
-                                              } catch(err) {
-                                                toast.error(`❌ Error de red (finanzas): ${err.message}`);
-                                              }
+                                             try {
+                                               const { data: d2 } = await import('../../../services/api').then(m => m.default).then(api => api.post(`/transactions/`, {
+                                                 type: 'Ingreso',
+                                                 concept: `Cobro Restante ${app.title} — ${app.patient}`,
+                                                 method: app.paymentMethod || 'Efectivo',
+                                                 amount: amountToPay,
+                                                 date: nowForAPI(),
+                                                 notes: `Cobro desde Agenda (Turno #${app.id})`,
+                                                 doctor_id: app.doctorId,
+                                                 patient_id: app.patientId
+                                               }));
+                                               toast.success(`✅ Restante de $${amountToPay.toLocaleString()} registrado en Finanzas!`);
+                                             } catch(err) {
+                                               const msg = err.response?.data?.message || err.message;
+                                               toast.error(`❌ Error finanzas: ${msg}`);
+                                             }
                                            } else if (updateOk && amountToPay <= 0) {
                                               toast('ℹ️ El turno ya estaba totalmente pagado. No se creó transacción extra.', { icon: '👏' });
                                            }
@@ -1297,10 +1281,10 @@ export default function AgendaPage() {
                                           const defaultAmount = app.paymentAmount || 35000;
                                           setSenasInput({ appId: app.id, value: String(Math.floor(defaultAmount / 2)) });
                                         }}
-                                        className={`w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold border-b border-[var(--border-color)]/10 transition-all flex items-center justify-between ${app.paymentStatus === 'senado' ? 'text-indigo-400 bg-indigo-500/10' : 'text-[var(--text-primary)] hover:bg-[var(--accent-light)]'}`}
+                                        className={`w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold border-b border-[var(--border-color)]/10 transition-all flex items-center justify-between ${app.paymentStatus === 'señado' ? 'text-indigo-400 bg-indigo-500/10' : 'text-[var(--text-primary)] hover:bg-[var(--accent-light)]'}`}
                                       >
                                         Señado
-                                        {app.paymentStatus === 'senado' && <CheckCircle2 size={12} />}
+                                        {app.paymentStatus === 'señado' && <CheckCircle2 size={12} />}
                                       </button>
 
                                       {/* Inline seña input - aparece dentro del dropdown */}
@@ -1321,7 +1305,7 @@ export default function AgendaPage() {
                                                     const amount = Number(senasInput.value);
                                                     if (amount <= 0) { toast.error('Ingresá un monto válido'); return; }
                                                     try {
-                                                      await store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'senado', paidAmount: amount });
+                                                      await store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'señado', paidAmount: amount });
                                                       await store.createTransaction({
                                                         date: nowForAPI(),
                                                         type: 'Ingreso',
@@ -1351,28 +1335,19 @@ export default function AgendaPage() {
                                                 const amount = Number(senasInput.value);
                                                 if (amount <= 0) { toast.error('Ingresá un monto válido'); return; }
                                                 
-                                                const token = localStorage.getItem('auth_token');
-                                                const API = 'https://control.integrarsalud.me/api-integrar/api';
-                                                
                                                 // PASO 1: Actualizar estado del turno
                                                 toast('⏳ Actualizando turno...', { duration: 2000 });
                                                 let paso1Ok = false;
                                                 try {
-                                                  const r1 = await fetch(`${API}/appointments/${app.id}/payment`, {
-                                                    method: 'PATCH',
-                                                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ paymentStatus: 'senado', paidAmount: amount })
-                                                  });
-                                                  const d1 = await r1.json();
-                                                  if (!r1.ok) {
-                                                    toast.error(`❌ Error turno (${r1.status}): ${d1.message || JSON.stringify(d1)}`);
-                                                  } else {
-                                                    paso1Ok = true;
-                                                    // Actualizar store localmente
-                                                    store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'senado', paidAmount: amount }).catch(()=>{});
-                                                  }
+                                                  const { data: d1 } = await import('../../../services/api').then(m => m.default).then(api => api.patch(`/appointments/${app.id}/payment`, {
+                                                    paymentStatus: 'señado', paidAmount: amount
+                                                  }));
+                                                  paso1Ok = true;
+                                                  // Actualizar store localmente
+                                                  store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'señado', paidAmount: amount }).catch(()=>{});
                                                 } catch(e1) {
-                                                  toast.error(`❌ Red (turno): ${e1.message}`);
+                                                  const msg = e1.response?.data?.message || e1.message;
+                                                  toast.error(`❌ Red (turno): ${msg}`);
                                                 }
                                                 
                                                 // PASO 2: Crear transacción en Finanzas
@@ -1388,19 +1363,11 @@ export default function AgendaPage() {
                                                       doctor_id: app.doctorId,
                                                       patient_id: app.patientId
                                                     };
-                                                    const r2 = await fetch(`${API}/transactions/`, {
-                                                      method: 'POST',
-                                                      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                                                      body: JSON.stringify(txBody)
-                                                    });
-                                                    const d2 = await r2.json();
-                                                    if (!r2.ok) {
-                                                      toast.error(`❌ Error finanzas (${r2.status}): ${d2.message || JSON.stringify(d2).substring(0,100)}`);
-                                                    } else {
-                                                      toast.success(`✅ Seña $${amount.toLocaleString()} registrada en Finanzas`);
-                                                    }
+                                                    const { data: d2 } = await import('../../../services/api').then(m => m.default).then(api => api.post(`/transactions/`, txBody));
+                                                    toast.success(`✅ Seña $${amount.toLocaleString()} registrada en Finanzas`);
                                                   } catch(e2) {
-                                                    toast.error(`❌ Red (finanzas): ${e2.message}`);
+                                                    const msg = e2.response?.data?.message || e2.message;
+                                                    toast.error(`❌ Red (finanzas): ${msg}`);
                                                   }
                                                 }
                                                 
@@ -1417,7 +1384,7 @@ export default function AgendaPage() {
                                     </>
                                   )}
 
-                                  {!['medico', 'administracion'].includes(userRole) && (
+                                  {!['medico'].includes(userRole) && (
                                     <>
                                       <div className="px-5 py-2.5 text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-[0.2em] bg-[var(--bg-sidebar)]/30 border-y border-[var(--border-color)]/30 sticky top-0 z-10 backdrop-blur-md">Estados de Asistencia</div>
                                       <button onClick={(e) => handleStatusChange(e, app.id, 'agendado')} className="w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--accent-light)] transition-all flex items-center gap-3 border-b border-[var(--border-color)]/10"><Clock size={15} className="opacity-40"/> Agendado</button>
@@ -1436,7 +1403,7 @@ export default function AgendaPage() {
                               )}
 
                                {/* — Comprobante button (only when paid or señado) — */}
-                               {(app.paymentStatus === 'pagado' || app.paymentStatus === 'senado') && (
+                               {(!['medico'].includes(userRole) && (app.paymentStatus === 'pagado' || app.paymentStatus === 'señado')) && (
                                  <button
                                    onClick={(e) => {
                                      e.stopPropagation();
@@ -1449,7 +1416,7 @@ export default function AgendaPage() {
                                  </button>
                                )}
 
-                               {store.globalConfig?.whatsappEnabled && (
+                               {(!['medico'].includes(userRole) && store.globalConfig?.whatsappEnabled) && (
                                  <button 
                                    onClick={(e) => {
                                      e.stopPropagation();
@@ -1483,7 +1450,7 @@ export default function AgendaPage() {
                               <button
                                  onClick={(e) => {
                                    e.stopPropagation();
-                                   if (userRole === 'administracion') {
+                                   if (false) {
                                      handleViewPatient(app);
                                    } else {
                                      handleOpenEdit(app);
@@ -1491,10 +1458,10 @@ export default function AgendaPage() {
                                  }}
                                 className="w-full text-left px-5 py-3 text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--accent-light)] transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"
                               >
-                                <Eye size={16} className="opacity-40" /> {['medico', 'administracion'].includes(userRole) ? 'Ver ficha detallada' : 'Editar detalles'}
+                                <Eye size={16} className="opacity-40" /> {['medico'].includes(userRole) ? 'Ver ficha detallada' : 'Editar detalles'}
                               </button>
                               
-                              {!['medico', 'administracion'].includes(userRole) && (
+                              {!['medico'].includes(userRole) && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1899,10 +1866,16 @@ export default function AgendaPage() {
                                       }
                                     }
                                     try {
-                                      await store.updateAppointmentVideoStatus(editingAppointmentId, 'activa');
-                                      setFormData({ ...formData, estadoVideollamada: 'activa' });
-                                      window.open(formData.meetLink, '_blank');
-                                      toast.success('Videollamada iniciada. El paciente será redirigido.');
+                                      const app = store.appointments.find(a => a.id === editingAppointmentId);
+                                      if (app) {
+                                        store.setActiveCallApp(app);
+                                        socket.emit('call-started', `appointment-${app.id}`);
+                                      } else {
+                                        await store.updateAppointmentVideoStatus(editingAppointmentId, 'activa');
+                                        setFormData({ ...formData, estadoVideollamada: 'activa' });
+                                        window.open(formData.meetLink, '_blank');
+                                      }
+                                      toast.success('Videollamada iniciada. El paciente será alertado.');
                                     } catch (err) {
                                       toast.error('Error al iniciar videollamada');
                                     }
@@ -2067,8 +2040,8 @@ export default function AgendaPage() {
                         </button>
                         <button 
                           type="button" 
-                          onClick={() => setFormData({...formData, paymentStatus: 'senado'})}
-                          className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${formData.paymentStatus === 'senado' ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20' : 'text-[var(--text-secondary)] opacity-50 hover:opacity-100'}`}
+                          onClick={() => setFormData({...formData, paymentStatus: 'señado'})}
+                          className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${formData.paymentStatus === 'señado' ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20' : 'text-[var(--text-secondary)] opacity-50 hover:opacity-100'}`}
                         >
                           Señado
                         </button>
@@ -2100,7 +2073,7 @@ export default function AgendaPage() {
                     {/* Medio de Pago Estilizado */}
                     <div className="col-span-full">
                       <span className="block text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-3 ml-2">
-                        {formData.paymentStatus === 'senado' ? 'Vía de Recepción de la Seña' : 'Vía de Recepción del Saldo'}
+                        {formData.paymentStatus === 'señado' ? 'Vía de Recepción de la Seña' : 'Vía de Recepción del Saldo'}
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {[
@@ -2108,13 +2081,13 @@ export default function AgendaPage() {
                           { id: 'Tarjeta', lbl: 'Plástico / Bank', sub: 'Débito / Crédito', icon: <Landmark size={16} />, color: 'indigo' },
                           { id: 'Transferencia', lbl: 'Digital / Bank', sub: 'Transferencia / MP', icon: <Activity size={16} />, color: 'sky' }
                         ].map((m) => {
-                          const isSelected = formData.paymentStatus === 'senado' ? formData.paidMethod === m.id : formData.paymentMethod === m.id;
+                          const isSelected = formData.paymentStatus === 'señado' ? formData.paidMethod === m.id : formData.paymentMethod === m.id;
                           return (
                             <button
                               key={m.id}
                               type="button"
                               onClick={() => {
-                                if (formData.paymentStatus === 'senado') {
+                                if (formData.paymentStatus === 'señado') {
                                   setFormData({...formData, paidMethod: m.id});
                                 } else {
                                   setFormData({...formData, paymentMethod: m.id});
@@ -2140,7 +2113,7 @@ export default function AgendaPage() {
                     </div>
 
                     {/* Campos Condicionales: Seña */}
-                    {formData.paymentStatus === 'senado' && (
+                    {formData.paymentStatus === 'señado' && (
                       <div className="col-span-full animate-fade-in-up">
                         <label htmlFor="paidAmount" className="block text-[10px] font-black [var(--accent-primary)] uppercase tracking-widest mb-2 ml-2 italic">Monto de la Seña (Registro parcial)</label>
                         <input id="paidAmount" name="paidAmount" 
@@ -2384,31 +2357,25 @@ export default function AgendaPage() {
                     const totalFee = Number(menuApp.paymentAmount) > 0 ? Number(menuApp.paymentAmount) : 35000;
                     const prevPaid = Number(menuApp.paidAmount || 0);
                     const amountToPay = totalFee - prevPaid;
-                    const token = localStorage.getItem('auth_token');
-                    const API = 'https://control.integrarsalud.me/api-integrar/api';
                     toast('⏳ Procesando cobro...', { duration: 2000 });
                     try {
-                      const r1 = await fetch(`${API}/appointments/${menuApp.id}/payment`, {
-                        method: 'PATCH',
-                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee })
-                      });
-                      if (r1.ok) {
-                        store.updateAppointmentPaymentStatus(menuApp.id, { paymentStatus: 'pagado', paidAmount: totalFee }).catch(()=>{});
-                        if (amountToPay > 0) {
-                          await fetch(`${API}/transactions/`, {
-                            method: 'POST',
-                            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({ type: 'Ingreso', concept: `Cobro ${menuApp.title} — ${menuApp.patient}`, method: menuApp.paymentMethod || 'Efectivo', amount: amountToPay, date: nowForAPI(), notes: `Cobro desde Agenda mobile (Turno #${menuApp.id})`, doctor_id: menuApp.doctorId, patient_id: menuApp.patientId })
-                          });
-                          toast.success(`✅ $${amountToPay.toLocaleString()} registrado en Finanzas`);
-                        } else {
-                          toast('✅ Turno marcado como abonado');
-                        }
-                      } else { toast.error('❌ Error al actualizar el turno'); }
-                    } catch(e) { toast.error('❌ Error de red: ' + e.message); }
+                      const { data: d1 } = await import('../../../services/api').then(m => m.default).then(api => api.patch(`/appointments/${menuApp.id}/payment`, {
+                        paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee
+                      }));
+                      store.updateAppointmentPaymentStatus(menuApp.id, { paymentStatus: 'pagado', paidAmount: totalFee }).catch(()=>{});
+                      
+                      if (amountToPay > 0) {
+                        await import('../../../services/api').then(m => m.default).then(api => api.post(`/transactions/`, {
+                          type: 'Ingreso', concept: `Cobro ${menuApp.title} — ${menuApp.patient}`, method: menuApp.paymentMethod || 'Efectivo', amount: amountToPay, date: nowForAPI(), notes: `Cobro desde Agenda mobile (Turno #${menuApp.id})`, doctor_id: menuApp.doctorId, patient_id: menuApp.patientId
+                        }));
+                        toast.success(`✅ $${amountToPay.toLocaleString()} registrado en Finanzas`);
+                      } else {
+                        toast('✅ Turno marcado como abonado');
+                      }
+                    } catch(e) {
+                      const msg = e.response?.data?.message || e.message;
+                      toast.error('❌ Error: ' + msg);
+                    }
                     setMenuApp(null);
                   }}
                   className={`w-full text-left px-5 py-3.5 text-sm font-bold flex items-center justify-between rounded-xl transition-all ${
@@ -2423,11 +2390,11 @@ export default function AgendaPage() {
                 <button
                   onClick={() => setMobileSeñaInput({ active: true, value: String(Math.floor(Number(menuApp.paymentAmount || 35000) / 2)) })}
                   className={`w-full text-left px-5 py-3.5 text-sm font-bold flex items-center justify-between rounded-xl transition-all ${
-                    menuApp.paymentStatus === 'senado' ? 'text-indigo-600 bg-indigo-50' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'
+                    menuApp.paymentStatus === 'señado' ? 'text-indigo-600 bg-indigo-50' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'
                   }`}
                 >
                   <span className="flex items-center gap-3"><span className="text-lg">💰</span> Registrar Seña</span>
-                  {menuApp.paymentStatus === 'senado' && <CheckCircle2 size={16} className="text-indigo-600" />}
+                  {menuApp.paymentStatus === 'señado' && <CheckCircle2 size={16} className="text-indigo-600" />}
                 </button>
 
                 {/* Input de monto de seña */}
@@ -2450,25 +2417,21 @@ export default function AgendaPage() {
                         onClick={async () => {
                           const amount = Number(mobileSeñaInput.value);
                           if (amount <= 0) { toast.error('Ingresá un monto válido'); return; }
-                          const token = localStorage.getItem('auth_token');
-                          const API = 'https://control.integrarsalud.me/api-integrar/api';
                           toast('⏳ Registrando seña...', { duration: 2000 });
                           try {
-                            const r1 = await fetch(`${API}/appointments/${menuApp.id}/payment`, {
-                              method: 'PATCH', credentials: 'include',
-                              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ paymentStatus: 'senado', paidAmount: amount })
-                            });
-                            if (r1.ok) {
-                              store.updateAppointmentPaymentStatus(menuApp.id, { paymentStatus: 'senado', paidAmount: amount }).catch(()=>{});
-                              await fetch(`${API}/transactions/`, {
-                                method: 'POST', credentials: 'include',
-                                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ type: 'Ingreso', concept: `Seña ${menuApp.title} — ${menuApp.patient}`, method: menuApp.paymentMethod || 'Efectivo', amount, date: nowForAPI(), notes: `Seña desde Agenda mobile (Turno #${menuApp.id})`, doctor_id: menuApp.doctorId, patient_id: menuApp.patientId })
-                              });
-                              toast.success(`✅ Seña $${amount.toLocaleString()} registrada`);
-                            } else { toast.error('❌ Error al actualizar'); }
-                          } catch(e) { toast.error('❌ Error de red'); }
+                            const { data: d1 } = await import('../../../services/api').then(m => m.default).then(api => api.patch(`/appointments/${menuApp.id}/payment`, {
+                              paymentStatus: 'señado', paidAmount: amount
+                            }));
+                            store.updateAppointmentPaymentStatus(menuApp.id, { paymentStatus: 'señado', paidAmount: amount }).catch(()=>{});
+                            
+                            await import('../../../services/api').then(m => m.default).then(api => api.post(`/transactions/`, {
+                              type: 'Ingreso', concept: `Seña ${menuApp.title} — ${menuApp.patient}`, method: menuApp.paymentMethod || 'Efectivo', amount, date: nowForAPI(), notes: `Seña desde Agenda mobile (Turno #${menuApp.id})`, doctor_id: menuApp.doctorId, patient_id: menuApp.patientId
+                            }));
+                            toast.success(`✅ Seña $${amount.toLocaleString()} registrada`);
+                          } catch(e) {
+                            const msg = e.response?.data?.message || e.message;
+                            toast.error('❌ Error: ' + msg);
+                          }
                           setMobileSeñaInput({ active: false, value: '' });
                           setMenuApp(null);
                         }}
@@ -2511,7 +2474,7 @@ export default function AgendaPage() {
               <button onClick={() => { handleOpenEdit(menuApp); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--accent-light)] flex items-center gap-3 transition-all rounded-xl">
                 <Eye size={20} /> Editar Ficha del Turno
               </button>
-              {(menuApp.paymentStatus === 'pagado' || menuApp.paymentStatus === 'senado') && (
+              {(menuApp.paymentStatus === 'pagado' || menuApp.paymentStatus === 'señado') && (
                 <button onClick={() => { setReceiptApp(menuApp); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-[var(--accent-primary)] hover:bg-[var(--accent-light)] flex items-center gap-3 transition-all rounded-xl">
                   <Receipt size={20} /> Imprimir Comprobante
                 </button>

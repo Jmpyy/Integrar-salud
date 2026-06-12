@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Video, ShieldCheck, Loader2, ArrowRight, UserCircle, LogOut, CalendarClock, Clock, AlertCircle, Lightbulb, Mic, Wifi, FileText } from 'lucide-react';
+import { Video, ShieldCheck, Loader2, ArrowRight, UserCircle, LogOut, CalendarClock, Clock, AlertCircle, Lightbulb, Mic, Wifi, FileText, CheckCircle, Star, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 
 const WAITING_TIPS = [
   {
@@ -36,6 +36,7 @@ const WAITING_TIPS = [
 ];
 
 import JitsiMeeting from '../../components/JitsiMeeting';
+import { socket } from '../../services/socket';
 
 export default function VirtualRoomPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -43,13 +44,70 @@ export default function VirtualRoomPage() {
   const [codigo, setCodigo] = useState(searchParams.get('codigo') || '');
   
   const [loading, setLoading] = useState(false);
-  // roomState: 'login' | 'waiting' | 'early' | 'past'
+  // roomState: 'login' | 'waiting' | 'early' | 'past' | 'active_call' | 'goodbye'
   const [roomState, setRoomState] = useState('login');
   const [paymentError, setPaymentError] = useState(null);
   const [appointmentData, setAppointmentData] = useState(null);
-  const [earlyData, setEarlyData] = useState(null); // { appointmentDate, appointmentTime, doctorName, message }
+  const [earlyData, setEarlyData] = useState(null);
   const [delayMessage, setDelayMessage] = useState(null);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
+
+  // Estados de la reseña
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewHover, setReviewHover] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [publicConfig, setPublicConfig] = useState(null);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://control.integrarsalud.me/api-integrar/api'}/settings/public`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.error) setPublicConfig(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSubmitReview = async () => {
+    if (!reviewRating) return;
+    setReviewLoading(true);
+    try {
+      const API = import.meta.env.VITE_API_BASE_URL || 'https://control.integrarsalud.me/api-integrar/api';
+      const res = await fetch(`${API}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointment_id: appointmentData?.appointmentId,
+          codigo: codigo,
+          rating: reviewRating,
+          comment: reviewComment.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error al enviar');
+      setReviewSubmitted(true);
+      
+      // Alerta de crisis (websocket)
+      if (reviewRating <= 2) {
+        socket.emit('low-rating-alert', {
+          patient_name: appointmentData?.patientName || 'Paciente',
+          doctor_name: appointmentData?.doctorName || 'Médico',
+          rating: reviewRating,
+        });
+      }
+
+      import('react-hot-toast').then(({ default: toast }) => {
+        toast.success('¡Gracias por tu opinión! 🌟', { duration: 4000 });
+      });
+    } catch (err) {
+      import('react-hot-toast').then(({ default: toast }) => {
+        toast.error(err.message || 'No se pudo enviar la reseña');
+      });
+    } finally {
+      setReviewLoading(false);
+    }
+  };
 
   // Rotar tips en la sala de espera
   useEffect(() => {
@@ -62,66 +120,101 @@ export default function VirtualRoomPage() {
     return () => clearInterval(interval);
   }, [roomState]);
 
-  // Polling cuando estemos en sala de espera o en llamada (para detectar si el médico finaliza)
+  // WebSockets: Conectar y escuchar eventos
   useEffect(() => {
-    let interval;
-    if ((roomState === 'waiting' || roomState === 'active_call') && appointmentData?.appointmentId) {
-      interval = setInterval(async () => {
-        try {
-          const API = 'https://control.integrarsalud.me/api-integrar/api';
-          const res = await fetch(`${API}/telemedicine/check_status?id=${appointmentData.appointmentId}&codigo=${codigo}&_t=${Date.now()}`, { cache: 'no-store' });
-          
-          if (res.ok) {
-            const data = await res.json();
-            
-            if (!data.error) {
-              setDelayMessage(data.delayMessage || null);
-              if (data.status === 'activa' && roomState !== 'active_call') {
-                toast.success('¡El médico ha iniciado la consulta!');
-                setRoomState('active_call');
-              } else if (data.status === 'finalizada' || data.status === 'ausente' || data.status === 'finalizado') {
-                clearInterval(interval);
-                toast.error('La consulta ha finalizado.');
-                setRoomState('login');
-                setAppointmentData(null);
-              }
-            }
-          }
-        } catch (err) {
-          console.error("Error polling:", err);
-        }
-      }, 5000);
-    }
-
-      // Listener para cuando el paciente cierra la pestaña o el navegador
-      const handleUnload = (e) => {
-        if (e && e.type === 'visibilitychange' && document.visibilityState !== 'hidden') return;
-        if (appointmentData?.appointmentId) {
-          const leaveUrl = `https://control.integrarsalud.me/api-integrar/api/telemedicine/leave_room?id=${appointmentData.appointmentId}`;
-          navigator.sendBeacon(leaveUrl);
-        }
-      };
+    if (appointmentData?.appointmentId) {
+      const roomId = `appointment-${appointmentData.appointmentId}`;
       
-      window.addEventListener('beforeunload', handleUnload);
-      window.addEventListener('pagehide', handleUnload);
-      document.addEventListener('visibilitychange', handleUnload);
+      if (appointmentData.token) {
+        socket.auth = { token: appointmentData.token };
+      }
+
+      const onConnect = () => {
+        socket.emit('join-room', roomId);
+        socket.emit('patient-entered', {
+          appointmentId: appointmentData.appointmentId,
+          patientName: appointmentData.patientName,
+          doctorName: appointmentData.doctorName
+        });
+      };
+
+      const onCallStarted = () => {
+        setRoomState(prev => {
+          if (prev !== 'active_call') {
+            toast.success('¡El médico ha iniciado la consulta!');
+            return 'active_call';
+          }
+          return prev;
+        });
+      };
+
+      const onCallEnded = () => {
+        setRoomState('goodbye');
+      };
+
+      const onDelayUpdated = (msg) => {
+        setDelayMessage(msg || null);
+      };
+
+      socket.on('connect', onConnect);
+      socket.on('call-started', onCallStarted);
+      socket.on('call-ended', onCallEnded);
+      socket.on('delay-updated', onDelayUpdated);
+
+      if (socket.connected) {
+        onConnect();
+      } else {
+        socket.connect();
+      }
 
       return () => {
-        clearInterval(interval);
-        window.removeEventListener('beforeunload', handleUnload);
-        window.removeEventListener('pagehide', handleUnload);
-        document.removeEventListener('visibilitychange', handleUnload);
+        socket.off('connect', onConnect);
+        socket.off('call-started', onCallStarted);
+        socket.off('call-ended', onCallEnded);
+        socket.off('delay-updated', onDelayUpdated);
+        socket.emit('leave-room', roomId);
       };
-  }, [roomState, appointmentData]);
+    }
+  }, [appointmentData]);
+
+  // Handle tab closing
+  useEffect(() => {
+    const handleUnload = (e) => {
+      // No desconectar si está en llamada activa y solo cambia de pestaña/minimiza
+      if (e && e.type === 'visibilitychange') {
+        if (document.visibilityState !== 'hidden') return; // Solo cuando oculta
+        if (roomState === 'active_call') return; // Durante llamada no desconectar
+      }
+      if (appointmentData?.appointmentId && codigo) {
+        const API = import.meta.env.VITE_API_BASE_URL || 'https://control.integrarsalud.me/api-integrar/api';
+        const leaveUrl = `${API}/telemedicine/leave_room?id=${appointmentData.appointmentId}&codigo=${codigo}`;
+        navigator.sendBeacon(leaveUrl);
+        socket.disconnect();
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+    document.addEventListener('visibilitychange', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+      document.removeEventListener('visibilitychange', handleUnload);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointmentData, codigo]);
 
   const handleLeaveRoom = async () => {
-    if (appointmentData?.appointmentId) {
+    if (appointmentData?.appointmentId && codigo) {
       try {
-        await fetch(`https://control.integrarsalud.me/api-integrar/api/telemedicine/leave_room?id=${appointmentData.appointmentId}`, { method: 'GET' });
-      } catch (err) {
-        console.error('Error leaving room', err);
+        const API = import.meta.env.VITE_API_BASE_URL || 'https://control.integrarsalud.me/api-integrar/api';
+        await fetch(`${API}/telemedicine/leave_room?id=${appointmentData.appointmentId}&codigo=${codigo}`, { method: 'GET' });
+      } catch (error) {
+        console.error('Error leaving room', error);
       }
     }
+    socket.disconnect();
     setRoomState('login');
     setAppointmentData(null);
   };
@@ -137,7 +230,7 @@ export default function VirtualRoomPage() {
     setLoading(true);
     setPaymentError(null);
     try {
-      const API = 'https://control.integrarsalud.me/api-integrar/api';
+      const API = import.meta.env.VITE_API_BASE_URL || 'https://control.integrarsalud.me/api-integrar/api';
       const res = await fetch(`${API}/telemedicine/verify_access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,8 +256,8 @@ export default function VirtualRoomPage() {
       }
 
       setAppointmentData(data); // data contains appointmentId, doctorName directly
-      setRoomState('waiting');
-      toast.success('Acceso correcto. Estás en la sala de espera.');
+      setRoomState(['activa', 'en_curso'].includes(data.status) ? 'active_call' : 'waiting');
+      toast.success('Acceso correcto. Estás en la sala virtual.');
       if (!searchParams.get('codigo') || !searchParams.get('dni')) {
         setSearchParams({ dni: d, codigo: c.toUpperCase() });
       }
@@ -184,6 +277,19 @@ export default function VirtualRoomPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Chequeo de cámara y micrófono al entrar a la sala de espera
+  useEffect(() => {
+    if (roomState === 'waiting') {
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(stream => {
+          stream.getTracks().forEach(track => track.stop());
+        })
+        .catch(() => {
+          toast.error("Por favor, permití el acceso a la cámara y micrófono para la videollamada.", { duration: 6000 });
+        });
+    }
+  }, [roomState]);
 
   return (
     <div className="min-h-screen bg-[var(--bg-main)] flex items-center justify-center p-4 sm:p-8 relative">
@@ -433,11 +539,166 @@ export default function VirtualRoomPage() {
           {/* Jitsi Meeting */}
           <div className="flex-1 relative bg-black">
             <JitsiMeeting
-              roomName={`integrarsalud-${appointmentData?.appointmentId}-${codigo}`}
+              roomName={`integrarsalud-${appointmentData?.appointmentId}-${codigo.substring(0, 5)}`}
+              password={codigo.length >= 6 ? codigo.substring(5) : codigo}
+              isModerator={false}
               displayName={appointmentData?.patientName || "Paciente"}
               onReadyToClose={handleLeaveRoom}
             />
           </div>
+        </div>
+      )}
+      {/* ── ESTADO: Despedida ── */}
+      {roomState === 'goodbye' && (
+        <div className="fixed inset-0 z-[99999] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-6 overflow-y-auto">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+            className="max-w-md w-full text-center py-8"
+          >
+            {/* Icono animado */}
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+              className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/40"
+            >
+              <CheckCircle size={48} className="text-white" />
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+              <h2 className="text-3xl font-black text-white mb-2 tracking-tight">¡Hasta pronto!</h2>
+              <p className="text-indigo-200 text-lg font-medium mb-1">Tu consulta ha finalizado.</p>
+              {appointmentData?.doctorName && (
+                <p className="text-slate-400 text-sm mb-6">
+                  Gracias por consultar con <span className="text-indigo-300 font-semibold">{appointmentData.doctorName}</span>
+                </p>
+              )}
+            </motion.div>
+
+            {/* Recuadro de recomendaciones */}
+            <motion.div
+              initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
+              className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 text-left space-y-3"
+            >
+              <p className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Heart size={12} className="text-rose-400" /> Recordá
+              </p>
+              {[
+                'Seguí las indicaciones y la medicación recetada por tu médico.',
+                'Si tenés dudas sobre tu tratamiento, podés contactar al consultorio.',
+                'En caso de urgencia, acercate al centro de salud más cercano.',
+              ].map((tip, i) => (
+                <div key={i} className="flex gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0" />
+                  <p className="text-slate-300 text-sm leading-relaxed">{tip}</p>
+                </div>
+              ))}
+            </motion.div>
+
+            {/* Sección de reseña */}
+            <motion.div
+              initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}
+              className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6"
+            >
+              {reviewSubmitted ? (
+                <div className="text-center py-2 animate-fade-in-quick">
+                  {reviewRating === 5 && publicConfig?.googleMapsUrl ? (
+                    <>
+                      <div className="text-4xl mb-3">🤩</div>
+                      <p className="text-emerald-400 font-bold text-sm mb-2">¡Nos alegra muchísimo!</p>
+                      <p className="text-slate-400 text-xs mt-1 mb-4">Si tuviste una excelente experiencia, nos ayudarías un montón copiando tu reseña en Google Maps para que más personas nos conozcan.</p>
+                      <a
+                        href={publicConfig.googleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex w-full items-center justify-center gap-2 py-2.5 px-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl transition-all text-xs"
+                      >
+                        <Globe size={14} />
+                        Publicar en Google Maps
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-3xl mb-2">🌟</div>
+                      <p className="text-emerald-400 font-bold text-sm">¡Gracias por tu opinión!</p>
+                      <p className="text-slate-400 text-xs mt-1">Tu reseña fue enviada y será revisada por el equipo.</p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <p className="text-slate-300 text-sm font-semibold mb-4">¿Cómo fue tu experiencia con {appointmentData?.doctorName || 'el médico'}?</p>
+                  
+                  {/* Estrellas interactivas */}
+                  <div className="flex justify-center gap-2 mb-4">
+                    {[1,2,3,4,5].map(star => (
+                      <button
+                        key={star}
+                        onMouseEnter={() => setReviewHover(star)}
+                        onMouseLeave={() => setReviewHover(0)}
+                        onClick={() => setReviewRating(star)}
+                        className="transition-transform hover:scale-125 focus:outline-none"
+                        title={`${star} estrella${star > 1 ? 's' : ''}`}
+                      >
+                        <Star
+                          size={32}
+                          className={`transition-colors duration-150 ${
+                            star <= (reviewHover || reviewRating)
+                              ? 'text-amber-400 fill-amber-400'
+                              : 'text-slate-600'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Etiqueta según puntaje */}
+                  {(reviewHover || reviewRating) > 0 && (
+                    <p className="text-xs text-slate-400 mb-3">
+                      {{ 1: '😟 Muy mala', 2: '🙁 Regular', 3: '😐 Aceptable', 4: '😊 Buena', 5: '🤩 ¡Excelente!' }[reviewHover || reviewRating]}
+                    </p>
+                  )}
+
+                  {/* Comentario opcional */}
+                  <AnimatePresence>
+                    {reviewRating > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                      >
+                        <textarea
+                          value={reviewComment}
+                          onChange={e => setReviewComment(e.target.value)}
+                          placeholder="Contanos más sobre tu experiencia (opcional)..."
+                          maxLength={500}
+                          rows={3}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-slate-300 text-sm placeholder-slate-500 resize-none focus:outline-none focus:border-indigo-400/50 mb-3"
+                        />
+                        <button
+                          onClick={handleSubmitReview}
+                          disabled={reviewLoading}
+                          className="w-full py-2.5 px-4 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-60 text-white font-bold rounded-xl transition-all duration-200 text-sm flex items-center justify-center gap-2"
+                        >
+                          {reviewLoading ? <>⏳ Enviando...</> : <>✨ Enviar reseña</>}
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+            </motion.div>
+
+            <motion.button
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1 }}
+              onClick={() => { setRoomState('login'); setAppointmentData(null); }}
+              className="w-full py-3 px-6 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-semibold rounded-xl transition-all duration-200"
+            >
+              Volver al inicio
+            </motion.button>
+          </motion.div>
         </div>
       )}
     </div>

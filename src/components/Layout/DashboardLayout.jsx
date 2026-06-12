@@ -5,27 +5,29 @@ import {
   LayoutDashboard, CalendarDays, Users, Wallet,
   Bell, Search, LogOut, Plus, Menu, X,
   UserCog, Stethoscope, BarChart3, Settings, ChevronRight,
-  Sun, Moon, Pill, Video, Maximize, Minimize
+  Sun, Moon, Pill, Video, Maximize, Minimize, Shield, Star
 } from 'lucide-react';
 import { useStore } from '../../stores/useStore';
 import NotificationCenter from '../NotificationCenter/NotificationCenter';
 import JitsiMeeting from '../JitsiMeeting';
 import { APPOINTMENT_STATUS } from '../../config/constants';
+import { playNotificationSound } from '../../utils/sounds';
+import { socket } from '../../services/socket';
 
 /* ─── Navigation config ─────────────────────────────────────── */
 const NAV = [
   {
     label: 'Principal',
     items: [
-      { path: '/dashboard',           icon: LayoutDashboard, label: 'Panel Principal', roles: ['admin', 'medico', 'recepcionista', 'administracion'] },
+      { path: '/dashboard',           icon: LayoutDashboard, label: 'Panel Principal', roles: ['admin', 'medico', 'recepcion'] },
     ],
   },
   {
     label: 'Clínico',
     items: [
-      { path: '/dashboard/agenda',      icon: CalendarDays,    label: 'Agenda',          roles: ['admin', 'medico', 'recepcionista', 'administracion'] },
-      { path: '/dashboard/consultorio', icon: Stethoscope,     label: 'Consultorio',     roles: ['admin', 'medico', 'administracion'] },
-      { path: '/dashboard/pacientes',   icon: Users,           label: 'Pacientes',       roles: ['admin', 'medico', 'recepcionista', 'administracion'] },
+      { path: '/dashboard/agenda',      icon: CalendarDays,    label: 'Agenda',          roles: ['admin', 'medico', 'recepcion'] },
+      { path: '/dashboard/consultorio', icon: Stethoscope,     label: 'Consultorio',     roles: ['admin', 'medico'] },
+      { path: '/dashboard/pacientes',   icon: Users,           label: 'Pacientes',       roles: ['admin', 'medico', 'recepcion'] },
       { path: '/dashboard/medicamentos', icon: Pill,            label: 'Medicamentos',    roles: ['admin', 'medico'] },
     ],
   },
@@ -35,12 +37,14 @@ const NAV = [
       { path: '/dashboard/finanzas',    icon: Wallet,          label: 'Finanzas',        roles: ['admin', 'administracion'] },
       { path: '/dashboard/personal',    icon: UserCog,         label: 'Personal',        roles: ['admin'] },
       { path: '/dashboard/reportes',    icon: BarChart3,       label: 'Reportes',        roles: ['admin', 'administracion'] },
+      { path: '/dashboard/reseñas',    icon: Star,            label: 'Reseñas',         roles: ['admin', 'medico'] },
     ],
   },
   {
     label: 'Sistema',
     items: [
       { path: '/dashboard/configuracion', icon: Settings,      label: 'Configuración',   roles: ['admin'] },
+      { path: '/dashboard/logs',          icon: Shield,        label: 'Seguridad / Logs', roles: ['admin'] },
     ],
   },
 ];
@@ -49,7 +53,7 @@ const NAV = [
 const ROLES = {
   admin:          { label: 'Administrador',     badgeBg: 'rgba(239,68,68,0.18)',   badgeText: '#fca5a5', dotColor: 'bg-rose-500'  },
   medico:         { label: 'Médico',           badgeBg: 'var(--accent-light)',    badgeText: 'var(--accent-primary)', dotColor: 'bg-[var(--accent-primary)]'},
-  recepcionista:  { label: 'Recepcionista',     badgeBg: 'rgba(16,185,129,0.18)',  badgeText: '#6ee7b7', dotColor: 'bg-emerald-400'},
+  recepcion:  { label: 'Recepcionista',     badgeBg: 'rgba(16,185,129,0.18)',  badgeText: '#6ee7b7', dotColor: 'bg-emerald-400'},
   administracion: { label: 'Administración',    badgeBg: 'rgba(245,158,11,0.18)',  badgeText: '#fcd34d', dotColor: 'bg-amber-400'},
 };
 
@@ -65,6 +69,7 @@ const PAGE_META = {
   '/dashboard/reportes':      { title: 'Reportes',         subtitle: 'Estadísticas y análisis' },
   '/dashboard/medicamentos':  { title: 'Medicamentos',     subtitle: 'Catálogo y seguimiento de fármacos' },
   '/dashboard/configuracion': { title: 'Configuración',    subtitle: 'Preferencias del sistema' },
+  '/dashboard/logs':          { title: 'Auditoría',        subtitle: 'Registro de seguridad' },
 };
 
 export default function DashboardLayout({ onLogout }) {
@@ -73,6 +78,7 @@ export default function DashboardLayout({ onLogout }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [isJitsiCollapsed, setIsJitsiCollapsed] = useState(false);
   const dragControls = useDragControls();
 
   const { 
@@ -80,7 +86,7 @@ export default function DashboardLayout({ onLogout }) {
     activeCallApp, setActiveCallApp, isJitsiMaximized, setIsJitsiMaximized,
     updateAppointmentStatus, updateAppointmentVideoStatus
   } = useStore();
-  const role     = ROLES[userRole] || ROLES.recepcionista;
+  const role     = ROLES[userRole] || ROLES.recepcion;
   const meta     = PAGE_META[location.pathname] || { title: 'Panel', subtitle: '' };
   const name     = user?.name || role.label;
   const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -88,71 +94,81 @@ export default function DashboardLayout({ onLogout }) {
   // Reference for previous waiting apps to detect new arrivals globally
   const prevWaitingApps = useRef([]);
 
+  // WebSockets: Conectar a la sala de doctores para notificaciones instantáneas
   useEffect(() => {
-    if (!['admin', 'medico', 'recepcionista'].includes(userRole)) return;
+    if (!['admin', 'medico', 'recepcion'].includes(userRole)) return;
 
-    const playNotificationSound = () => {
-      try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContext) return;
-        if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
-        
-        const audioCtx = new AudioContext();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-        oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5);
-
-        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
-
-        oscillator.start(audioCtx.currentTime);
-        oscillator.stop(audioCtx.currentTime + 1);
-      } catch (err) {
-        console.log("Audio play blocked by browser policies");
-      }
-    };
-
-    // Polling every 15s
+    // Polling general para sincronizar estado de turnos (modificados por recepcionistas, abandonos, etc)
     const interval = setInterval(() => {
       fetchAppointments(null, true);
     }, 15000);
 
-    return () => clearInterval(interval);
+    // Desactivado temporalmente para no generar errores 404 en consola si no está el server Node
+    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+    if (token) {
+      socket.auth = { token };
+    }
+    
+    const handleConnect = () => {
+      socket.emit('join-room', 'doctors');
+    };
+    
+    socket.on('connect', handleConnect);
+    
+    if (socket.connected) {
+      handleConnect();
+    } else {
+      socket.connect();
+    }
+
+    const handlePatientEntered = (data) => {
+      // Disparar refetch inmediato cuando un paciente entra a la sala de espera virtual
+      fetchAppointments(null, true);
+    };
+
+    const handleLowRatingAlert = (data) => {
+      // Filtrar: Los médicos NO deben recibir esta alerta, solo admin y recepcion.
+      if (userRole === 'medico') return;
+
+      // Mostrar alerta inmediata de mala reseña a los admins/recepcion
+      import('react-hot-toast').then(({ default: toast }) => {
+        toast.error(`⚠️ ALERTA DE CRISIS: El paciente ${data.patient_name} acaba de dejar una reseña de ${data.rating} estrellas para el Dr/a. ${data.doctor_name}. Revisar panel de reseñas urgente.`, {
+          duration: 10000,
+          icon: '🚨',
+          style: {
+            borderRadius: '10px',
+            background: '#fff1f2',
+            color: '#be123c',
+            border: '2px solid #f43f5e',
+            fontWeight: 'bold',
+          }
+        });
+      });
+      playNotificationSound();
+    };
+
+    socket.on('patient-entered', handlePatientEntered);
+    socket.on('low-rating-alert', handleLowRatingAlert);
+
+    return () => {
+      clearInterval(interval);
+      socket.off('connect', handleConnect);
+      socket.off('patient-entered', handlePatientEntered);
+      socket.off('low-rating-alert', handleLowRatingAlert);
+      socket.emit('leave-room', 'doctors');
+      socket.disconnect();
+    };
   }, [userRole, fetchAppointments]);
 
   useEffect(() => {
-    if (!['admin', 'medico', 'recepcionista'].includes(userRole)) return;
+    if (!['admin', 'medico', 'recepcion'].includes(userRole)) return;
 
     const currentWaitingVirtuals = (appointments || []).filter(a => a.attendance === 'en_espera' && a.modalidad === 'virtual');
     
     currentWaitingVirtuals.forEach(app => {
       const wasWaitingBefore = prevWaitingApps.current.find(prev => prev.id === app.id);
       if (!wasWaitingBefore) {
-        try {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          if (AudioContext && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) {
-            const audioCtx = new AudioContext();
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-            oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5);
-            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
-            oscillator.start(audioCtx.currentTime);
-            oscillator.stop(audioCtx.currentTime + 1);
-          }
-        } catch (e) {}
+        playNotificationSound();
 
         import('react-hot-toast').then(({ default: toast }) => {
           toast.success(`¡El paciente ${app.patient || 'Virtual'} ha ingresado a la sala de espera!`, {
@@ -187,10 +203,12 @@ export default function DashboardLayout({ onLogout }) {
 
   const handleJitsiClose = useCallback(async () => {
     if (!activeCallApp) return;
+    const appId = activeCallApp.id;
     setActiveCallApp(null);
     setIsJitsiMaximized(false);
-    await updateAppointmentStatus(activeCallApp.id, APPOINTMENT_STATUS.FINALIZADO);
-    await updateAppointmentVideoStatus(activeCallApp.id, 'finalizada');
+    await updateAppointmentStatus(appId, APPOINTMENT_STATUS.FINALIZADO);
+    await updateAppointmentVideoStatus(appId, 'finalizada');
+    socket.emit('call-ended', `appointment-${appId}`);
   }, [activeCallApp, setActiveCallApp, setIsJitsiMaximized, updateAppointmentStatus, updateAppointmentVideoStatus]);
 
   const handleJitsiJoined = useCallback(async () => {
@@ -199,6 +217,7 @@ export default function DashboardLayout({ onLogout }) {
       await updateAppointmentStatus(activeCallApp.id, APPOINTMENT_STATUS.EN_CURSO);
       await updateAppointmentVideoStatus(activeCallApp.id, 'activa');
     }
+    // Ya no emitimos automáticamente, ahora el médico debe tocar el botón "Llamar"
   }, [activeCallApp, updateAppointmentStatus, updateAppointmentVideoStatus]);
 
   /* ── Sidebar inner content — renderizado directamente, no como componente anidado ── */
@@ -313,10 +332,10 @@ export default function DashboardLayout({ onLogout }) {
 
   // Items de la barra inferior (móvil) — filtramos por rol
   const MOBILE_NAV_PATHS = [
-    { path: '/dashboard',           icon: LayoutDashboard, label: 'Inicio',    roles: ['admin', 'medico', 'recepcionista', 'administracion'] },
-    { path: '/dashboard/agenda',      icon: CalendarDays,    label: 'Agenda',    roles: ['admin', 'medico', 'recepcionista', 'administracion'] },
-    { path: '/dashboard/consultorio', icon: Stethoscope,     label: 'Clínica',   roles: ['admin', 'medico', 'administracion'] },
-    { path: '/dashboard/pacientes',   icon: Users,           label: 'Pacientes', roles: ['admin', 'medico', 'recepcionista', 'administracion'] },
+    { path: '/dashboard',           icon: LayoutDashboard, label: 'Inicio',    roles: ['admin', 'medico', 'recepcion'] },
+    { path: '/dashboard/agenda',      icon: CalendarDays,    label: 'Agenda',    roles: ['admin', 'medico', 'recepcion'] },
+    { path: '/dashboard/consultorio', icon: Stethoscope,     label: 'Clínica',   roles: ['admin', 'medico'] },
+    { path: '/dashboard/pacientes',   icon: Users,           label: 'Pacientes', roles: ['admin', 'medico', 'recepcion'] },
   ];
 
   const visibleMobileItems = MOBILE_NAV_PATHS.filter(item => item.roles.includes(userRole));
@@ -435,71 +454,128 @@ export default function DashboardLayout({ onLogout }) {
 
       {/* GLOBAL JITSI COMPONENT */}
       {activeCallApp && (
-        <motion.div 
-          drag={!isJitsiMaximized}
-          dragControls={dragControls}
-          dragListener={false}
-          dragMomentum={false}
-          onDragStart={() => setIsDragging(true)}
-          onDragEnd={() => setIsDragging(false)}
-          animate={isJitsiMaximized ? { x: 0, y: 0 } : undefined}
-          className={`fixed flex flex-col bg-slate-900 shadow-2xl overflow-hidden border border-slate-700 animate-fade-in-quick z-[99999] ${
-            isJitsiMaximized 
-              ? 'inset-4 rounded-3xl' 
-              : 'bottom-4 right-4 w-[420px] h-[550px] rounded-2xl top-auto left-auto'
-          }`}
-          style={{
-            width: isJitsiMaximized ? 'auto' : undefined,
-            height: isJitsiMaximized ? 'auto' : undefined,
-            transitionProperty: 'inset, width, height, border-radius',
-            transitionDuration: '300ms',
-            transitionTimingFunction: 'ease-in-out'
-          }}
-        >
-          {/* Header de la videollamada */}
-          <div 
-            className="flex items-center justify-between px-3 py-2 bg-slate-900 border-b border-slate-800 shrink-0 cursor-move"
-            onPointerDown={(e) => dragControls.start(e)}
-            style={{ touchAction: 'none' }}
+        <>
+          <style>{`
+            .jitsi-maximized {
+              transform: none !important;
+            }
+          `}</style>
+          <motion.div 
+            key={`jitsi-window-${activeCallApp.id}`}
+            id="jitsi-motion-container"
+            drag={!isJitsiMaximized}
+            dragConstraints={{ top: -800, left: -1500, right: 0, bottom: 0 }}
+            dragControls={dragControls}
+            dragListener={false}
+            dragMomentum={false}
+            onDragStart={() => setIsDragging(true)}
+            onDragEnd={() => setIsDragging(false)}
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={
+              isJitsiMaximized 
+                ? { opacity: 1, scale: 1, x: 0, y: 0 } 
+                : isJitsiCollapsed
+                  ? { opacity: 1, scale: 1, x: 0, y: 0 }
+                  : { opacity: 1, scale: 1 }
+            }
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className={`fixed flex flex-col bg-slate-900 shadow-2xl overflow-hidden border border-slate-700 z-[99999] ${
+              isJitsiMaximized 
+                ? 'rounded-3xl' 
+                : `bottom-6 right-6 w-[420px] ${isJitsiCollapsed ? 'h-[44px] min-h-[44px]' : 'h-[550px]'} rounded-2xl top-auto left-auto`
+            }`}
+            style={isJitsiMaximized ? {
+              position: 'fixed',
+              top: '16px',
+              left: '16px',
+              right: '16px',
+              bottom: '16px',
+              width: 'auto',
+              height: 'auto',
+              transform: 'none'
+            } : undefined}
           >
-            <div className="flex items-center gap-2 overflow-hidden">
-              <div className="w-8 h-8 bg-indigo-500/20 rounded-lg flex items-center justify-center shrink-0">
-                <Video size={16} className="text-indigo-400 animate-pulse" />
+            {/* Header de la videollamada estilo macOS */}
+            <div 
+              className="grid grid-cols-3 items-center px-4 py-2 bg-gradient-to-b from-[#3a3a3a] to-[#2a2a2a] border-b border-black/50 shrink-0 cursor-move min-h-[44px] relative z-50 shadow-sm"
+              onPointerDown={(e) => dragControls.start(e)}
+              style={{ touchAction: 'none' }}
+            >
+              {/* Controles Mac OS (Izquierda) */}
+              <div className="flex items-center gap-2 relative z-10">
+                <button
+                  onClick={() => setActiveCallApp(null)}
+                  className="w-3.5 h-3.5 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 flex items-center justify-center border border-black/20 shadow-sm group"
+                  title="Cerrar ventana"
+                >
+                  <X size={8} className="opacity-0 group-hover:opacity-100 text-black/60 stroke-[3]" />
+                </button>
+                <button
+                  onClick={() => {
+                    if (isJitsiMaximized) {
+                      setIsJitsiMaximized(false);
+                      setIsJitsiCollapsed(false);
+                    } else {
+                      setIsJitsiCollapsed(!isJitsiCollapsed);
+                    }
+                  }}
+                  className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e] hover:bg-[#ffbd2e]/80 flex items-center justify-center border border-black/20 shadow-sm group"
+                  title="Minimizar / Colapsar"
+                >
+                  <Minimize size={8} className="opacity-0 group-hover:opacity-100 text-black/60 stroke-[3]" />
+                </button>
+                <button
+                  onClick={() => {
+                    setIsJitsiMaximized(!isJitsiMaximized);
+                    setIsJitsiCollapsed(false);
+                  }}
+                  className="w-3.5 h-3.5 rounded-full bg-[#27c93f] hover:bg-[#27c93f]/80 flex items-center justify-center border border-black/20 shadow-sm group"
+                  title={isJitsiMaximized ? "Restaurar" : "Maximizar"}
+                >
+                  <Maximize size={8} className="opacity-0 group-hover:opacity-100 text-black/60 stroke-[3]" />
+                </button>
               </div>
-              <div className="min-w-0">
-                <h3 className="text-white font-bold text-sm truncate">Videollamada</h3>
-                <p className="text-slate-400 text-xs truncate max-w-[150px]">{activeCallApp.patient || 'Desconocido'}</p>
+
+              {/* Título perfectamente centrado */}
+              <div className="flex items-center justify-center pointer-events-none z-0">
+                <h3 className="text-[#e0e0e0] font-semibold text-xs tracking-wide flex items-center gap-1.5 drop-shadow-md whitespace-nowrap">
+                  <Video size={12} className="text-[#27c93f] animate-pulse" />
+                  Videollamada
+                </h3>
+              </div>
+
+              {/* Botón de Llamar (Derecha) */}
+              <div className="flex justify-end relative z-10">
+                <button
+                  onClick={() => {
+                    socket.emit('call-started', `appointment-${activeCallApp.id}`);
+                    import('react-hot-toast').then(({ default: toast }) => {
+                      toast.success('¡Llamando al paciente!', { icon: '🔔' });
+                    });
+                  }}
+                  className="px-3 py-1.5 bg-[#007aff] hover:bg-[#005bb5] text-white text-[11px] font-bold rounded-md transition-colors flex items-center gap-1.5 border border-[#007aff]/50 shadow-[0_2px_8px_rgba(0,122,255,0.4)] whitespace-nowrap"
+                  title="Avisar al paciente que ya puede entrar"
+                >
+                  <Bell size={12} /> Llamar
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => setIsJitsiMaximized(!isJitsiMaximized)}
-                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors flex items-center justify-center"
-                title={isJitsiMaximized ? "Minimizar" : "Maximizar"}
-              >
-                {isJitsiMaximized ? <Minimize size={16} /> : <Maximize size={16} />}
-              </button>
-              <button
-                onClick={() => setActiveCallApp(null)}
-                className="p-2 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-lg transition-colors flex items-center justify-center"
-                title="Cerrar Video (Sigue en curso)"
-              >
-                <X size={16} />
-              </button>
+
+            {/* Jitsi Meeting */}
+            <div className="flex-1 min-h-0 relative bg-black overflow-hidden">
+              {/* Este overlay transparente captura los eventos del mouse mientras se arrastra, evitando que el iframe de Jitsi se los trague y el movimiento se corte */}
+              {isDragging && <div className="absolute inset-0 z-10 cursor-move" />}
+              <JitsiMeeting
+                roomName={`integrarsalud-${activeCallApp.id}-${activeCallApp.codigoAcceso.substring(0, 5)}`}
+                password={activeCallApp.codigoAcceso.length >= 6 ? activeCallApp.codigoAcceso.substring(5) : activeCallApp.codigoAcceso}
+                isModerator={true}
+                displayName={user?.name || "Médico"}
+                onReadyToClose={handleJitsiClose}
+                onJoined={handleJitsiJoined}
+              />
             </div>
-          </div>
-          {/* Jitsi Meeting */}
-          <div className="flex-1 relative bg-black">
-            {/* Este overlay transparente captura los eventos del mouse mientras se arrastra, evitando que el iframe de Jitsi se los trague y el movimiento se corte */}
-            {isDragging && <div className="absolute inset-0 z-10 cursor-move" />}
-            <JitsiMeeting
-              roomName={`integrarsalud-${activeCallApp.id}-${activeCallApp.codigoAcceso}`}
-              displayName={user?.name || "Médico"}
-              onReadyToClose={handleJitsiClose}
-              onJoined={handleJitsiJoined}
-            />
-          </div>
-        </motion.div>
+          </motion.div>
+        </>
       )}
     </div>
   );

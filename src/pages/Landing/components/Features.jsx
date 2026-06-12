@@ -1,7 +1,7 @@
 import { Globe, MapPin, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export default function Features({ config }) {
+export default function Features() {
   const features = [
     {
       title: "Atención Trilingüe",

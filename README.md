@@ -19,13 +19,12 @@ Este repositorio contiene la interfaz de usuario (Frontend) de **Integrar Salud*
 
 ---
 
-## 🛠️ Correcciones y Mejoras Recientes
-- **Resolución de estado en Agenda:** Corrección en la persistencia de datos (Modalidad Virtual/Presencial y Tipo de Consulta Psiquiatría/Psicología), garantizando precisión y actualización en tiempo real en la UI.
-- **Validación de Consultas Virtuales:** Sistema de seguridad y validación de horarios que impide el ingreso prematuro a la videollamada (más de 10 min de antelación), con alertas profesionales.
-- **Accesibilidad y Estándares W3C:** Corrección sistemática de etiquetas HTML, atributos `htmlFor` huérfanos, y `autocomplete` faltantes en los módulos de LoginPage, Agenda, Medicamentos, Finanzas y Personal.
-- **Formato Monetario Universal:** Estandarización de divisas usando la API `Intl.NumberFormat('es-AR')` para asegurar la correcta legibilidad de valores con dos decimales ($1.500,50) en toda la UI y comprobantes de pago.
-- **Responsividad Avanzada (Mobile):** Adaptación profunda de las vistas de Finanzas y Personal, implementando tablas desplazables horizontalmente (`overflow-x-auto`), y auto-ocultamiento y apilamiento inteligente en tarjetas KPI.
-- **Actualización de Interfaz:** Optimización de menús orientados al nuevo Centro de Notificaciones integrado.
+## 🛠️ Novedades y Optimización (Última Versión)
+- **Sala Virtual Ultra-Estable:** Refactorización del flujo de conexión WebSocket para las videollamadas, eliminando condiciones de carrera y asegurando un salto instantáneo desde la sala de espera hacia la consulta activa.
+- **Motor de Reseñas Post-Consulta:** Sistema inteligente que califica la atención e incentiva las reseñas en Google Maps, derivando los casos negativos (alertas de crisis) directamente a administración.
+- **Facturación AFIP Nativa:** Integración visual fluida en el módulo de Finanzas para generar comprobantes electrónicos en 1-click.
+- **Performance & Caching:** Implementación de Code-Splitting extremo (React.lazy) y `Vendor Chunk Splitting` en Vite, reduciendo el peso de carga inicial y mejorando radicalmente la velocidad de las actualizaciones en navegadores móviles.
+- **Auditoría de Roles:** Ajustes visuales estrictos en el Dashboard que se sincronizan con las nuevas reglas RBAC del backend, restringiendo las acciones no autorizadas para los profesionales médicos.
 
 ---
 

@@ -15,6 +15,7 @@ const DEFAULT_CONFIG = {
   instagram: '',
   facebook: '',
   linkedin: '',
+  googleMapsUrl: '',
   defaultDuration: 1,
   defaultPaymentMethod: 'Efectivo',
   currency: 'ARS',
@@ -251,6 +252,10 @@ export default function ConfiguracionPage() {
                     <div>
                       <label htmlFor="linkedin" className={labelClass}>LinkedIn URL</label>
                       <input id="linkedin" name="linkedin" type="url" autoComplete="url" value={config.linkedin || ''} onChange={e => update('linkedin', e.target.value)} className={fieldClass} placeholder="https://linkedin.com/in/tu_perfil" />
+                    </div>
+                    <div>
+                      <label htmlFor="googleMapsUrl" className={labelClass}>Google Maps URL</label>
+                      <input id="googleMapsUrl" name="googleMapsUrl" type="url" autoComplete="url" value={config.googleMapsUrl || ''} onChange={e => update('googleMapsUrl', e.target.value)} className={fieldClass} placeholder="Enlace a tu perfil de Google" />
                     </div>
                   </div>
                 </div>

@@ -31,6 +31,8 @@ const MedicamentosPage  = lazy(() => import('./pages/Dashboard/Medicamentos'));
 const MiPerfilPage      = lazy(() => import('./pages/Dashboard/MiPerfil'));
 const NotFoundPage      = lazy(() => import('./pages/NotFoundPage'));
 const VirtualRoomPage   = lazy(() => import('./pages/VirtualRoom'));
+const LogsPage          = lazy(() => import('./pages/Dashboard/Logs'));
+const ReseñasPage       = lazy(() => import('./pages/Dashboard/Reseñas'));
 const AuthSetup         = lazy(() => import('./components/AuthSetup/AuthSetup'));
 
 /** Fallback mientras carga el chunk de la página */
@@ -68,7 +70,8 @@ function RequireControlPanel({ children }) {
 
   if (!isLocalhost && !isControlSubdomain) {
     // Redirigir al subdominio manteniendo la ruta hash actual
-    window.location.replace(`https://control.integrarsalud.me${window.location.hash}`);
+    const targetUrl = import.meta.env.VITE_CONTROL_URL || 'https://control.integrarsalud.me';
+    window.location.replace(`${targetUrl}${window.location.hash}`);
     return null;
   }
   return children;
@@ -92,12 +95,13 @@ function App() {
 
   const [initialized, setInitialized] = useState(false);
   const prevWaitingIds = useRef([]);
+  const hasLoadedInitialAppointments = useRef(false);
 
-  // Sonido de notificación (Ping suave)
   const playPing = () => {
-    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    audio.volume = 0.5;
-    audio.play().catch(e => console.log('Audio blocked by browser policy'));
+    // Sonido estilo Apple / Mac (burbuja suave y premium)
+    const audio = new Audio('/assets/sounds/apple_style_2.mp3');
+    audio.volume = 0.2; // Bajar el volumen al 20% para que no sea molesto
+    audio.play().catch(e => console.log('Audio autoplay prevented:', e));
   };
 
   useEffect(() => {
@@ -118,13 +122,13 @@ function App() {
       fetchPatients();
       fetchAppointments();
       fetchAdminStaff();
-      if (['admin', 'administracion'].includes(userRole)) fetchTransactions();
+      if (['admin'].includes(userRole)) fetchTransactions();
       fetchGlobalConfig();
 
-      // Polling global de turnos cada 60 segundos para evitar saturar el backend
+      // Polling global de turnos cada 10 segundos para mayor reactividad (notificaciones)
       const poll = setInterval(() => {
         fetchAppointments();
-      }, 60000);
+      }, 10000);
 
       return () => clearInterval(poll);
     }
@@ -132,14 +136,21 @@ function App() {
 
   // Detector global de pacientes en sala de espera
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !appointments) return;
     
-    const waitingRoomApps = (appointments || []).filter(a => a && a.attendance === 'en_espera');
+    const waitingRoomApps = appointments.filter(a => a && a.attendance === 'en_espera');
     const currentWaitingIds = waitingRoomApps.map(a => a.id);
     
+    // Si es la primera vez que cargamos los turnos, no notificamos, solo guardamos el estado
+    if (!hasLoadedInitialAppointments.current) {
+      prevWaitingIds.current = currentWaitingIds;
+      hasLoadedInitialAppointments.current = true;
+      return;
+    }
+
     const newArrivals = waitingRoomApps.filter(app => !prevWaitingIds.current.includes(app.id));
     
-    if (newArrivals.length > 0 && prevWaitingIds.current.length > 0) {
+    if (newArrivals.length > 0) {
       newArrivals.forEach(app => {
         toast.success(`¡Paciente en sala!: ${app.patient}`, {
           duration: 5000,
@@ -262,14 +273,16 @@ function App() {
             }
           >
              <Route index element={<DashboardPage />} />
-             <Route path="agenda" element={<ProtectedRoute allowedRoles={['admin', 'medico', 'recepcionista', 'administracion']}><AgendaPage /></ProtectedRoute>} />
-             <Route path="pacientes" element={<ProtectedRoute allowedRoles={['admin', 'medico', 'recepcionista', 'administracion']}><PacientesPage /></ProtectedRoute>} />
-             <Route path="consultorio" element={<ProtectedRoute allowedRoles={['admin', 'medico', 'administracion']}><ConsultorioPage /></ProtectedRoute>} />
+             <Route path="agenda" element={<ProtectedRoute allowedRoles={['admin', 'medico', 'recepcion']}><AgendaPage /></ProtectedRoute>} />
+             <Route path="pacientes" element={<ProtectedRoute allowedRoles={['admin', 'medico', 'recepcion']}><PacientesPage /></ProtectedRoute>} />
+             <Route path="consultorio" element={<ProtectedRoute allowedRoles={['admin', 'medico']}><ConsultorioPage /></ProtectedRoute>} />
              <Route path="medicamentos" element={<ProtectedRoute allowedRoles={['admin', 'medico']}><MedicamentosPage /></ProtectedRoute>} />
-             <Route path="finanzas" element={<ProtectedRoute allowedRoles={['admin', 'administracion']}><FinanzasPage /></ProtectedRoute>} />
+             <Route path="finanzas" element={<ProtectedRoute allowedRoles={['admin']}><FinanzasPage /></ProtectedRoute>} />
              <Route path="personal" element={<ProtectedRoute allowedRoles={['admin']}><PersonalPage /></ProtectedRoute>} />
-             <Route path="reportes" element={<ProtectedRoute allowedRoles={['admin', 'administracion']}><ReportesPage /></ProtectedRoute>} />
+             <Route path="reportes" element={<ProtectedRoute allowedRoles={['admin']}><ReportesPage /></ProtectedRoute>} />
              <Route path="configuracion" element={<ProtectedRoute allowedRoles={['admin']}><ConfiguracionPage /></ProtectedRoute>} />
+             <Route path="logs" element={<ProtectedRoute allowedRoles={['admin']}><LogsPage /></ProtectedRoute>} />
+             <Route path="reseñas" element={<ProtectedRoute allowedRoles={['admin', 'medico']}><ReseñasPage /></ProtectedRoute>} />
              <Route path="perfil" element={<MiPerfilPage />} />
           </Route>
 

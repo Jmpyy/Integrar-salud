@@ -19,9 +19,9 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
   const businessPhone   = consultorioConfig.phone   || '';
 
   const isPaid   = appointment.paymentStatus === 'pagado';
-  const isSenado = appointment.paymentStatus === 'senado';
-  const amount   = Number(isSenado ? appointment.paidAmount : (appointment.paymentAmount || appointment.paidAmount || 0));
-  const method   = isSenado ? (appointment.paidMethod || 'Efectivo') : (appointment.paymentMethod || 'Efectivo');
+  const isSeñado = appointment.paymentStatus === 'señado';
+  const amount   = Number(isSeñado ? appointment.paidAmount : (appointment.paymentAmount || appointment.paidAmount || 0));
+  const method   = isSeñado ? (appointment.paidMethod || 'Efectivo') : (appointment.paymentMethod || 'Efectivo');
 
   const appointmentDate = appointment.date
     ? new Date(appointment.date + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -30,8 +30,8 @@ export default function PaymentReceiptModal({ appointment, doctor, onClose }) {
   const formatMoney = (v) =>
     new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(v || 0);
 
-  const statusLabel = isPaid ? 'PAGADO' : isSenado ? 'SEÑADO' : appointment.paymentStatus?.toUpperCase() || '—';
-  const statusColorHex = isPaid ? '#10b981' : isSenado ? '#6366f1' : '#64748b';
+  const statusLabel = isPaid ? 'PAGADO' : isSeñado ? 'SEÑADO' : appointment.paymentStatus?.toUpperCase() || '—';
+  const statusColorHex = isPaid ? '#10b981' : isSeñado ? '#6366f1' : '#64748b';
 
   /* ── Print handler — opens a dedicated print window ── */
   const handlePrint = () => {

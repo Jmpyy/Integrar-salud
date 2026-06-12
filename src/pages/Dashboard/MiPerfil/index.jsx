@@ -10,8 +10,7 @@ import {
 const ROLE_META = {
   admin:          { label: 'Administrador',      color: 'bg-rose-500',    text: 'text-rose-500',    bg: 'bg-rose-500/10',    border: 'border-rose-500/20' },
   medico:         { label: 'Médico / Terapeuta', color: 'bg-[var(--accent-primary)]',  text: 'text-[var(--accent-primary)]',  bg: 'bg-[var(--accent-light)]',  border: 'border-[var(--accent-primary)]/20' },
-  recepcionista:  { label: 'Recepcionista',      color: 'bg-emerald-500', text: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
-  administracion: { label: 'Administración',     color: 'bg-amber-500',   text: 'text-amber-500',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
+  recepcion:  { label: 'Recepcion',      color: 'bg-emerald-500', text: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
 };
 
 const SECTIONS = [
@@ -52,7 +51,7 @@ const PasswordField = ({ label, value, onChange, show, onToggle, placeholder = '
 
 export default function MiPerfilPage() {
   const { user, userRole, setUser } = useStore();
-  const role = ROLE_META[userRole] || ROLE_META.recepcionista;
+  const role = ROLE_META[userRole] || ROLE_META.recepcion;
 
   const initials = (user?.name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -60,7 +59,7 @@ export default function MiPerfilPage() {
 
   // ── Profile form ──
   const [profileName,  setProfileName]  = useState(user?.name  || '');
-  const [profileEmail, setProfileEmail] = useState(user?.email || '');
+  const profileEmail = user?.email || '';
   const [savingProfile, setSavingProfile] = useState(false);
 
   const handleSaveProfile = async () => {

@@ -525,7 +525,7 @@ export default function PatientHistoryViewer({
                                             🧠 {item.title}
                                           </span>
                                         )}
-                                        {item.type && !['psicologia', 'psiquiatria'].includes(item.type.toLowerCase()) && (
+                                        {item.type && !['psicologia', 'psicología', 'psiquiatria', 'psiquiatría'].includes(item.type.toLowerCase().trim()) && (
                                           <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded border flex items-center gap-1 ${
                                             item.type.toLowerCase().includes('virtual') ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' :
                                             item.type.toLowerCase().includes('domicilio') ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
@@ -544,10 +544,10 @@ export default function PatientHistoryViewer({
                                   <div className="flex items-center gap-2">
                                     <span className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border ${
                                       item.paymentStatus === 'pagado' ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg' :
-                                      item.paymentStatus === 'senado' ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-lg' :
+                                      item.paymentStatus === 'señado' ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-lg' :
                                       'bg-[var(--bg-main)] text-[var(--text-secondary)] border-[var(--border-color)]'
                                     }`}>
-                                      <Wallet size={12} /> {item.paymentStatus === 'pagado' ? 'ABONADO' : item.paymentStatus === 'senado' ? 'SEÑADO' : 'PENDIENTE'}
+                                      <Wallet size={12} /> {item.paymentStatus === 'pagado' ? 'ABONADO' : item.paymentStatus === 'señado' ? 'SEÑADO' : 'PENDIENTE'}
                                     </span>
                                   </div>
                                 </div>
