@@ -132,13 +132,13 @@ export default function DashboardLayout({ onLogout }) {
 
       // Mostrar alerta inmediata de mala reseña a los admins/recepcion
       import('react-hot-toast').then(({ default: toast }) => {
-        toast.error(`⚠️ ALERTA DE CRISIS: El paciente ${data.patient_name} acaba de dejar una reseña de ${data.rating} estrellas para el Dr/a. ${data.doctor_name}. Revisar panel de reseñas urgente.`, {
+        toast(`Atención requerida: El paciente ${data.patient_name} ha registrado una calificación de ${data.rating} estrellas tras su consulta con el Dr/a. ${data.doctor_name}. Se recomienda revisión en el panel.`, {
           duration: 10000,
-          icon: '🚨',
+          icon: '🔔',
           style: {
             borderRadius: '10px',
-            background: '#fff1f2',
-            color: '#be123c',
+            background: '#fff3cd',
+            color: '#856404',
             border: '2px solid #f43f5e',
             fontWeight: 'bold',
           }

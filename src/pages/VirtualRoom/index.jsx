@@ -121,6 +121,7 @@ export default function VirtualRoomPage() {
       // Polling cada 10 segundos como respaldo
       pollInterval = setInterval(async () => {
         try {
+          const API = import.meta.env.VITE_API_BASE_URL || 'https://control.integrarsalud.me/api-integrar/api';
           const res = await fetch(`${API}/telemedicine/check_status?id=${appointmentData.appointmentId}&codigo=${searchParams.get('codigo')}`);
           if (res.ok) {
             const data = await res.json();
