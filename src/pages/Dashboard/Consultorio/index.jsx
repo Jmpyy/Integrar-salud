@@ -11,7 +11,7 @@ import PatientHistoryViewer from '../../../components/PatientHistoryViewer';
 import { toLocalDateString } from '../../../utils/helpers';
 import { APPOINTMENT_STATUS } from '../../../config/constants';
 import { socket } from '../../../services/socket';
-import JitsiMeeting from '../../../components/JitsiMeeting';
+import DailyMeeting from '../../../components/DailyMeeting';
 import api from '../../../services/api';
 
 export default function ConsultorioPage() {
