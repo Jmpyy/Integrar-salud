@@ -238,8 +238,8 @@ export default function VirtualRoomPage() {
       setRoomState('goodbye');
     } else {
       setRoomState('login');
+      setAppointmentData(null);
     }
-    setAppointmentData(null);
   };
 
   const handleAccess = async (e, forceDni, forceCodigo) => {
