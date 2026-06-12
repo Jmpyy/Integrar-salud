@@ -41,14 +41,18 @@ export default function ReloadPrompt() {
             <p className="text-xs text-[var(--text-secondary)] mt-1 mb-3">Hay nuevas mejoras del sistema listas para instalarse.</p>
             <div className="flex gap-2">
               <button
-                onClick={() => updateServiceWorker(true)}
-                className="px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-lg transition-colors flex-1"
+                onClick={() => {
+                  updateServiceWorker(true);
+                  // Forcefully reload if the SW update event is slow or hangs
+                  setTimeout(() => window.location.reload(true), 1000);
+                }}
+                className="px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-lg transition-colors flex-1 cursor-pointer pointer-events-auto relative z-[999999]"
               >
                 Actualizar ahora
               </button>
               <button
                 onClick={close}
-                className="px-3 py-1.5 bg-[var(--bg-main)] hover:bg-slate-200 dark:hover:bg-slate-700 border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-lg transition-colors"
+                className="px-3 py-1.5 bg-[var(--bg-main)] hover:bg-slate-200 dark:hover:bg-slate-700 border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-lg transition-colors cursor-pointer pointer-events-auto relative z-[999999]"
               >
                 Más tarde
               </button>
