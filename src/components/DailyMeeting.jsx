@@ -41,10 +41,8 @@ const DailyMeeting = ({ appointmentId, codigo, displayName, isModerator, onReady
         callObjectRef.current = callFrame;
 
         // 3. Escuchar eventos
-        callFrame.on('left-meeting', (e) => {
-          console.log('Daily left-meeting fired:', e);
-          // TEMPORAL: no cerramos la ventana automáticamente para poder leer qué dice el iframe de Daily
-          // if (onReadyToClose) onReadyToClose();
+        callFrame.on('left-meeting', () => {
+          if (onReadyToClose) onReadyToClose();
         });
         
         callFrame.on('joined-meeting', () => {
@@ -99,12 +97,9 @@ const DailyMeeting = ({ appointmentId, codigo, displayName, isModerator, onReady
 
   return (
     <div className="w-full h-full relative bg-black">
-      {loading && !error && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-900 text-white">
-          <Loader2 size={40} className="animate-spin text-indigo-500 mb-4" />
-          <p className="text-sm font-semibold animate-pulse text-indigo-200">Conectando a servidor seguro...</p>
-        </div>
-      )}
+        {/* El spinner ha sido removido porque Daily.co tiene su propia pantalla de carga.
+            Si dejamos un overlay por encima, el usuario no puede hacer click en el botón "Unirse a la llamada"
+            de la pantalla de prueba de cámara de Daily. */}
       
       {error && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center">
