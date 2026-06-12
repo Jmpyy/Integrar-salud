@@ -109,16 +109,35 @@ export default function VirtualRoomPage() {
     }
   };
 
-  // Rotar tips en la sala de espera
+  // Rotar tips en la sala de espera y hacer polling del estado (por si falla el websocket)
   useEffect(() => {
     let interval;
-    if (roomState === 'waiting') {
+    let pollInterval;
+    if (roomState === 'waiting' && appointmentData) {
       interval = setInterval(() => {
         setCurrentTipIndex(prev => (prev + 1) % WAITING_TIPS.length);
       }, 8000);
+
+      // Polling cada 10 segundos como respaldo
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`${API}/telemedicine/check_status?id=${appointmentData.appointmentId}&codigo=${searchParams.get('codigo')}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.data?.status === 'activa' || data.data?.status === 'en_curso' || data.status === 'activa' || data.status === 'en_curso') {
+              setRoomState('active_call');
+            }
+          }
+        } catch (e) {
+          console.error('Error en polling:', e);
+        }
+      }, 10000);
     }
-    return () => clearInterval(interval);
-  }, [roomState]);
+    return () => {
+      clearInterval(interval);
+      clearInterval(pollInterval);
+    };
+  }, [roomState, appointmentData, searchParams]);
 
   // WebSockets: Conectar y escuchar eventos
   useEffect(() => {
@@ -215,7 +234,11 @@ export default function VirtualRoomPage() {
       }
     }
     socket.disconnect();
-    setRoomState('login');
+    if (roomState === 'active_call') {
+      setRoomState('goodbye');
+    } else {
+      setRoomState('login');
+    }
     setAppointmentData(null);
   };
 
