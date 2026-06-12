@@ -41,8 +41,10 @@ const DailyMeeting = ({ appointmentId, codigo, displayName, isModerator, onReady
         callObjectRef.current = callFrame;
 
         // 3. Escuchar eventos
-        callFrame.on('left-meeting', () => {
-          if (onReadyToClose) onReadyToClose();
+        callFrame.on('left-meeting', (e) => {
+          console.log('Daily left-meeting fired:', e);
+          // TEMPORAL: no cerramos la ventana automáticamente para poder leer qué dice el iframe de Daily
+          // if (onReadyToClose) onReadyToClose();
         });
         
         callFrame.on('joined-meeting', () => {
