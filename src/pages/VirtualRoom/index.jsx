@@ -281,8 +281,14 @@ export default function VirtualRoomPage() {
 
       const actualData = data.data || data;
       setAppointmentData(actualData); 
-      setRoomState(['activa', 'en_curso'].includes(actualData.status) ? 'active_call' : 'waiting');
-      toast.success('Acceso correcto. Estás en la sala virtual.');
+      
+      if (actualData.status === 'finalizada') {
+        setRoomState('goodbye');
+        toast.success('Tu consulta ha finalizado. Por favor, dejanos tu reseña.');
+      } else {
+        setRoomState(['activa', 'en_curso'].includes(actualData.status) ? 'active_call' : 'waiting');
+        toast.success('Acceso correcto. Estás en la sala virtual.');
+      }
       if (!searchParams.get('codigo') || !searchParams.get('dni')) {
         setSearchParams({ dni: d, codigo: c.toUpperCase() });
       }
