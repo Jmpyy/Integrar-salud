@@ -581,12 +581,12 @@ export default function VirtualRoomPage() {
       )}
       {/* ── ESTADO: Despedida ── */}
       {roomState === 'goodbye' && (
-        <div className="fixed inset-0 z-[99999] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-[99999] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 overflow-y-auto flex p-4 sm:p-6">
           <motion.div
-            initial={{ opacity: 0, scale: 0.85, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="max-w-md w-full text-center py-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className="m-auto max-w-md w-full text-center py-8"
           >
             {/* Icono animado */}
             <motion.div

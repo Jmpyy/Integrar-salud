@@ -482,7 +482,7 @@ export default function DashboardLayout({ onLogout }) {
             className={`fixed flex flex-col bg-slate-900 shadow-2xl overflow-hidden border border-slate-700 z-[99999] ${
               isJitsiMaximized 
                 ? 'rounded-3xl' 
-                : `bottom-6 right-6 w-[420px] ${isJitsiCollapsed ? 'h-[44px] min-h-[44px]' : 'h-[550px]'} rounded-2xl top-auto left-auto`
+                : `bottom-4 right-4 sm:bottom-6 sm:right-6 w-[calc(100vw-32px)] sm:w-[420px] ${isJitsiCollapsed ? 'h-[44px] min-h-[44px]' : 'h-[500px] sm:h-[550px]'} rounded-2xl top-auto left-auto`
             }`}
             style={isJitsiMaximized ? {
               position: 'fixed',
