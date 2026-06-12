@@ -7,7 +7,20 @@ import api from '../../../services/api';
 const RATING_LABELS = { 1: 'Muy mala', 2: 'Regular', 3: 'Aceptable', 4: 'Buena', 5: '¡Excelente!' };
 const RATING_COLORS = { 1: 'text-rose-500', 2: 'text-orange-400', 3: 'text-amber-400', 4: 'text-lime-500', 5: 'text-emerald-500' };
 
-
+const StarDisplay = ({ rating }) => {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map(star => (
+        <Star
+          key={star}
+          size={14}
+          className={star <= rating ? RATING_COLORS[rating] : 'text-slate-200 dark:text-slate-800'}
+          fill={star <= rating ? 'currentColor' : 'none'}
+        />
+      ))}
+    </div>
+  );
+};
 
 export default function ReseñasPage() {
   const { userRole } = useStore();
