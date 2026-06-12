@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../../stores/useStore';
 import NotificationCenter from '../NotificationCenter/NotificationCenter';
-import JitsiMeeting from '../JitsiMeeting';
+import DailyMeeting from '../DailyMeeting';
 import { APPOINTMENT_STATUS } from '../../config/constants';
 import { playNotificationSound } from '../../utils/sounds';
 import { socket } from '../../services/socket';
@@ -565,9 +565,9 @@ export default function DashboardLayout({ onLogout }) {
             <div className="flex-1 min-h-0 relative bg-black overflow-hidden">
               {/* Este overlay transparente captura los eventos del mouse mientras se arrastra, evitando que el iframe de Jitsi se los trague y el movimiento se corte */}
               {isDragging && <div className="absolute inset-0 z-10 cursor-move" />}
-              <JitsiMeeting
-                roomName={`integrarsalud-${activeCallApp.id}-${activeCallApp.codigoAcceso.substring(0, 5)}`}
-                password={activeCallApp.codigoAcceso.length >= 6 ? activeCallApp.codigoAcceso.substring(5) : activeCallApp.codigoAcceso}
+              <DailyMeeting
+                appointmentId={activeCallApp.id}
+                codigo={activeCallApp.codigoAcceso}
                 isModerator={true}
                 displayName={user?.name || "Médico"}
                 onReadyToClose={handleJitsiClose}

@@ -35,7 +35,7 @@ const WAITING_TIPS = [
   }
 ];
 
-import JitsiMeeting from '../../components/JitsiMeeting';
+import DailyMeeting from '../../components/DailyMeeting';
 import { socket } from '../../services/socket';
 
 export default function VirtualRoomPage() {
@@ -537,11 +537,11 @@ export default function VirtualRoomPage() {
               <LogOut size={16} /> Salir
             </button>
           </div>
-          {/* Jitsi Meeting */}
+          {/* Daily Meeting */}
           <div className="flex-1 relative bg-black">
-            <JitsiMeeting
-              roomName={`integrarsalud-${appointmentData?.appointmentId}-${codigo.substring(0, 5)}`}
-              password={codigo.length >= 6 ? codigo.substring(5) : codigo}
+            <DailyMeeting
+              appointmentId={appointmentData?.appointmentId}
+              codigo={codigo}
               isModerator={false}
               displayName={appointmentData?.patientName || "Paciente"}
               onReadyToClose={handleLeaveRoom}
