@@ -1,8 +1,8 @@
 import { io } from 'socket.io-client';
 
-// En producción esto debería apuntar a tu dominio, ej: 'https://socket.integrarsalud.me'
-// Por ahora usa el puerto 3001 asumiendo que el server.js corre en la misma máquina
-const SOCKET_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
+// URL base para el websocket
+// En producción usa el mismo dominio de la web (Nginx lo redirige) si no hay variable de entorno.
+const SOCKET_URL = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:3001');
 
 // Opción autoConnect: false permite conectar solo cuando sea necesario
 export const socket = io(SOCKET_URL, {
