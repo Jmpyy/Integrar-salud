@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Video, ShieldCheck, Loader2, ArrowRight, UserCircle, LogOut, CalendarClock, Clock, AlertCircle, Lightbulb, Mic, Wifi, FileText, CheckCircle, Star, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const WAITING_TIPS = [
   {
@@ -255,8 +255,9 @@ export default function VirtualRoomPage() {
         throw new Error(data.message || 'Error de acceso');
       }
 
-      setAppointmentData(data); // data contains appointmentId, doctorName directly
-      setRoomState(['activa', 'en_curso'].includes(data.status) ? 'active_call' : 'waiting');
+      const actualData = data.data || data;
+      setAppointmentData(actualData); 
+      setRoomState(['activa', 'en_curso'].includes(actualData.status) ? 'active_call' : 'waiting');
       toast.success('Acceso correcto. Estás en la sala virtual.');
       if (!searchParams.get('codigo') || !searchParams.get('dni')) {
         setSearchParams({ dni: d, codigo: c.toUpperCase() });
