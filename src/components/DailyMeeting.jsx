@@ -16,7 +16,7 @@ const DailyMeeting = ({ appointmentId, codigo, displayName, isModerator, onReady
       try {
         setLoading(true);
         // 1. Obtener la URL dinámica de la sala desde nuestro backend
-        const { data } = await api.get(`/telemedicine/get_room.php?id=${appointmentId}&codigo=${codigo}`);
+        const { data } = await api.get(`/telemedicine/get_room?id=${appointmentId}&codigo=${codigo}`);
         
         if (!data || !data.data || !data.data.url) {
           throw new Error('No se pudo obtener la URL de la sala');
