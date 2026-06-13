@@ -43,8 +43,6 @@ export default function ReloadPrompt() {
               <button
                 onClick={() => {
                   updateServiceWorker(true);
-                  // Forcefully reload if the SW update event is slow or hangs
-                  setTimeout(() => window.location.reload(true), 1000);
                 }}
                 className="px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-lg transition-colors flex-1 cursor-pointer pointer-events-auto relative z-[999999]"
               >
