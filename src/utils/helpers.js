@@ -23,7 +23,18 @@ export function nowForAPI() {
  * Formatea una fecha para display en español
  */
 export function formatDate(date, options = {}) {
-  const d = new Date(date);
+  if (!date) return '';
+  let dateString = date;
+  
+  // Si la fecha es "YYYY-MM-DD", forzar que se evalúe a las 12 del mediodía local
+  // para evitar que al parsearlo como UTC se reste un día en zonas como Argentina (UTC-3).
+  if (typeof date === 'string' && date.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    dateString = `${date}T12:00:00`;
+  }
+  
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return String(date);
+  
   return d.toLocaleDateString('es-ES', {
     day: '2-digit',
     month: '2-digit',

@@ -92,7 +92,7 @@ export default function DashboardLayout({ onLogout }) {
   const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   // Reference for previous waiting apps to detect new arrivals globally
-  const prevWaitingApps = useRef([]);
+
 
   // WebSockets: Conectar a la sala de doctores para notificaciones instantáneas
   useEffect(() => {
@@ -160,33 +160,7 @@ export default function DashboardLayout({ onLogout }) {
     };
   }, [userRole, fetchAppointments]);
 
-  useEffect(() => {
-    if (!['admin', 'medico', 'recepcion'].includes(userRole)) return;
 
-    const currentWaitingVirtuals = (appointments || []).filter(a => a.attendance === 'en_espera' && a.modalidad === 'virtual');
-    
-    currentWaitingVirtuals.forEach(app => {
-      const wasWaitingBefore = prevWaitingApps.current.find(prev => prev.id === app.id);
-      if (!wasWaitingBefore) {
-        playNotificationSound();
-
-        import('react-hot-toast').then(({ default: toast }) => {
-          toast.success(`¡El paciente ${app.patient || 'Virtual'} ha ingresado a la sala de espera!`, {
-            icon: '🎥',
-            duration: 6000,
-            style: {
-              borderRadius: '10px',
-              background: '#10b981',
-              color: '#fff',
-              fontWeight: 'bold',
-            },
-          });
-        });
-      }
-    });
-
-    prevWaitingApps.current = currentWaitingVirtuals;
-  }, [appointments, userRole]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -204,11 +178,19 @@ export default function DashboardLayout({ onLogout }) {
   const handleJitsiClose = useCallback(async () => {
     if (!activeCallApp) return;
     const appId = activeCallApp.id;
+    
+    // Emitir inmediatamente para que el paciente sea expulsado al instante
+    socket.emit('call-ended', `appointment-${appId}`);
+    
     setActiveCallApp(null);
     setIsJitsiMaximized(false);
-    await updateAppointmentStatus(appId, APPOINTMENT_STATUS.FINALIZADO);
-    await updateAppointmentVideoStatus(appId, 'finalizada');
-    socket.emit('call-ended', `appointment-${appId}`);
+    
+    try {
+      await updateAppointmentStatus(appId, APPOINTMENT_STATUS.FINALIZADO);
+      await updateAppointmentVideoStatus(appId, 'finalizada');
+    } catch (err) {
+      console.error('Error al actualizar estado del turno al cerrar videollamada:', err);
+    }
   }, [activeCallApp, setActiveCallApp, setIsJitsiMaximized, updateAppointmentStatus, updateAppointmentVideoStatus]);
 
   const handleJitsiJoined = useCallback(async () => {
