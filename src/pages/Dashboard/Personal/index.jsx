@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../../stores/useStore';
 import {
   Users, Plus, X, Stethoscope, Monitor, Search, Briefcase,
@@ -38,27 +39,57 @@ export default function PersonalPage() {
   const [confirmRevokeUser, setConfirmRevokeUser] = useState(null); // { id, name }
 
   // Form state
-  const [form, setForm] = useState({
-    name: '', specialty: '', license: '', color: 'indigo', phone: '', meetLink: '',
-    adminRole: 'recepcion', shift: 'Mañana', remuneration: '',
-    email: '', password: '' // Para creación de admin
-  });
+  const BLANK_FORM = { 
+    name: '', specialty: '', license: '', color: 'indigo', phone: '', meetLink: '', email: '', adminRole: 'recepcion', shift: 'Mañana', remuneration: '', remunerationType: 'fijo',
+    schedule: {
+      1: { enabled: true, start: '09:00', end: '18:00' },
+      2: { enabled: true, start: '09:00', end: '18:00' },
+      3: { enabled: true, start: '09:00', end: '18:00' },
+      4: { enabled: true, start: '09:00', end: '18:00' },
+      5: { enabled: true, start: '09:00', end: '18:00' },
+      6: { enabled: false, start: '09:00', end: '13:00' },
+      0: { enabled: false, start: '09:00', end: '13:00' },
+    }
+  };
 
-  const BLANK_FORM = { name: '', specialty: '', license: '', color: 'indigo', phone: '', meetLink: '', email: '', adminRole: 'recepcion', shift: 'Mañana', remuneration: '', remunerationType: 'fijo' };
+  const [form, setForm] = useState({ ...BLANK_FORM, password: '' });
 
-  const openNewEmployee = () => { setEditingId(null); setForm(BLANK_FORM); setShowModal(true); };
+  const formatHour = (h) => `${String(h).padStart(2, '0')}:00`;
+  
+  const parseDoctorSchedule = (docSchedule) => {
+     const defaultSchedule = JSON.parse(JSON.stringify(BLANK_FORM.schedule));
+     if (!docSchedule || Object.keys(docSchedule).length === 0) return defaultSchedule;
+     
+     // Disable all days first
+     Object.keys(defaultSchedule).forEach(day => defaultSchedule[day].enabled = false);
+     
+     // Enable and set times for days in docSchedule
+     Object.entries(docSchedule).forEach(([day, hours]) => {
+        if (defaultSchedule[day]) {
+           defaultSchedule[day].enabled = true;
+           defaultSchedule[day].start = formatHour(hours.start);
+           defaultSchedule[day].end = formatHour(hours.end);
+        }
+     });
+     return defaultSchedule;
+  };
+
+  const openNewEmployee = () => { setEditingId(null); setForm({ ...BLANK_FORM, password: '' }); setShowModal(true); };
 
   const openEditDoctor = (doc) => {
     setModalRole('medico');
     setEditingId(doc.id);
-    setForm({ name: doc.name, specialty: doc.specialty || '', license: doc.license || '', color: doc.color || 'indigo', phone: doc.phone || '', meetLink: doc.meet_link || '', adminRole: 'recepcion', shift: 'Mañana', remuneration: doc.remuneration || '', remunerationType: doc.remunerationType || 'fijo' });
+    setForm({ 
+       name: doc.name, specialty: doc.specialty || '', license: doc.license || '', color: doc.color || 'indigo', phone: doc.phone || '', meetLink: doc.meet_link || '', adminRole: 'recepcion', shift: 'Mañana', remuneration: doc.remuneration || '', remunerationType: doc.remuneration_type || 'fijo',
+       schedule: parseDoctorSchedule(doc.schedule)
+    });
     setShowModal(true);
   };
 
   const openEditAdmin = (emp) => {
     setModalRole('recepcion');
     setEditingId(emp.id);
-    setForm({ name: emp.name, specialty: '', license: '', color: 'indigo', phone: emp.phone || '', adminRole: emp.role || 'recepcion', shift: emp.shift || 'Mañana', remuneration: emp.remuneration || '', remunerationType: emp.remunerationType || 'fijo' });
+    setForm({ ...BLANK_FORM, name: emp.name, specialty: '', license: '', color: 'indigo', phone: emp.phone || '', adminRole: emp.role || 'recepcion', shift: emp.shift || 'Mañana', remuneration: emp.remuneration || '', remunerationType: emp.remuneration_type || 'fijo' });
     setShowModal(true);
   };
 
@@ -86,9 +117,21 @@ export default function PersonalPage() {
 
     try {
       if (modalRole === 'medico') {
+        const scheduleToSave = {};
+        if (form.schedule) {
+           Object.entries(form.schedule).forEach(([day, data]) => {
+              if (data.enabled) {
+                 scheduleToSave[day] = {
+                    start: parseInt(data.start.split(':')[0], 10),
+                    end: parseInt(data.end.split(':')[0], 10)
+                 };
+              }
+           });
+        }
+
         const remuData = { remuneration: form.remuneration, remunerationType: form.remunerationType };
         if (editingId !== null) {
-          await store.updateDoctor(editingId, { name: form.name, specialty: form.specialty, license: form.license, color: form.color, phone: form.phone, meetLink: form.meetLink, ...remuData });
+          await store.updateDoctor(editingId, { name: form.name, specialty: form.specialty, license: form.license, color: form.color, phone: form.phone, meetLink: form.meetLink, schedule: scheduleToSave, ...remuData });
           showToast(`✓ Datos de ${form.name} actualizados.`);
         } else {
           const newDoc = {
@@ -99,8 +142,8 @@ export default function PersonalPage() {
             phone: form.phone,
             meetLink: form.meetLink,
             email: form.email || undefined,
-            ...remuData,
-            schedule: { 1: { start: 9, end: 18 }, 3: { start: 9, end: 18 }, 5: { start: 9, end: 18 } }
+            schedule: scheduleToSave,
+            ...remuData
           };
           const created = await store.createDoctor(newDoc);
           createdEntityId = created.doctor.id;
@@ -109,7 +152,7 @@ export default function PersonalPage() {
           setCreatedCredentials({ name: form.name, email: created.email, password: created.password, role: 'Médico' });
         }
       } else if (modalRole === 'recepcion') {
-        const remuData = { remuneration: form.remuneration, remunerationType: form.remunerationType };
+        const remuData = { remuneration: form.remuneration, remunerationType: 'fijo' };
         if (editingId !== null) {
           await store.updateStaff(editingId, { name: form.name, role: form.adminRole, shift: form.shift, phone: form.phone, ...remuData });
           showToast(`✓ Datos de ${form.name} actualizados.`);
@@ -156,7 +199,7 @@ export default function PersonalPage() {
   const filteredAdmin = adminStaff.filter(a => a && a.name && a.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="flex flex-col gap-6 h-full animate-fade-in-quick px-2 sm:px-6 py-2 sm:py-4 print:overflow-visible relative bg-[var(--bg-main)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-[2.5rem]">
+    <div className="flex flex-col gap-6 h-full animate-fade-in-quick pb-8 print:overflow-visible relative">
 
       {/* TOAST */}
       {toastMsg && (
@@ -166,9 +209,9 @@ export default function PersonalPage() {
       )}
 
       {/* MODAL NUEVO EMPLEADO */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in-quick">
-          <div className="bg-[var(--bg-card)] rounded-[2.5rem] p-8 w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar border border-[var(--glass-border)]">
+      {showModal && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 z-[999999] flex items-center justify-center p-2 sm:p-4 backdrop-blur-md animate-fade-in-quick">
+          <div className="bg-[var(--bg-card)] rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 w-full max-w-lg shadow-2xl overflow-y-auto max-h-[95vh] sm:max-h-[90vh] custom-scrollbar border border-[var(--glass-border)]">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-xl font-black text-[var(--text-primary)] flex items-center gap-3">
                 <div className="p-2 bg-[var(--accent-primary)]/10 rounded-xl">
@@ -235,7 +278,7 @@ export default function PersonalPage() {
 
               {modalRole === 'medico' ? (
                 <>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div>
                        <label htmlFor="specialty" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Especialidad *</label>
                        <input id="specialty" name="specialty" required value={form.specialty} onChange={e => setForm({...form, specialty: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all" placeholder="Ej: Psicología" />
@@ -260,9 +303,48 @@ export default function PersonalPage() {
                       ))}
                     </div>
                   </div>
+
+                  <div>
+                    <span className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-[0.2em] flex items-center gap-2 opacity-70"><Clock size={12} /> Días y Horarios Laborales</span>
+                    <div className="bg-[var(--bg-main)]/50 rounded-2xl border border-[var(--border-color)]/30 overflow-hidden divide-y divide-[var(--border-color)]/30">
+                      {[1, 2, 3, 4, 5, 6, 0].map(day => {
+                        const dayNames = {1:'Lunes', 2:'Martes', 3:'Miércoles', 4:'Jueves', 5:'Viernes', 6:'Sábado', 0:'Domingo'};
+                        const data = form.schedule?.[day] || { enabled: false, start: '09:00', end: '18:00' };
+                        return (
+                           <div key={day} className="flex items-center justify-between p-3 sm:p-4 hover:bg-[var(--bg-card)] transition-colors">
+                             <label className="flex items-center gap-3 cursor-pointer">
+                               <input 
+                                 type="checkbox" 
+                                 checked={data.enabled}
+                                 onChange={(e) => setForm({...form, schedule: {...form.schedule, [day]: {...data, enabled: e.target.checked}}})}
+                                 className="w-4 h-4 text-[var(--accent-primary)] rounded border-[var(--border-color)] focus:ring-[var(--accent-primary)]/50"
+                               />
+                               <span className={`text-sm font-bold ${data.enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] opacity-50'}`}>{dayNames[day]}</span>
+                             </label>
+                             
+                             <div className={`flex items-center gap-2 transition-opacity ${data.enabled ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+                               <input 
+                                  type="time" 
+                                  value={data.start}
+                                  onChange={(e) => setForm({...form, schedule: {...form.schedule, [day]: {...data, start: e.target.value}}})}
+                                  className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg px-2 py-1 text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                               />
+                               <span className="text-[var(--text-secondary)] text-xs font-black">a</span>
+                               <input 
+                                  type="time" 
+                                  value={data.end}
+                                  onChange={(e) => setForm({...form, schedule: {...form.schedule, [day]: {...data, end: e.target.value}}})}
+                                  className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg px-2 py-1 text-xs font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                               />
+                             </div>
+                           </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </>
               ) : modalRole === 'recepcion' ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="adminRole" className="block text-[10px] font-black text-[var(--text-secondary)] mb-2 uppercase tracking-widest opacity-70">Rol Asignado</label>
                     <select id="adminRole" name="adminRole" value={form.adminRole} onChange={e => setForm({...form, adminRole: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] transition-all">
@@ -296,26 +378,22 @@ export default function PersonalPage() {
               )}
 
               {/* REMUNERACIÓN - universal con toggle % / Monto Fijo */}
+              {modalRole !== 'admin' && (
               <div className="border-t border-[var(--border-color)]/30 pt-6 space-y-4">
                 <span className="block text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] opacity-80 flex items-center gap-2">💰 Modelo de Contraprestación</span>
                 
-                {/* Toggle tipo */}
-                <div className="flex bg-[var(--bg-main)] rounded-xl p-1.5 gap-1.5 border border-[var(--border-color)]/30">
-                  <button type="button" onClick={() => setForm({...form, remunerationType: 'porcentaje', remuneration: ''})}
-                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
-                      form.remunerationType === 'porcentaje' ? 'bg-[var(--accent-primary)] text-white shadow-md' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100'
-                    }`}>
-                    Honorario %
-                  </button>
-                  <button type="button" onClick={() => setForm({...form, remunerationType: 'fijo', remuneration: ''})}
-                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
-                      form.remunerationType === 'fijo' ? 'bg-[var(--accent-primary)] text-white shadow-md' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100'
-                    }`}>
-                    Sueldo Fijo $
-                  </button>
-                </div>
+                {modalRole === 'medico' && (
+                  <div className="flex bg-[var(--bg-main)] p-1.5 rounded-2xl gap-1.5 border border-[var(--border-color)]/30">
+                    <button type="button" onClick={() => setForm({...form, remunerationType: 'porcentaje'})} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${form.remunerationType === 'porcentaje' ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-card)]'}`}>
+                      % POR PACIENTE
+                    </button>
+                    <button type="button" onClick={() => setForm({...form, remunerationType: 'fijo'})} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${form.remunerationType === 'fijo' ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-card)]'}`}>
+                      $ FIJO POR PACIENTE
+                    </button>
+                  </div>
+                )}
 
-                {form.remunerationType === 'porcentaje' ? (
+                {form.remunerationType === 'porcentaje' && modalRole === 'medico' ? (
                   <div className="space-y-4 animate-fade-in-quick">
                     <div className="relative flex items-center">
                         <input id="remuneration" name="remuneration" type="number" min="0" max="100" step="0.01"
@@ -325,7 +403,7 @@ export default function PersonalPage() {
                           placeholder="0.00" />
                         <span className="absolute right-6 top-1/2 -translate-y-1/2 text-2xl font-black text-emerald-500/50">%</span>
                     </div>
-                    <p className="text-[10px] text-[var(--text-secondary)] font-bold px-1 opacity-60 leading-relaxed uppercase tracking-wider">Compensación por producción variable. No impacta de forma automática en el Libro Diario.</p>
+                    <p className="text-[10px] text-[var(--text-secondary)] font-bold px-1 opacity-60 leading-relaxed uppercase tracking-wider">El médico cobra un porcentaje sobre el valor abonado por el paciente. (Ej: 70% para el médico, 30% para el consultorio).</p>
                   </div>
                 ) : (
                   <div className="space-y-4 animate-fade-in-quick">
@@ -337,10 +415,15 @@ export default function PersonalPage() {
                           className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl pl-12 pr-6 py-3.5 text-xl font-black text-sky-500 outline-none focus:border-sky-500/50 focus:ring-4 focus:ring-sky-500/5 transition-all"
                           placeholder="0.00" />
                     </div>
-                    <p className="text-[10px] text-[var(--text-secondary)] font-bold px-1 opacity-60 leading-relaxed uppercase tracking-wider">Carga fija operativa. Al guardar, se inyectará el movimiento contable en el Dashboard de Finanzas.</p>
+                    {modalRole === 'medico' ? (
+                      <p className="text-[10px] text-[var(--text-secondary)] font-bold px-1 opacity-60 leading-relaxed uppercase tracking-wider">Monto fijo establecido que el médico cobra por cada paciente atendido, sin importar el valor total cobrado.</p>
+                    ) : (
+                      <p className="text-[10px] text-[var(--text-secondary)] font-bold px-1 opacity-60 leading-relaxed uppercase tracking-wider">Sueldo fijo mensual. Al crear, se inyectará como egreso en Finanzas de este mes.</p>
+                    )}
                   </div>
                 )}
               </div>
+              )}
 
               <div className="pt-4">
                 <button type="submit" className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-[var(--accent-primary)]/20 active:scale-95 uppercase tracking-[0.2em] text-xs">
@@ -349,7 +432,8 @@ export default function PersonalPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* CABECERA */}
@@ -361,7 +445,7 @@ export default function PersonalPage() {
             </div>
             Gestión de Personal
           </h2>
-          <p className="text-sm font-medium text-[var(--text-secondary)] mt-1.5 opacity-70">Administración táctica del equipo clínico y administrativo del consultorio.</p>
+          <p className="text-sm font-medium text-[var(--text-secondary)] mt-1.5 opacity-70">Administración del equipo médico y soporte del consultorio.</p>
         </div>
         <button
           onClick={() => openNewEmployee()}
@@ -372,29 +456,29 @@ export default function PersonalPage() {
       </div>
 
       {/* STATS RÁPIDOS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
         {[
-          { label: 'Cluster Total', value: doctors.length + adminStaff.length, icon: Users, color: 'text-[var(--accent-primary)]', bg: 'bg-[var(--accent-primary)]/10' },
-          { label: 'Operadores Clínicos', value: doctors.length, icon: Stethoscope, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-          { label: 'Staff Recepción', value: adminStaff.length, icon: Monitor, color: 'text-sky-500', bg: 'bg-sky-500/10' },
+          { label: 'Total Personal', value: doctors.length + adminStaff.length, icon: Users, color: 'text-[var(--accent-primary)]', bg: 'bg-[var(--accent-primary)]/10' },
+          { label: 'Médicos', value: doctors.length, icon: Stethoscope, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+          { label: 'Administrativos', value: adminStaff.length, icon: Monitor, color: 'text-sky-500', bg: 'bg-sky-500/10' },
           { label: 'Disponibilidad', value: '100%', icon: CheckCircle, color: 'text-purple-500', bg: 'bg-purple-500/10' },
         ].map(({ label, value, icon: StatIcon, color, bg }, i) => (
-          <div key={i} className="card-premium rounded-2xl p-5 border border-[var(--border-color)]/30 shadow-sm flex items-center gap-4 group">
-            <div className={`${bg} p-3 rounded-2xl group-hover:scale-110 transition-transform duration-500`}>
-              <StatIcon size={22} className={color} />
+          <div key={i} className="card-premium rounded-2xl p-3 sm:p-5 border border-[var(--border-color)]/30 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 group">
+            <div className={`${bg} p-2.5 sm:p-3 rounded-xl sm:rounded-2xl group-hover:scale-110 transition-transform duration-500 shrink-0`}>
+              <StatIcon size={18} className={`sm:w-[22px] sm:h-[22px] ${color}`} />
             </div>
-            <div>
-              <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 mb-0.5">{label}</p>
-              <p className="text-2xl font-black text-[var(--text-primary)] leading-none">{value}</p>
+            <div className="min-w-0 w-full">
+              <p className="text-[9px] sm:text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-wider sm:tracking-widest opacity-60 mb-0.5 truncate">{label}</p>
+              <p className="text-xl sm:text-2xl font-black text-[var(--text-primary)] leading-none">{value}</p>
             </div>
           </div>
         ))}
       </div>
 
       {/* TABLA PRINCIPAL */}
-      <div className="card-premium rounded-3xl border border-[var(--border-color)]/50 shadow-xl flex flex-1 min-h-[600px] flex-col overflow-hidden">
+      <div className="flex flex-1 min-h-[600px] flex-col overflow-hidden">
         {/* TABS + SEARCH */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--border-color)]/50 px-6 pt-6 pb-0 gap-4 bg-[var(--bg-sidebar)]/30 overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--border-color)]/50 px-0 sm:px-2 pt-2 sm:pt-6 pb-0 gap-4 overflow-hidden">
           <div className="flex gap-2 w-full sm:w-auto overflow-x-auto overflow-y-hidden hide-scrollbar pb-1 sm:pb-0">
             {[ ['medicos', Stethoscope, 'Clínico'], ['admin', Monitor, 'Soporte'], ['seguridad', ShieldCheck, 'Sistemas'] ].map(([tabId, TabIcon, label]) => (
               <button key={tabId} 
@@ -402,7 +486,7 @@ export default function PersonalPage() {
                   setStaffTab(tabId);
                   if (tabId === 'seguridad') store.fetchUsers();
                 }} 
-                className={`shrink-0 px-6 py-4 rounded-t-2xl font-black text-[10px] uppercase tracking-[0.15em] flex items-center gap-2 transition-all ${staffTab === tabId ? 'bg-[var(--bg-card)] text-[var(--accent-primary)] border border-[var(--border-color)] border-b-transparent relative top-[1px] shadow-[0_-5px_15px_rgba(0,0,0,0.03)]' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-main)]'}`}>
+                className={`shrink-0 px-6 py-4 rounded-t-2xl font-black text-[10px] uppercase tracking-[0.15em] flex items-center gap-2 transition-all ${staffTab === tabId ? 'bg-[var(--bg-card)] text-[var(--accent-primary)] border border-[var(--border-color)] border-b-transparent relative top-[1px] shadow-[0_-5px_15px_rgba(0,0,0,0.03)]' : 'text-[var(--text-secondary)] opacity-60 hover:opacity-100 hover:bg-[var(--bg-card)]/50'}`}>
                 <TabIcon size={16} /> {label}
               </button>
             ))}
@@ -419,20 +503,20 @@ export default function PersonalPage() {
         </div>
 
         {/* TABLE CONTENT - SCOLL RESPONSIVO */}
-        <div className="flex-1 overflow-x-auto custom-scrollbar bg-[var(--bg-card)]">
-           <div className="min-w-[900px] sm:min-w-0 px-8 py-2">
+        <div className="flex-1 overflow-x-auto custom-scrollbar">
+           <div className="px-0 py-4">
 
           {/* SEGURIDAD Y CUENTAS */}
           {staffTab === 'seguridad' && (
             <div className="animate-fade-in-quick">
-              <div className="p-8 bg-[var(--accent-primary)]/5 border-b border-[var(--accent-primary)]/10 rounded-[2rem] flex items-center justify-between mb-6 mt-4">
-                <div className="flex items-center gap-5">
-                  <div className="w-14 h-14 bg-[var(--accent-primary)]/20 rounded-2xl flex items-center justify-center text-[var(--accent-primary)] shadow-inner">
+              <div className="p-6 sm:p-8 bg-[var(--accent-primary)]/5 border-b border-[var(--accent-primary)]/10 rounded-[2rem] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 mt-4">
+                <div className="flex items-center gap-4 sm:gap-5">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[var(--accent-primary)]/20 rounded-2xl flex items-center justify-center text-[var(--accent-primary)] shadow-inner shrink-0">
                     <ShieldCheck size={28} />
                   </div>
                   <div>
-                    <h4 className="text-lg font-black text-[var(--text-primary)] tracking-tight">Ecosistema de Acceso Centralizado</h4>
-                    <p className="text-xs text-[var(--text-secondary)] font-bold mt-1 opacity-70">Control de privilegios y auditoría de cuentas activas en la red clínica.</p>
+                    <h4 className="text-lg font-black text-[var(--text-primary)] tracking-tight">Cuentas de Acceso</h4>
+                    <p className="text-xs text-[var(--text-secondary)] font-bold mt-1 opacity-70">Administración de usuarios y contraseñas del sistema.</p>
                   </div>
                 </div>
                 <button 
@@ -443,14 +527,14 @@ export default function PersonalPage() {
                 </button>
               </div>
 
-              <table className="w-full text-left border-separate border-spacing-y-2">
+              <table className="w-full text-left border-separate border-spacing-y-2 hidden md:table min-w-[900px]">
                 <thead>
                   <tr className="bg-transparent">
-                    <th className="py-4 px-6 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Operador / Identidad</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Punto de Enlace (Email)</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-center">Nivel de Privilegio</th>
-                    <th className="py-4 px-4 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-center">Estado del Token</th>
-                    <th className="py-4 px-6 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-right">Mandos</th>
+                    <th className="py-4 px-6 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Usuario</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Email</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-center">Rol</th>
+                    <th className="py-4 px-4 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-center">Estado de Contraseña</th>
+                    <th className="py-4 px-6 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="space-y-4">
@@ -458,9 +542,13 @@ export default function PersonalPage() {
                     <tr key={user.id} className="bg-[var(--bg-main)]/30 hover:bg-[var(--bg-card)] transition-all group rounded-2xl overflow-hidden border border-[var(--border-color)]/20">
                       <td className="py-5 px-6 rounded-l-2xl border-l border-y border-[var(--border-color)]/20">
                         <div className="flex items-center gap-4">
-                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm border shadow-sm ${user.role === 'admin' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : user.role === 'medico' ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border-[var(--accent-primary)]/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
-                            {user.name.substring(0, 2).toUpperCase()}
-                          </div>
+                          {user.profile_picture ? (
+                            <img src={user.profile_picture} alt={user.name} className="w-11 h-11 rounded-2xl object-cover shadow-sm border border-[var(--border-color)]/20" />
+                          ) : (
+                            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm border shadow-sm ${user.role === 'admin' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : user.role === 'medico' ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border-[var(--accent-primary)]/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
+                              {user.name.substring(0, 2).toUpperCase()}
+                            </div>
+                          )}
                           <div>
                             <p className="text-sm font-black text-[var(--text-primary)]">{user.name}</p>
                             <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-50 mt-0.5">
@@ -487,11 +575,11 @@ export default function PersonalPage() {
                       <td className="py-5 px-4 text-center border-y border-[var(--border-color)]/20">
                         {user.must_change_password ? (
                            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase rounded-xl border border-amber-500/20 shadow-sm">
-                             <RefreshCw size={12} className="animate-spin-slow" /> Rotación Pendiente
+                             <RefreshCw size={12} className="animate-spin-slow" /> Debe Cambiar Contraseña
                            </div>
                         ) : (
                            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 text-[9px] font-black uppercase rounded-xl border border-emerald-500/20">
-                             <CheckCircle size={12} /> Sync Verificada
+                             <CheckCircle size={12} /> Ok
                            </div>
                         )}
                       </td>
@@ -517,19 +605,57 @@ export default function PersonalPage() {
                   ))}
                 </tbody>
               </table>
+
+              {/* MÓVIL SEGURIDAD */}
+              <div className="md:hidden space-y-3 mt-4">
+                {store.users.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase())).map(user => (
+                  <div key={user.id} className="bg-[var(--bg-main)]/30 rounded-2xl p-4 border border-[var(--border-color)]/20">
+                    <div className="flex items-center gap-3 mb-3">
+                      {user.profile_picture ? (
+                        <img src={user.profile_picture} alt={user.name} className="w-10 h-10 rounded-2xl object-cover shadow-sm border border-[var(--border-color)]/20 shrink-0" />
+                      ) : (
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm border shadow-sm shrink-0 ${user.role === 'admin' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : user.role === 'medico' ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border-[var(--accent-primary)]/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
+                          {user.name.substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-black text-[var(--text-primary)]">{user.name}</p>
+                        <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-50 mt-0.5">
+                          {user.doctor_name ? `Clínico: ${user.doctor_name}` : user.staff_name ? `Support: ${user.staff_name}` : 'Super Administrador'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 mb-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Email</span>
+                        <span className="text-xs font-mono font-black text-[var(--text-primary)]/80 tracking-tight">{user.email}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Nivel</span>
+                        <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${user.role === 'admin' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : user.role === 'medico' ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/20' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'}`}>{user.role}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-3 border-t border-[var(--border-color)]/10">
+                      <button onClick={() => { setResetPasswordUser({ id: user.id, name: user.name }); setResetPasswordValue(''); }} className="flex-1 py-2 text-xs font-black text-[var(--text-secondary)] hover:text-[var(--accent-primary)] bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]/50 uppercase tracking-widest transition-all">Token</button>
+                      <button onClick={() => setConfirmRevokeUser({ id: user.id, name: user.name })} className="flex-1 py-2 text-xs font-black text-[var(--text-secondary)] hover:text-rose-500 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]/50 uppercase tracking-widest transition-all">Revocar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {/* MÉDICOS */}
           {staffTab === 'medicos' && (
-            <table className="w-full text-left border-separate border-spacing-y-4 animate-fade-in-quick mt-4">
+            <div className="animate-fade-in-quick">
+            <table className="w-full text-left border-separate border-spacing-y-4 mt-4 hidden md:table min-w-[900px]">
               <thead>
                 <tr className="bg-transparent">
-                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Especialista / Clínica</th>
-                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 hidden sm:table-cell">Credencial MN</th>
-                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 hidden md:table-cell">Enlace Directo</th>
-                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-center">Firma Visual</th>
-                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-right">Comandos</th>
+                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Médico</th>
+                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 hidden sm:table-cell">Matrícula (MN)</th>
+                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 hidden md:table-cell">Teléfono</th>
+                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-center">Color Agenda</th>
+                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="space-y-4">
@@ -537,9 +663,13 @@ export default function PersonalPage() {
                   <tr key={doc.id} className="bg-[var(--bg-main)]/30 hover:bg-[var(--bg-card)] transition-all group hover:scale-[1.01] transform duration-300">
                     <td className="py-5 px-4 rounded-l-3xl border-l border-y border-[var(--border-color)]/20">
                       <div className="flex items-center gap-5">
-                        <div className={`w-12 h-12 rounded-[1.25rem] flex items-center justify-center font-black text-white shadow-xl ${COLOR_MAP[doc.color]?.bg || 'bg-[var(--accent-primary)]'} border-2 border-white/20`}>
-                          {doc.name.substring(0, 2).toUpperCase()}
-                        </div>
+                        {doc.profile_picture ? (
+                          <img src={doc.profile_picture} alt={doc.name} className="w-12 h-12 rounded-[1.25rem] object-cover shadow-xl border-2 border-white/20" />
+                        ) : (
+                          <div className={`w-12 h-12 rounded-[1.25rem] flex items-center justify-center font-black text-white shadow-xl ${COLOR_MAP[doc.color]?.bg || 'bg-[var(--accent-primary)]'} border-2 border-white/20`}>
+                            {doc.name.substring(0, 2).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="text-sm font-black text-[var(--text-primary)] tracking-tight">{doc.name}</p>
                           <p className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 mt-1">{doc.specialty}</p>
@@ -572,18 +702,59 @@ export default function PersonalPage() {
                 )}
               </tbody>
             </table>
+
+            {/* MÓVIL MÉDICOS */}
+            <div className="md:hidden space-y-3 mt-4">
+              {filteredDoctors.length === 0 ? (
+                <div className="py-10 text-center text-[var(--text-secondary)] text-sm font-black uppercase tracking-[0.2em] opacity-40">No hay registros.</div>
+              ) : (
+                filteredDoctors.map(doc => (
+                  <div key={doc.id} className="bg-[var(--bg-main)]/30 rounded-2xl p-4 border border-[var(--border-color)]/20">
+                    <div className="flex items-center gap-3 mb-3">
+                      {doc.profile_picture ? (
+                        <img src={doc.profile_picture} alt={doc.name} className="w-10 h-10 rounded-[1rem] object-cover shadow-xl border-2 border-white/20 shrink-0" />
+                      ) : (
+                        <div className={`w-10 h-10 rounded-[1rem] flex items-center justify-center font-black text-white shadow-xl ${COLOR_MAP[doc.color]?.bg || 'bg-[var(--accent-primary)]'} border-2 border-white/20 shrink-0`}>
+                          {doc.name.substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-black text-[var(--text-primary)]">{doc.name}</p>
+                        <p className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest opacity-80 mt-0.5">{doc.specialty}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 mb-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">MN</span>
+                        <span className="text-[10px] font-mono font-black text-[var(--text-secondary)] bg-[var(--bg-card)] px-2 py-1 rounded-md border border-[var(--border-color)]/50">{doc.license || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Teléfono</span>
+                        <span className="text-xs font-black text-[var(--text-primary)] opacity-80">{doc.phone || '---'}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-3 border-t border-[var(--border-color)]/10">
+                      <button onClick={() => openEditDoctor(doc)} className="flex-1 py-2 text-xs font-black text-[var(--text-secondary)] hover:text-[var(--accent-primary)] bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]/50 uppercase tracking-widest transition-all">Editar</button>
+                      <button onClick={() => setConfirmDeleteDoctor(doc.id)} className="flex-1 py-2 text-xs font-black text-[var(--text-secondary)] hover:text-rose-500 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]/50 uppercase tracking-widest transition-all">Eliminar</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            </div>
           )}
 
           {/* ADMINISTRATIVOS */}
           {staffTab === 'admin' && (
-            <table className="w-full text-left border-separate border-spacing-y-4 animate-fade-in-quick mt-4">
+            <div className="animate-fade-in-quick">
+            <table className="w-full text-left border-separate border-spacing-y-4 mt-4 hidden md:table min-w-[900px]">
               <thead>
                 <tr className="bg-transparent">
-                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Agente Operativo</th>
-                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 hidden sm:table-cell">Función Crítica</th>
-                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 hidden md:table-cell">Bloque Horario</th>
-                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-center">Carga Salarial</th>
-                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-right">Acciones de Red</th>
+                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Administrativo</th>
+                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 hidden sm:table-cell">Rol</th>
+                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 hidden md:table-cell">Turno</th>
+                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-center">Remuneración</th>
+                  <th className="py-3 px-2 text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="space-y-4">
@@ -626,6 +797,42 @@ export default function PersonalPage() {
                 )}
               </tbody>
             </table>
+
+            {/* MÓVIL ADMINISTRATIVOS */}
+            <div className="md:hidden space-y-3 mt-4">
+              {filteredAdmin.length === 0 ? (
+                <div className="py-10 text-center text-[var(--text-secondary)] text-sm font-black uppercase tracking-[0.2em] opacity-40">No hay registros.</div>
+              ) : (
+                filteredAdmin.map(emp => (
+                  <div key={emp.id} className="bg-[var(--bg-main)]/30 rounded-2xl p-4 border border-[var(--border-color)]/20">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-[1rem] bg-[var(--bg-main)] flex items-center justify-center font-black text-[var(--text-secondary)] border border-[var(--border-color)]/50 shadow-inner shrink-0">
+                        {emp.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-[var(--text-primary)]">{emp.name}</p>
+                        <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 mt-0.5">{emp.phone || '---'}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 mb-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Rol</span>
+                        <span className="text-[10px] font-black text-[var(--text-primary)] uppercase tracking-widest bg-[var(--accent-light)]/50 px-2 py-1 rounded-md border border-[var(--accent-primary)]/10">{emp.role}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-60">Turno</span>
+                        <span className="text-xs font-black text-[var(--text-primary)] opacity-80">{emp.shift}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-3 border-t border-[var(--border-color)]/10">
+                      <button onClick={() => openEditAdmin(emp)} className="flex-1 py-2 text-xs font-black text-[var(--text-secondary)] hover:text-[var(--accent-primary)] bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]/50 uppercase tracking-widest transition-all">Editar</button>
+                      <button onClick={() => setConfirmDeleteStaff(emp.id)} className="flex-1 py-2 text-xs font-black text-[var(--text-secondary)] hover:text-rose-500 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]/50 uppercase tracking-widest transition-all">Eliminar</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            </div>
           )}
            </div>
         </div>

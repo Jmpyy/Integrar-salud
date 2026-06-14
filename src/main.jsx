@@ -6,12 +6,20 @@ import App from './App.jsx'
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary.jsx'
 // Service Worker Registration is now handled by ReloadPrompt component
 
+// Si el usuario ingresa una ruta sin el hash (ej. /a en lugar de /#/a), 
+// el servidor devuelve el index.html pero el HashRouter no entiende la ruta y carga el inicio.
+// Esto fuerza a que cualquier ruta en la URL (pathname) se mueva al hash para que el Router la maneje y muestre 404 si no existe.
+if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+  window.location.replace('/#' + window.location.pathname + window.location.search);
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
       <App />
       <Toaster
         position="top-right"
+        containerStyle={{ zIndex: 999999 }}
         toastOptions={{
           duration: 3500,
           style: {

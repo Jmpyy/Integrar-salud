@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, useDragControls } from 'framer-motion';
 import {
   LayoutDashboard, CalendarDays, Users, Wallet,
   Bell, Search, LogOut, Plus, Menu, X,
   UserCog, Stethoscope, BarChart3, Settings, ChevronRight,
-  Sun, Moon, Pill, Video, Maximize, Minimize, Shield, Star
+  Sun, Moon, Pill, Video, Maximize, Minimize, Shield, Star, AlertCircle
 } from 'lucide-react';
 import { useStore } from '../../stores/useStore';
 import NotificationCenter from '../NotificationCenter/NotificationCenter';
@@ -82,14 +82,67 @@ export default function DashboardLayout({ onLogout }) {
   const dragControls = useDragControls();
 
   const { 
-    userRole, user, theme, toggleTheme, globalConfig, appointments, fetchAppointments,
+    userRole, user, theme, toggleTheme, globalConfig, fetchAppointments,
     activeCallApp, setActiveCallApp, isJitsiMaximized, setIsJitsiMaximized,
-    updateAppointmentStatus, updateAppointmentVideoStatus
+    updateAppointmentStatus, updateAppointmentVideoStatus,
+    appointments, appointmentsLoading
   } = useStore();
   const role     = ROLES[userRole] || ROLES.recepcion;
   const meta     = PAGE_META[location.pathname] || { title: 'Panel', subtitle: '' };
   const name     = user?.name || role.label;
   const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  const hasNotifiedEvolutionsRef = useRef(false);
+
+  useEffect(() => {
+    if (appointmentsLoading || !appointments || appointments.length === 0) return;
+    
+    if (!hasNotifiedEvolutionsRef.current) {
+      // Local date string format YYYY-MM-DD
+      const dt = new Date();
+      dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
+      const todayStr = dt.toISOString().split('T')[0];
+      
+      const missingEvolutions = appointments.filter(a => 
+        a.attendance === APPOINTMENT_STATUS.FINALIZADO && 
+        !a.hasEvolution && 
+        user?.doctor_id && 
+        a.doctorId === user.doctor_id
+      );
+      
+      if (missingEvolutions.length > 0) {
+        import('../../utils/sounds').then(({ playErrorSound }) => playErrorSound());
+        import('react-hot-toast').then(({ default: toast }) => {
+          toast.custom((t) => (
+            <div className={`${t.visible ? 'animate-fade-in-up' : 'animate-fade-out-down'} max-w-sm w-full bg-[var(--bg-card)] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-[var(--border-color)] overflow-hidden backdrop-blur-xl border border-[var(--glass-border)]`}>
+              <div className="flex-1 w-0 p-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 pt-0.5">
+                    <AlertCircle className="h-10 w-10 text-rose-500 p-2 bg-rose-500/10 rounded-xl" />
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <p className="text-[10px] font-black text-rose-500 uppercase tracking-wider mb-1">Evoluciones Pendientes</p>
+                    <p className="text-sm text-[var(--text-primary)] font-bold">
+                      Tienes {missingEvolutions.length} evolución(es) médica(s) pendiente(s) por completar.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex border-l border-[var(--border-color)]/20 bg-[var(--bg-sidebar)]/50">
+                <button
+                  onClick={() => toast.dismiss(t.id)}
+                  className="w-full border border-transparent rounded-none rounded-r-2xl px-4 flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-light)] transition-colors focus:outline-none"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          ), { duration: 8000, position: 'top-right' });
+        });
+      }
+      hasNotifiedEvolutionsRef.current = true;
+    }
+  }, [appointments, appointmentsLoading]);
 
   // Reference for previous waiting apps to detect new arrivals globally
 
@@ -121,7 +174,7 @@ export default function DashboardLayout({ onLogout }) {
       socket.connect();
     }
 
-    const handlePatientEntered = (data) => {
+    const handlePatientEntered = () => {
       // Disparar refetch inmediato cuando un paciente entra a la sala de espera virtual
       fetchAppointments(null, true);
     };
@@ -288,9 +341,17 @@ export default function DashboardLayout({ onLogout }) {
           onClick={() => setOpen(false)}
           className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-3 transition-all group hover:border-[var(--accent-primary)]"
         >
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-xs shrink-0 ${role.dotColor}`}>
-            {initials}
-          </div>
+          {user?.profile_picture ? (
+            <img 
+              src={user.profile_picture} 
+              alt="Perfil" 
+              className="w-9 h-9 rounded-xl object-cover shrink-0 border border-[var(--border-color)]"
+            />
+          ) : (
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-xs shrink-0 ${role.dotColor}`}>
+              {initials}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-bold text-[var(--text-primary)] truncate leading-tight transition-colors">{name}</p>
             <span
@@ -342,7 +403,7 @@ export default function DashboardLayout({ onLogout }) {
   );
 
   return (
-    <div className="min-h-screen flex font-sans text-[var(--text-primary)] print:block print:bg-white">
+    <div className="h-[100dvh] overflow-hidden flex font-sans text-[var(--text-primary)] print:block print:bg-white print:h-auto print:overflow-visible">
 
       {/* Mobile overlay */}
       {open && (
@@ -367,7 +428,7 @@ export default function DashboardLayout({ onLogout }) {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden print:block print:overflow-visible">
 
         {/* Header */}
-        <header className="h-16 lg:h-[4.5rem] bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between px-4 sm:px-8 z-30 sticky top-0 print:hidden gap-4">
+        <header className="h-16 lg:h-[4.5rem] bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between px-4 sm:px-8 z-50 sticky top-0 print:hidden gap-4 shadow-sm">
           <div className="flex items-center gap-4">
             <button
               className="lg:hidden p-3 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--border-color)] rounded-xl transition-colors"
@@ -409,21 +470,12 @@ export default function DashboardLayout({ onLogout }) {
             {/* Notifications */}
             <NotificationCenter />
 
-            {/* CTA */}
-            {userRole !== 'medico' && (
-              <button
-                onClick={() => navigate('/dashboard/agenda?new=true')}
-                className="hidden sm:flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-[13px] font-bold rounded-xl transition-all shadow-lg shadow-sky-500/10"
-              >
-                <Plus size={15} />
-                Nuevo Turno
-              </button>
-            )}
+            {/* CTA removido */}
           </div>
         </header>
 
         {/* Page content: pb extra en mobile para que el bottom nav no tape el contenido */}
-        <div className="flex-1 overflow-auto p-3 sm:p-6 lg:p-8 lg:pb-8"
+        <div className="flex-1 overflow-auto p-3 sm:p-6 lg:p-8 lg:pb-8 custom-scrollbar"
           style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}
         >
           <div className="max-w-full mx-auto space-y-4 sm:space-y-6 animate-fade-in-quick">

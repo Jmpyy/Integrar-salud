@@ -2,7 +2,7 @@ import { patientsService } from '../../services/patients';
 import { filesService } from '../../services/files';
 import logger from '../../utils/logger';
 
-export const createPatientsSlice = (set) => ({
+export const createPatientsSlice = (set, get) => ({
   patients: [],
   patientsLoading: false,
   patientsError: null,
@@ -81,6 +81,10 @@ export const createPatientsSlice = (set) => ({
     return newFile;
   },
 
+  downloadFile: async (patientId, fileId) => {
+    return await filesService.downloadFile(patientId, fileId);
+  },
+
   deleteFile: async (patientId, fileId) => {
     await filesService.deleteFile(patientId, fileId);
     set((state) => ({
@@ -99,6 +103,23 @@ export const createPatientsSlice = (set) => ({
         return p;
       })
     }));
+
+    // Update local appointments state to remove "Falta Evolución" badge
+    const storeAppointments = get().appointments || [];
+    const dateStr = (entry.date || entry.created_at || '').split(' ')[0].split('T')[0];
+    const docId = Number(entry.doctor_id || entryData.doctorId);
+    
+    if (storeAppointments.length > 0) {
+      set({
+        appointments: storeAppointments.map(app => {
+          if (Number(app.patientId) === Number(patientId) && Number(app.doctorId) === docId && app.date === dateStr) {
+            return { ...app, hasEvolution: true };
+          }
+          return app;
+        })
+      });
+    }
+
     return entry;
   },
 

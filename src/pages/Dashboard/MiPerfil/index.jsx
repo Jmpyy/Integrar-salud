@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../../../stores/useStore';
 import { authService } from '../../../services/auth';
 import { toast } from 'react-hot-toast';
 import {
   User, Lock, Shield, Eye, EyeOff,
-  CheckCircle2, AlertCircle, Save, KeyRound, Mail, BadgeCheck
+  CheckCircle2, AlertCircle, Save, KeyRound, Mail, BadgeCheck, Camera, Loader2
 } from 'lucide-react';
 
 const ROLE_META = {
@@ -76,6 +76,90 @@ export default function MiPerfilPage() {
     }
   };
 
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Cargar el script de Cloudinary dinámicamente si no está presente
+  useEffect(() => {
+    if (!document.getElementById('cloudinary-script')) {
+      const script = document.createElement('script');
+      script.id = 'cloudinary-script';
+      script.src = 'https://upload-widget.cloudinary.com/global/all.js';
+      script.type = 'text/javascript';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  const handleAvatarUpload = () => {
+    if (!window.cloudinary) {
+      return toast.error('El editor de imágenes está cargando. Intenta en un momento.');
+    }
+
+    const widget = window.cloudinary.createUploadWidget({
+      cloudName: 'IntegrarSalud',
+      uploadPreset: 'Img_salud',
+      sources: ['local', 'camera'],
+      multiple: false,
+      cropping: true,
+      croppingAspectRatio: 1,
+      showSkipCropButton: false,
+      resourceType: 'image',
+      clientAllowedFormats: ['png', 'jpg', 'jpeg', 'webp', 'gif'],
+      maxImageFileSize: 5000000,
+      language: 'es',
+      text: {
+        es: {
+          or: 'O',
+          menu: { files: 'Mis Archivos', camera: 'Cámara' },
+          local: { browse: 'Seleccionar', dd_title_single: 'Arrastra tu imagen aquí' },
+          camera: { capture: 'Capturar', cancel: 'Cancelar', take_pic: 'Tomar foto y recortar' },
+          crop: { title: 'Recortar foto', crop_btn: 'Recortar', skip_btn: 'Saltar' }
+        }
+      }
+    }, async (error, result) => {
+      if (!error && result && result.event === "success") {
+        setUploadingAvatar(true);
+        try {
+          let optimizedUrl = result.info.secure_url;
+          const parts = optimizedUrl.split('/upload/');
+          
+          // Si el usuario usó la herramienta de recorte, extraemos las coordenadas
+          if (result.info.coordinates && result.info.coordinates.custom && result.info.coordinates.custom.length > 0) {
+            const crop = result.info.coordinates.custom[0];
+            // crop is usually an array [x, y, width, height]
+            const x = Math.round(crop[0]);
+            const y = Math.round(crop[1]);
+            const w = Math.round(crop[2]);
+            const h = Math.round(crop[3]);
+            // Aplicar recorte manual y luego redimensionar a 250x250
+            optimizedUrl = `${parts[0]}/upload/c_crop,x_${x},y_${y},w_${w},h_${h}/c_fill,w_250,h_250,f_auto,q_auto/${parts[1]}`;
+          } else {
+            // Si no hay recorte manual, usar IA para centrar la cara
+            optimizedUrl = `${parts[0]}/upload/c_thumb,g_face,w_250,h_250,f_auto,q_auto/${parts[1]}`;
+          }
+          
+          // Enviar el nombre también para evitar el error 400 del backend
+          await authService.updateProfile(user.id, { 
+            name: user?.name || '', 
+            profile_picture: optimizedUrl 
+          });
+          
+          if (setUser) {
+            setUser({ ...user, profile_picture: optimizedUrl });
+          }
+          toast.success('Foto de perfil actualizada correctamente.');
+        } catch (err) {
+          console.error('Avatar upload error:', err);
+          toast.error(err.response?.data?.message || 'Error al actualizar foto de perfil');
+        } finally {
+          setUploadingAvatar(false);
+        }
+      }
+    });
+
+    widget.open();
+  };
+
   // ── Password form ──
   const [currentPwd,  setCurrentPwd]  = useState('');
   const [newPwd,      setNewPwd]      = useState('');
@@ -133,9 +217,35 @@ export default function MiPerfilPage() {
   return (
     <div className="space-y-6 max-w-4xl animate-fade-in-quick">
       <div className="glass-effect rounded-3xl p-6 shadow-[var(--glass-shadow)] border border-[var(--glass-border)] flex flex-col sm:flex-row items-center sm:items-start gap-6">
-        <div className={`w-20 h-20 rounded-3xl ${role.color} flex items-center justify-center text-white font-black text-3xl shadow-lg shrink-0`}>
-          {initials}
+        
+        <div className="relative group shrink-0">
+          {user?.profile_picture ? (
+            <img 
+              src={user.profile_picture} 
+              alt="Perfil" 
+              className={`w-20 h-20 rounded-3xl object-cover shadow-lg border border-[var(--border-color)]/50 ${uploadingAvatar ? 'opacity-50' : ''}`}
+            />
+          ) : (
+            <div className={`w-20 h-20 rounded-3xl ${role.color} flex items-center justify-center text-white font-black text-3xl shadow-lg ${uploadingAvatar ? 'opacity-50' : ''}`}>
+              {initials}
+            </div>
+          )}
+          
+          <div 
+            onClick={!uploadingAvatar ? handleAvatarUpload : undefined}
+            className="absolute inset-0 bg-black/50 text-white rounded-3xl opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-all backdrop-blur-sm"
+          >
+            {uploadingAvatar ? (
+              <Loader2 size={24} className="animate-spin" />
+            ) : (
+              <>
+                <Camera size={24} className="mb-1 drop-shadow-md" />
+                <span className="text-[9px] font-black uppercase tracking-wider text-center px-1">Cambiar<br/>Foto</span>
+              </>
+            )}
+          </div>
         </div>
+
         <div className="flex-1 text-center sm:text-left">
           <h2 className="text-2xl font-black text-[var(--text-primary)]">{user?.name || 'Mi cuenta'}</h2>
           <p className="text-sm text-[var(--text-secondary)] font-medium mt-0.5 flex items-center justify-center sm:justify-start gap-1.5">

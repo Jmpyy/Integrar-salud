@@ -1,7 +1,7 @@
-# 🎨 Integrar Salud | Frontend Premium v2.0
-> **SaaS Interface v2.0** - Experiencia de usuario de alta fidelidad para gestión médica.
+# 🎨 Integrar Salud | Frontend Premium v3.0
+> **SaaS Interface v3.0** - Experiencia de usuario de alta fidelidad, extrema seguridad y gestión médica.
 
-Este repositorio contiene la interfaz de usuario (Frontend) de **Integrar Salud**, desarrollada con las tecnologías más modernas para garantizar velocidad, fluidez y una estética premium. En esta versión 2.0, el sistema ha sido ampliado para cubrir todas las necesidades operativas de un consultorio o centro médico.
+Este repositorio contiene la interfaz de usuario (Frontend) de **Integrar Salud**, desarrollada con las tecnologías más modernas para garantizar velocidad, fluidez y una estética premium. En esta versión 3.0, el sistema da un salto generacional en materia de seguridad, integrando arquitecturas modernas para proteger la información médica y optimizando el flujo de trabajo en tiempo real.
 
 ---
 
@@ -19,12 +19,14 @@ Este repositorio contiene la interfaz de usuario (Frontend) de **Integrar Salud*
 
 ---
 
-## 🛠️ Novedades y Optimización (Última Versión)
-- **Sala Virtual Ultra-Estable:** Refactorización del flujo de conexión WebSocket para las videollamadas, eliminando condiciones de carrera y asegurando un salto instantáneo desde la sala de espera hacia la consulta activa.
-- **Motor de Reseñas Post-Consulta:** Sistema inteligente que califica la atención e incentiva las reseñas en Google Maps, derivando los casos negativos (alertas de crisis) directamente a administración.
-- **Facturación AFIP Nativa:** Integración visual fluida en el módulo de Finanzas para generar comprobantes electrónicos en 1-click.
-- **Performance & Caching:** Implementación de Code-Splitting extremo (React.lazy) y `Vendor Chunk Splitting` en Vite, reduciendo el peso de carga inicial y mejorando radicalmente la velocidad de las actualizaciones en navegadores móviles.
-- **Auditoría de Roles:** Ajustes visuales estrictos en el Dashboard que se sincronizan con las nuevas reglas RBAC del backend, restringiendo las acciones no autorizadas para los profesionales médicos.
+## 🛠️ Novedades de Arquitectura y Seguridad (Versión 3.0)
+- **Migración a HttpOnly Cookies:** Arquitectura Zero-Trust que elimina por completo el uso de `localStorage` para tokens de acceso, mitigando vulnerabilidades críticas de robo de sesión (XSS).
+- **WebSockets Ultra-Seguros:** Sincronización en tiempo real mejorada. El servidor Node.js ahora autentica automáticamente extrayendo tokens directamente de las cookies seguras (con `withCredentials: true`), manteniendo la seguridad sin fricciones.
+- **Auditoría de Roles y Permisos (RBAC):** Ajustes visuales estrictos en el Dashboard que se sincronizan con las nuevas reglas del backend, restringiendo las acciones no autorizadas.
+- **Sala Virtual Ultra-Estable:** Refactorización del flujo de conexión WebSocket para las videollamadas, eliminando condiciones de carrera.
+- **Motor de Reseñas Post-Consulta:** Sistema inteligente que califica la atención e incentiva reseñas en Google Maps, derivando casos negativos a administración.
+- **Facturación AFIP Nativa:** Integración visual fluida en Finanzas para comprobantes electrónicos en 1-click.
+- **Atajos Inteligentes de Evolución:** Flujo de redacción de "Evolución Olvidada" integrado en la Agenda que agiliza drásticamente el trabajo de los médicos.
 
 ---
 

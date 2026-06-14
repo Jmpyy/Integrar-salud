@@ -43,7 +43,7 @@ const DOT = {
 
 export default function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
-  const { appointments } = useStore();
+  const { appointments, user } = useStore();
 
   const todayStr = toLocalDateStr();
   const now      = new Date();
@@ -118,7 +118,25 @@ export default function NotificationCenter() {
       });
     }
 
-    /* 4. If no active alert but appointments exist — general summary */
+    /* 4. Missing evolutions */
+    const missingEvo = (appointments || []).filter(
+      a => a && a.id && !a.isBlock && a.attendance === APPOINTMENT_STATUS.FINALIZADO && !a.hasEvolution && user?.doctor_id && a.doctorId === user.doctor_id
+    );
+    if (missingEvo.length > 0) {
+      items.push({
+        id:       'missing-evo',
+        type:     'warning',
+        category: 'Evoluciones Pendientes',
+        Icon:     AlertTriangle,
+        title:    `Faltan ${missingEvo.length} evolución(es) médica(s)`,
+        detail:   missingEvo.slice(0, 3).map(a => a.patient).join(', ')
+                    + (missingEvo.length > 3 ? ` y ${missingEvo.length - 3} más` : ''),
+        to:       '/dashboard/consultorio',
+        cta:      'Completar Evoluciones',
+      });
+    }
+
+    /* 5. If no active alert but appointments exist — general summary */
     if (items.length === 0 && todayApps.length > 0) {
       const done = todayApps.filter(a => a.attendance === APPOINTMENT_STATUS.FINALIZADO).length;
       items.push({
@@ -134,7 +152,7 @@ export default function NotificationCenter() {
     }
 
     return items;
-  }, [appointments, todayStr, now]);
+  }, [appointments, todayStr, now, user?.doctor_id]);
 
   const urgentCount = notifications.filter(n => n.type === 'danger' || n.type === 'warning').length;
 

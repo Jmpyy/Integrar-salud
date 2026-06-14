@@ -65,10 +65,8 @@ export const createAuthSlice = (set, get) => ({
         set({ user, userRole: getNormalizedRole(user.role), isAuthenticated: true });
       } catch {
         // Token inválido o expirado → limpiar COMPLETAMENTE (estado + storage)
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('refresh_token');
-        sessionStorage.removeItem('auth_token');
-        sessionStorage.removeItem('refresh_token');
+        localStorage.removeItem('has_session');
+        sessionStorage.removeItem('has_session');
         set({ user: null, userRole: null, isAuthenticated: false });
       }
     },

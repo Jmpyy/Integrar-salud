@@ -102,7 +102,15 @@ export default function PacientesPage() {
     return (
       <PatientHistoryViewer
         patient={selectedPatient}
-        onBack={() => setSelectedPatient(null)}
+        onBack={() => {
+          setSelectedPatient(null);
+          const newParams = new URLSearchParams(searchParams);
+          newParams.delete('action');
+          newParams.delete('date');
+          setSearchParams(newParams, { replace: true });
+        }}
+        initialAction={searchParams.get('action')}
+        initialDate={searchParams.get('date')}
       />
     );
   }
@@ -156,43 +164,43 @@ export default function PacientesPage() {
         </div>
 
         {/* QUICK STATS CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="card-premium p-6 border border-[var(--glass-border)] flex items-center gap-5 hover:-translate-y-1 transition-all">
-            <div className="w-14 h-14 bg-indigo-500/10 text-indigo-600 rounded-2xl flex items-center justify-center shadow-inner">
-               <Users size={24} />
+        <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto hide-scrollbar snap-x pb-2 sm:pb-0">
+          <div className="card-premium p-4 sm:p-6 border border-[var(--glass-border)] flex items-center gap-4 sm:gap-5 hover:-translate-y-1 transition-all shrink-0 min-w-[160px] sm:min-w-0 snap-start">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-indigo-500/10 text-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner shrink-0">
+               <Users size={20} className="sm:w-6 sm:h-6" />
             </div>
             <div>
-               <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1">Total Pacientes</p>
-               <h4 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">{totalItems}</h4>
+               <p className="text-[9px] sm:text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-0.5 sm:mb-1">Total Pacientes</p>
+               <h4 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">{totalItems}</h4>
             </div>
           </div>
-          <div className="card-premium p-6 border border-[var(--glass-border)] flex items-center gap-5 hover:-translate-y-1 transition-all">
-            <div className="w-14 h-14 bg-emerald-500/10 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
-               <UserCheck size={24} />
+          <div className="card-premium p-4 sm:p-6 border border-[var(--glass-border)] flex items-center gap-4 sm:gap-5 hover:-translate-y-1 transition-all shrink-0 min-w-[160px] sm:min-w-0 snap-start">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-emerald-500/10 text-emerald-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner shrink-0">
+               <UserCheck size={20} className="sm:w-6 sm:h-6" />
             </div>
             <div>
-               <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1">Con Cobertura</p>
-               <h4 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">
+               <p className="text-[9px] sm:text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-0.5 sm:mb-1">Con Cobertura</p>
+               <h4 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">
                  {patients.filter(p => p.coverage !== 'Particular').length * (totalPages || 1)}+
                </h4>
             </div>
           </div>
-          <div className="card-premium p-6 border border-[var(--glass-border)] flex items-center gap-5 hover:-translate-y-1 transition-all">
-            <div className="w-14 h-14 bg-rose-500/10 text-rose-600 rounded-2xl flex items-center justify-center shadow-inner">
-               <HeartPulse size={24} />
+          <div className="card-premium p-4 sm:p-6 border border-[var(--glass-border)] flex items-center gap-4 sm:gap-5 hover:-translate-y-1 transition-all shrink-0 min-w-[160px] sm:min-w-0 snap-start">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-rose-500/10 text-rose-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner shrink-0">
+               <HeartPulse size={20} className="sm:w-6 sm:h-6" />
             </div>
             <div>
-               <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1">Promedio Edad</p>
-               <h4 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">38.4 <span className="text-sm font-bold opacity-30 italic">Años</span></h4>
+               <p className="text-[9px] sm:text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-0.5 sm:mb-1">Promedio Edad</p>
+               <h4 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">38.4 <span className="text-[10px] sm:text-sm font-bold opacity-30 italic">Años</span></h4>
             </div>
           </div>
-          <div className="card-premium p-6 border border-[var(--glass-border)] flex items-center gap-5 hover:-translate-y-1 transition-all">
-            <div className="w-14 h-14 bg-amber-500/10 text-amber-600 rounded-2xl flex items-center justify-center shadow-inner">
-               <FileText size={24} />
+          <div className="card-premium p-4 sm:p-6 border border-[var(--glass-border)] flex items-center gap-4 sm:gap-5 hover:-translate-y-1 transition-all shrink-0 min-w-[160px] sm:min-w-0 snap-start">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-amber-500/10 text-amber-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner shrink-0">
+               <FileText size={20} className="sm:w-6 sm:h-6" />
             </div>
             <div>
-               <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1">Evoluciones hoy</p>
-               <h4 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">12</h4>
+               <p className="text-[9px] sm:text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-0.5 sm:mb-1">Evoluciones hoy</p>
+               <h4 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">12</h4>
             </div>
           </div>
         </div>

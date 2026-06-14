@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ShieldAlert, HeartPulse, AlertCircle, FileText, ChevronRight, Calendar, User, Wallet, CheckCircle2, Clock, Pencil, X, Save, Plus, Trash2, Download, Smartphone, File, Trash, Activity, RefreshCw } from 'lucide-react';
 import { calculateAge, formatDateTime, formatDate } from '../../utils/helpers';
 import { useStore } from '../../stores/useStore';
@@ -26,7 +27,8 @@ const FARMACOS_AR = [
 export default function PatientHistoryViewer({
   patient,
   onBack,
-  showEditActions = false,
+  initialAction,
+  initialDate,
 }) {
   const store = useStore();
   const doctors = store.doctors || [];
@@ -34,6 +36,12 @@ export default function PatientHistoryViewer({
 
   // Fuente de verdad: buscar el paciente en el store global para tener reactividad
   const storePatient = store.patients.find(p => p.id === patient?.id) || patient;
+
+  // Auto-detect logged-in doctor
+  const loggedInDoctor = doctors.find(d => 
+    (store.user?.doctor_id && Number(d.id) === Number(store.user.doctor_id)) ||
+    (d.name === store.user?.name)
+  );
 
   const activeHistory = storePatient?.history || [];
   const activeMedications = (storePatient?.medications || []).filter(m => Number(m.active) !== 0);
@@ -49,7 +57,11 @@ export default function PatientHistoryViewer({
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [isAddingMed, setIsAddingMed] = useState(false);
-  const [activeDoctorId, setActiveDoctorId] = useState(null);
+  const [activeDoctorId, setActiveDoctorId] = useState(() => {
+    if (loggedInDoctor) return loggedInDoctor.id;
+    if (doctors.length > 0) return doctors[0].id;
+    return null;
+  });
 
   const [editFormData, setEditFormData] = useState({
     name: normPatient.name || '',
@@ -72,13 +84,27 @@ export default function PatientHistoryViewer({
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState(null);
 
-  const [soapData, setSoapData] = useState({
-    subjective: '',
-    objective: '',
-    analysis: '',
-    plan: '',
-    date: new Date().toISOString().split('T')[0] + 'T' + new Date().toTimeString().slice(0,5),
+  const [soapData, setSoapData] = useState({ 
+    subjective: '', 
+    objective: '', 
+    analysis: '', 
+    plan: '', 
+    date: formatDateTime(new Date()) 
   });
+
+  // Handle initialization from Agenda shortcuts
+  useEffect(() => {
+    if (initialAction === 'add_evolution') {
+      setIsAddingNote(true);
+      if (initialDate) {
+        setSoapData(prev => ({ ...prev, date: initialDate }));
+      }
+      setTimeout(() => {
+        document.getElementById('subjective')?.focus();
+      }, 100);
+    }
+  }, [initialAction, initialDate]);
+
   // Secciones libres adicionales: [{ title, content }]
   const [extraSections, setExtraSections] = useState([]);
   const [confirmConfig, setConfirmConfig] = useState({ 
@@ -97,19 +123,7 @@ export default function PatientHistoryViewer({
   });
   const [availableDoses, setAvailableDoses] = useState([]);
 
-  // Auto-detect logged-in doctor
-  const loggedInDoctor = doctors.find(d => 
-    (store.user?.doctor_id && Number(d.id) === Number(store.user.doctor_id)) ||
-    (d.name === store.user?.name)
-  );
 
-  // 1. Efecto para inicializar el médico activo (solo una vez o cuando cambie la lista de médicos)
-  useEffect(() => {
-    if (!activeDoctorId) {
-      if (loggedInDoctor) setActiveDoctorId(loggedInDoctor.id);
-      else if (doctors.length > 0) setActiveDoctorId(doctors[0].id);
-    }
-  }, [doctors, loggedInDoctor, activeDoctorId]);
 
   // 2. Efecto para cargar archivos (solo cuando cambie el ID del paciente)
   useEffect(() => {
@@ -190,7 +204,7 @@ export default function PatientHistoryViewer({
           await store.deleteHistoryEntry(patient.id, entryId);
           toast.success('Entrada eliminada');
           setConfirmConfig(prev => ({ ...prev, open: false }));
-        } catch (err) {
+        } catch {
           toast.error('Error al eliminar');
         }
       }
@@ -222,10 +236,6 @@ export default function PatientHistoryViewer({
       const freshPatient = await patientsService.getById(patient.id);
       if (freshPatient) {
         store.updatePatient(patient.id, freshPatient);
-        // Actualizar el objeto local que se está mostrando
-        if (freshPatient.medications) {
-          patient.medications = freshPatient.medications;
-        }
       }
       setIsAddingMed(false);
       setMedData({ drug: '', dose: '', frequency: '' });
@@ -248,8 +258,8 @@ export default function PatientHistoryViewer({
           await store.suspendMedication(patient.id, medId);
           toast.success('Medicación suspendida');
           setConfirmConfig(prev => ({ ...prev, open: false }));
-        } catch (err) {
-          toast.error('Error al suspender');
+        } catch {
+          toast.error('Error al suspender medicación');
         }
       }
     });
@@ -277,105 +287,136 @@ export default function PatientHistoryViewer({
 
   return (
     <>
-      <div className="flex flex-col h-[calc(100vh-8rem)] animate-fade-in-quick">
-        {/* CABECERA CLÍNICA */}
-        <div className="glass-effect p-4 sm:p-5 rounded-3xl shadow-[var(--glass-shadow)] border border-[var(--glass-border)] shrink-0 mb-4 sm:mb-6 relative overflow-hidden flex flex-col md:flex-row gap-4 sm:gap-6 items-start md:items-center justify-between">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[var(--accent-light)] rounded-full blur-3xl opacity-20 -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+      <div className="flex flex-col h-full animate-fade-in-quick pb-24 md:pb-0">
+        {/* CABECERA CLÍNICA - STICKY (INFO) */}
+        <div className="bg-slate-900/95 backdrop-blur-xl p-3 sm:p-6 md:rounded-[32px] border-b md:border border-white/5 shrink-0 mb-0 md:mb-8 relative flex flex-col md:flex-row gap-4 sm:gap-6 items-start md:items-center justify-between shadow-lg md:shadow-sm overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--accent-primary)] rounded-full blur-[100px] opacity-10 -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
-          <div className="flex items-center gap-3 sm:gap-4 relative z-10 w-full md:w-auto">
+          <div className="flex items-center gap-3 sm:gap-5 relative z-10 w-full md:w-auto">
             <button
               onClick={onBack}
-              className="p-2.5 sm:p-3 bg-[var(--bg-main)] hover:bg-[var(--accent-light)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] rounded-2xl transition-colors shrink-0 outline-none border border-[var(--border-color)]"
+              className="p-2 sm:p-3.5 bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-white rounded-[12px] sm:rounded-[14px] transition-colors shrink-0 outline-none border border-white/5"
               aria-label="Volver a la lista de pacientes"
             >
               <ChevronRight size={20} className="sm:w-6 sm:h-6 rotate-180" />
             </button>
-            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-hover)] border border-[var(--glass-border)] rounded-2xl flex items-center justify-center text-white font-black text-xl sm:text-2xl shadow-lg shrink-0">
+            <div className="w-10 h-10 sm:w-16 sm:h-16 bg-gradient-to-b from-slate-700 to-slate-800 border border-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center text-white font-black text-lg sm:text-3xl shadow-lg shrink-0">
               {normPatient?.name?.charAt(0) || '?'}
             </div>
-            <div>
+            <div className="space-y-0.5 sm:space-y-1">
               <div className="flex items-center gap-2 sm:gap-3">
-                <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] leading-none tracking-tight">{normPatient.name}</h2>
-                <span className="px-2 py-0.5 bg-[var(--accent-light)] text-[var(--accent-primary)] text-[9px] sm:text-[10px] uppercase font-black tracking-wider rounded border border-[var(--border-color)] shadow-sm">
+                <h2 className="text-lg sm:text-3xl font-black text-white leading-none tracking-tight drop-shadow-md">{normPatient.name}</h2>
+                <span className="px-1.5 py-0.5 bg-slate-500/20 text-slate-300 text-[9px] sm:text-[10px] uppercase font-bold tracking-[0.2em] rounded border border-white/5 hidden sm:inline-block">
                   {normPatient.nhc || "NHC N/D"}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] mt-1 flex items-center gap-2 tracking-wide opacity-80">
-                DNI {normPatient.dni || "S/D"} • <span className="text-[var(--text-primary)] font-bold">{calculateAge(normPatient.birthDate) ?? 'N/D'} Años</span>
+              <p className="text-[11px] sm:text-[13px] font-medium text-slate-400 flex items-center gap-1.5 sm:gap-2 tracking-wide mt-1 sm:mt-1.5">
+                DNI {normPatient.dni || "S/D"} 
+                <span className="w-1 h-1 rounded-full bg-slate-600 hidden sm:inline-block"></span> 
+                <span className="text-slate-300 font-bold">{calculateAge(normPatient.birthDate) ?? 'N/D'} Años</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 relative z-10">
+          {/* ACCIONES - DESKTOP */}
+          <div className="hidden md:flex flex-wrap md:flex-nowrap items-center gap-3 relative z-10 w-full md:w-auto mt-2 md:mt-0">
             <button
               onClick={() => setIsAddingNote(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[var(--accent-primary)] text-white rounded-xl font-black text-xs transition-all shadow-lg hover:bg-[var(--accent-hover)] hover:-translate-y-0.5"
+              className="flex-1 md:flex-none justify-center flex items-center gap-2 px-6 py-3 bg-[var(--accent-primary)] text-white rounded-[14px] font-bold text-[13px] transition-all shadow-[0_4px_20px_-4px_var(--accent-primary)] hover:bg-[var(--accent-hover)] hover:-translate-y-0.5 active:scale-95 whitespace-nowrap"
             >
-              <FileText size={14} />
+              <FileText size={16} />
               Nueva Evolución
             </button>
 
             <button
               onClick={() => setIsEditingInfo(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] hover:border-[var(--accent-primary)] rounded-xl font-black text-xs transition-all shadow-sm group"
+              className="flex-1 md:flex-none justify-center flex items-center gap-2 px-5 py-3 bg-slate-800/50 border border-white/5 text-slate-300 hover:text-white hover:bg-slate-700/50 hover:border-white/10 rounded-[14px] font-bold text-[13px] transition-all group active:scale-95 whitespace-nowrap"
             >
-              <Pencil size={14} className="group-hover:rotate-12 transition-transform" />
+              <Pencil size={14} className="group-hover:-translate-y-0.5 transition-transform" />
               Editar Ficha
             </button>
             
-            <div className="w-px h-8 bg-[var(--border-color)] mx-1 hidden md:block opacity-50"></div>
+            <div className="w-px h-10 bg-white/10 mx-2 hidden lg:block"></div>
 
-            <div className="w-full md:w-64 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl p-3 flex flex-col justify-center min-h-[4rem]">
-              <div className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest mb-1 pl-1 opacity-70">
+            <div className="w-full lg:w-64 bg-slate-900/50 border border-white/5 rounded-[18px] p-3.5 flex flex-col justify-center min-h-[4.5rem] shadow-inner shrink-0">
+              <div className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-1 pl-1">
                 Diagnóstico Principal
               </div>
-              <div className="px-1 text-sm font-bold text-[var(--text-primary)] break-words line-clamp-2">
-                {storePatient.diagnosis || <span className="text-[var(--text-secondary)] italic opacity-40">No especificado</span>}
+              <div className="px-1 text-sm font-medium text-slate-200 break-words line-clamp-2">
+                {storePatient.diagnosis || <span className="text-slate-600 italic">No especificado</span>}
               </div>
             </div>
           </div>
         </div>
 
-        {/* --- NUEVO: PESTAÑAS DE NAVEGACIÓN INTERNA --- */}
-        <div className="flex items-center gap-2 mb-6 bg-[var(--bg-sidebar)]/30 p-1.5 rounded-2xl border border-[var(--border-color)]/30 w-fit">
+        {/* ACCIONES - MOBILE */}
+        <div className="md:hidden flex flex-wrap items-center gap-3 py-4 shrink-0">
+          <button
+            onClick={() => setIsAddingNote(true)}
+            className="flex-1 justify-center flex items-center gap-2 px-4 py-3 bg-[var(--accent-primary)] text-white rounded-[14px] font-bold text-[13px] shadow-[0_4px_15px_-4px_var(--accent-primary)] active:scale-95 whitespace-nowrap"
+          >
+            <FileText size={16} />
+            Nueva Evolución
+          </button>
+
+          <button
+            onClick={() => setIsEditingInfo(true)}
+            className="flex-1 justify-center flex items-center gap-2 px-4 py-3 bg-slate-800/50 border border-white/5 text-slate-300 rounded-[14px] font-bold text-[13px] active:scale-95 whitespace-nowrap"
+          >
+            <Pencil size={14} />
+            Editar Ficha
+          </button>
+          
+          <div className="w-full bg-slate-900/50 border border-white/5 rounded-[16px] p-3.5 flex flex-col justify-center min-h-[4rem] shadow-inner mt-1">
+            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-1 pl-1">
+              Diagnóstico Principal
+            </div>
+            <div className="px-1 text-sm font-medium text-slate-200 break-words line-clamp-2">
+              {storePatient.diagnosis || <span className="text-slate-600 italic">No especificado</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* --- PESTAÑAS DE NAVEGACIÓN INTERNA --- */}
+        <div className="flex items-center gap-1 mb-6 bg-slate-800/40 p-1.5 rounded-2xl border border-white/5 w-fit shadow-inner">
           <button 
             onClick={() => setActiveTab('history')} 
-            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-[var(--accent-primary)] text-white shadow-lg' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
+            className={`px-6 py-2.5 rounded-[12px] text-xs font-bold uppercase tracking-[0.1em] transition-all ${activeTab === 'history' ? 'bg-slate-700/80 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
           >
             Historial & SOAP
           </button>
           <button 
             onClick={() => setActiveTab('files')} 
-            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'files' ? 'bg-[var(--accent-primary)] text-white shadow-lg' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
+            className={`px-6 py-2.5 rounded-[12px] text-xs font-bold uppercase tracking-[0.1em] transition-all flex items-center gap-2 ${activeTab === 'files' ? 'bg-slate-700/80 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
           >
             Estudios y Archivos
-            {store.patientFiles.length > 0 && <span className="bg-white/20 px-1.5 py-0.5 rounded-md text-[9px]">{store.patientFiles.length}</span>}
+            {store.patientFiles.length > 0 && <span className="bg-slate-600/50 border border-white/10 px-2 py-0.5 rounded text-[10px]">{store.patientFiles.length}</span>}
           </button>
         </div>
 
         {/* CUERPO: Alergias + Historia + Medicación */}
-        <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
           {/* LATERAL IZQUIERDO: Alertas */}
           <div className="w-full lg:w-72 shrink-0 space-y-4">
             <AllergyCard patient={storePatient} />
 
-            <div className="card-premium p-5 space-y-1 border border-[var(--glass-border)]">
-              <div className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-widest mb-3 flex items-center gap-1.5 opacity-70">
-                <HeartPulse size={14} /> Cobertura y OS
+            <div className="bg-slate-800/40 p-6 rounded-[24px] space-y-2 border border-white/5 shadow-sm hover:border-white/10 transition-colors">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                <HeartPulse size={14} className="text-emerald-500" /> Cobertura y OS
               </div>
-              <div className="font-black text-lg text-[var(--text-primary)] tracking-tight">{storePatient.coverage}</div>
+              <div className="font-bold text-xl text-slate-200 tracking-tight">{storePatient.coverage}</div>
               {(storePatient.coverage_number || storePatient.plan) && (
-                <div className="font-bold text-xs mt-1 text-[var(--text-secondary)] font-mono tracking-wider opacity-80">
-                  {storePatient.coverage_number} {storePatient.plan && `• ${storePatient.plan}`}
+                <div className="font-medium text-[13px] text-slate-400 font-mono tracking-widest">
+                  {storePatient.coverage_number} {storePatient.plan && <span className="text-slate-600"> / {storePatient.plan}</span>}
                 </div>
               )}
             </div>
 
-            <div className="card-premium p-5 space-y-1 border border-[var(--glass-border)]">
-              <div className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-widest mb-3 flex items-center gap-1.5 opacity-70">
-                <AlertCircle size={14} /> Contacto de Emergencia
+            <div className="bg-slate-800/40 p-6 rounded-[24px] space-y-2 border border-white/5 shadow-sm hover:border-white/10 transition-colors">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                <AlertCircle size={14} className="text-rose-500" /> Contacto de Emergencia
               </div>
-              <div className="bg-[var(--bg-main)] px-3 py-2.5 rounded-xl font-black text-sm text-[var(--text-primary)] border border-[var(--border-color)] flex items-center gap-2 shadow-sm">
+              <div className="bg-slate-900/50 px-4 py-3.5 rounded-2xl font-medium text-[13px] text-slate-300 border border-white/5 flex items-center gap-2 shadow-inner">
                 {storePatient.emergency_contact || "No especificado"}
               </div>
             </div>
@@ -385,43 +426,45 @@ export default function PatientHistoryViewer({
           <div className="flex-1 space-y-6 min-h-0">
             {activeTab === 'history' ? (
               <>
-                <div className="card-premium border border-[var(--glass-border)] overflow-hidden">
-                  <div className="px-6 py-4 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] flex items-center gap-2">
-                    <Calendar size={18} className="text-[var(--accent-primary)]" />
-                    <h3 className="font-black text-[var(--text-primary)] uppercase text-xs tracking-widest">Línea de Tiempo Cronológica</h3>
-                    <span className="text-[10px] font-black text-[var(--text-secondary)] ml-auto opacity-70">
+                <div className="bg-slate-800/40 border border-white/5 rounded-[24px] overflow-hidden shadow-sm">
+                  <div className="px-6 py-4 border-b border-white/5 bg-slate-900/50 flex items-center gap-2">
+                    <Calendar size={18} className="text-[var(--accent-primary)] drop-shadow-md" />
+                    <h3 className="font-bold text-white uppercase text-[11px] tracking-[0.2em]">Línea de Tiempo Cronológica</h3>
+                    <span className="text-[10px] font-bold text-slate-500 ml-auto uppercase tracking-widest">
                       {timeline.length} evento{timeline.length !== 1 ? 's' : ''}
                     </span>
                   </div>
 
                   {timeline.length === 0 ? (
-                    <div className="p-12 text-center text-slate-400">
-                      <FileText size={48} className="mx-auto mb-4 text-slate-200" />
-                      <p className="font-bold text-slate-600">Sin historial registrado</p>
-                      <p className="text-sm mt-1">Aquí aparecerán todas las visitas y evoluciones médicas.</p>
+                    <div className="p-12 text-center text-slate-500">
+                      <FileText size={48} className="mx-auto mb-4 text-slate-700/50" />
+                      <p className="font-bold text-slate-400">Sin historial registrado</p>
+                      <p className="text-[13px] font-medium mt-1">Aquí aparecerán todas las visitas y evoluciones médicas.</p>
                     </div>
                   ) : (
-                    <div className="p-6 relative">
-                      <div className="absolute left-9 top-8 bottom-8 w-px bg-slate-100 pointer-events-none"></div>
+                    <div className="p-6 sm:p-8 relative">
+                      <div className="absolute left-[38px] sm:left-[46px] top-8 bottom-8 w-px bg-slate-700/50 pointer-events-none border-l border-dashed border-slate-600"></div>
                       <div className="space-y-8">
                         {timeline.map((item, idx) => {
                           if (item.timelineType === 'clinical_note') {
                             return (
-                              <div key={`note-${item.id || idx}`} className="relative pl-12">
-                                <div className="absolute left-0 top-0 w-6 h-6 rounded-full bg-indigo-600 border-4 border-white shadow-sm z-10 flex items-center justify-center">
-                                  <FileText size={10} className="text-white" />
+                              <div key={`note-${item.id || idx}`} className="relative pl-10 sm:pl-12 group/timeline">
+                                <div className="absolute left-[-2px] sm:left-0 top-0 w-8 h-8 rounded-full bg-slate-800 border-4 border-[var(--bg-card)] shadow-[0_0_0_1px_rgba(255,255,255,0.05)] z-10 flex items-center justify-center group-hover/timeline:scale-110 transition-transform">
+                                  <FileText size={12} className="text-indigo-400" />
                                 </div>
-                                <div className="card-premium border border-[var(--border-color)]/50 p-5 shadow-sm hover:shadow-md transition-shadow">
-                                  <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-8 h-8 rounded-full bg-[var(--bg-main)] text-[var(--accent-primary)] flex items-center justify-center font-black text-xs border border-[var(--border-color)]">
-                                      {item.doctorName?.split(' ').map(w => w[0]).slice(0, 2).join('') || 'DR'}
+                                <div className="bg-slate-900/50 border border-white/5 rounded-[20px] p-5 shadow-sm hover:border-white/10 hover:bg-slate-800/50 transition-all">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-[14px] bg-slate-800 border border-white/5 text-indigo-400 flex items-center justify-center font-black text-sm shrink-0">
+                                        {item.doctorName?.split(' ').map(w => w[0]).slice(0, 2).join('') || 'DR'}
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-black text-[var(--text-primary)]">Evolución Médica {item.doctorName ? `— ${item.doctorName}` : ''}</p>
+                                        <p className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-wider">{formatDateTime(item.date || item.created_at)}</p>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <p className="text-sm font-black text-[var(--text-primary)]">Evolución Médica — {item.doctorName}</p>
-                                      <p className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-wider">{formatDateTime(item.date || item.created_at)}</p>
-                                    </div>
-                                    <div className="ml-auto flex items-center gap-2 shrink-0">
-                                      <div className="flex items-center gap-1.5 p-1 bg-[var(--bg-sidebar)] rounded-xl border border-[var(--border-color)]">
+                                    <div className="w-full sm:w-auto overflow-x-auto hide-scrollbar">
+                                      <div className="flex items-center gap-1.5 p-1 bg-[var(--bg-sidebar)] rounded-xl border border-[var(--border-color)] w-max sm:w-auto">
                                         {item.isAclaracion ? (
                                           <span className="px-3 py-1.5 bg-[var(--accent-light)] text-[var(--accent-primary)] text-[10px] font-black uppercase rounded-lg border border-[var(--border-color)]/30">Aclaración</span>
                                         ) : (
@@ -432,7 +475,7 @@ export default function PatientHistoryViewer({
                                               setIsAddingNote(true);
                                               setSoapData(s => ({...s, date: new Date().toISOString().split('T')[0] + 'T' + new Date().toTimeString().slice(0,5)}));
                                             }}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[var(--accent-light)] text-[var(--accent-primary)] rounded-lg text-[10px] font-black uppercase transition-all border border-[var(--border-color)] shadow-sm"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[var(--accent-light)] text-[var(--accent-primary)] rounded-lg text-[10px] font-black uppercase transition-all border border-[var(--border-color)] shadow-sm shrink-0"
                                           >
                                             <Plus size={12} /> Aclarar
                                           </button>
@@ -440,58 +483,58 @@ export default function PatientHistoryViewer({
                                         
                                         <button 
                                           onClick={() => handleEditNote(item)}
-                                          className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-primary)] hover:bg-white rounded-lg transition-all border border-transparent hover:border-[var(--border-color)] group"
+                                          className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--text-primary)] hover:bg-white rounded-lg transition-all border border-transparent hover:border-[var(--border-color)] group shrink-0"
                                           title="Editar nota"
                                         >
                                           <Pencil size={14} className="text-[var(--accent-primary)]" />
-                                          <span className="text-[9px] font-black uppercase tracking-tighter">Editar</span>
+                                          <span className="text-[9px] font-black uppercase tracking-tighter hidden sm:inline">Editar</span>
                                         </button>
                                         <button 
                                           onClick={() => handleDeleteNote(item.id)}
-                                          className="flex items-center gap-1.5 px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-all border border-transparent hover:border-red-100 group"
+                                          className="flex items-center gap-1.5 px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-all border border-transparent hover:border-red-100 group shrink-0"
                                           title="Borrar nota"
                                         >
                                           <Trash2 size={14} />
-                                          <span className="text-[9px] font-black uppercase tracking-tighter">Borrar</span>
+                                          <span className="text-[9px] font-black uppercase tracking-tighter hidden sm:inline">Borrar</span>
                                         </button>
                                       </div>
                                     </div>
                                   </div>
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {item.subjective && (
-                                      <div className="bg-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm hover:shadow-md transition-all group/soap">
+                                      <div className="bg-slate-800/30 rounded-[18px] p-5 border border-white/5 hover:border-white/10 transition-all group/soap">
                                         <div className="flex items-center gap-2 mb-3">
-                                          <div className="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center text-[10px] font-black border border-indigo-500/20">S</div>
-                                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover/soap:text-indigo-600 transition-colors">Subjetivo</p>
+                                          <div className="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-[10px] font-black border border-indigo-500/20">S</div>
+                                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] group-hover/soap:text-indigo-400 transition-colors">Subjetivo</p>
                                         </div>
-                                        <p className="text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">{item.subjective}</p>
+                                        <p className="text-[13px] text-slate-300 leading-relaxed font-medium whitespace-pre-wrap">{item.subjective}</p>
                                       </div>
                                     )}
                                     {item.objective && (
-                                      <div className="bg-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm hover:shadow-md transition-all group/soap">
+                                      <div className="bg-slate-800/30 rounded-[18px] p-5 border border-white/5 hover:border-white/10 transition-all group/soap">
                                         <div className="flex items-center gap-2 mb-3">
-                                          <div className="w-6 h-6 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center text-[10px] font-black border border-purple-500/20">O</div>
-                                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover/soap:text-purple-600 transition-colors">Objetivo</p>
+                                          <div className="w-6 h-6 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-[10px] font-black border border-purple-500/20">O</div>
+                                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] group-hover/soap:text-purple-400 transition-colors">Objetivo</p>
                                         </div>
-                                        <p className="text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">{item.objective}</p>
+                                        <p className="text-[13px] text-slate-300 leading-relaxed font-medium whitespace-pre-wrap">{item.objective}</p>
                                       </div>
                                     )}
                                     {item.analysis && (
-                                      <div className="bg-indigo-50/50 rounded-2xl p-5 border border-indigo-100 shadow-sm hover:shadow-md transition-all group/soap">
+                                      <div className="bg-indigo-900/20 rounded-[18px] p-5 border border-indigo-500/10 hover:border-indigo-500/20 transition-all group/soap">
                                         <div className="flex items-center gap-2 mb-3">
-                                          <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black">A</div>
-                                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest group-hover/soap:text-indigo-600 transition-colors">Análisis Clínico</p>
+                                          <div className="w-6 h-6 rounded-lg bg-indigo-500 text-white flex items-center justify-center text-[10px] font-black">A</div>
+                                          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] group-hover/soap:text-indigo-300 transition-colors">Análisis Clínico</p>
                                         </div>
-                                        <p className="text-sm text-slate-800 leading-relaxed font-bold whitespace-pre-wrap">{item.analysis}</p>
+                                        <p className="text-[13px] text-slate-200 leading-relaxed font-bold whitespace-pre-wrap">{item.analysis}</p>
                                       </div>
                                     )}
                                     {item.plan && (
-                                      <div className="bg-emerald-50/50 rounded-2xl p-5 border border-emerald-100 shadow-sm hover:shadow-md transition-all group/soap">
+                                      <div className="bg-emerald-900/20 rounded-[18px] p-5 border border-emerald-500/10 hover:border-emerald-500/20 transition-all group/soap">
                                         <div className="flex items-center gap-2 mb-3">
-                                          <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">P</div>
-                                          <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest group-hover/soap:text-emerald-600 transition-colors">Plan Terapéutico</p>
+                                          <div className="w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-[10px] font-black">P</div>
+                                          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.2em] group-hover/soap:text-emerald-300 transition-colors">Plan Terapéutico</p>
                                         </div>
-                                        <p className="text-sm text-slate-800 leading-relaxed font-bold whitespace-pre-wrap">{item.plan}</p>
+                                        <p className="text-[13px] text-slate-200 leading-relaxed font-bold whitespace-pre-wrap">{item.plan}</p>
                                       </div>
                                     )}
                                   </div>
@@ -501,48 +544,50 @@ export default function PatientHistoryViewer({
                           } else {
                             const doctor = doctors.find(d => d.id === item.doctorId);
                             return (
-                              <div key={`app-${item.id || idx}`} className="relative pl-12">
-                                <div className="absolute left-0 top-0 w-6 h-6 rounded-full bg-slate-200 border-4 border-white shadow-sm z-10 flex items-center justify-center">
-                                  <Clock size={10} className="text-slate-500" />
+                              <div key={`app-${item.id || idx}`} className="relative pl-10 sm:pl-12 group/timeline">
+                                <div className="absolute left-[-2px] sm:left-0 top-0 w-8 h-8 rounded-full bg-slate-800 border-4 border-[var(--bg-card)] shadow-[0_0_0_1px_rgba(255,255,255,0.05)] z-10 flex items-center justify-center group-hover/timeline:scale-110 transition-transform">
+                                  <Clock size={12} className="text-slate-400" />
                                 </div>
-                                <div className="bg-[var(--bg-card)] border border-[var(--border-color)]/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                  <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] flex items-center justify-center text-[var(--text-secondary)] shadow-sm shrink-0">
-                                      <Calendar size={20} />
-                                    </div>
-                                    <div>
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="text-sm font-black text-[var(--text-primary)] uppercase tracking-tight">Turno Programado</p>
-                                        <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded border ${
-                                          item.attendance === 'finalizado' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 
-                                          item.attendance === 'ausente' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 
-                                          'bg-[var(--bg-main)] text-[var(--text-secondary)] border-[var(--border-color)]'
-                                        }`}>
-                                          {item.attendance === 'finalizado' ? 'Asistió' : item.attendance === 'ausente' ? 'No Asistió' : 'Pendiente'}
-                                        </span>
-                                        {item.title && (
-                                          <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded border bg-purple-500/10 text-purple-600 border-purple-500/20">
-                                            🧠 {item.title}
-                                          </span>
-                                        )}
-                                        {item.type && !['psicologia', 'psicología', 'psiquiatria', 'psiquiatría'].includes(item.type.toLowerCase().trim()) && (
-                                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded border flex items-center gap-1 ${
-                                            item.type.toLowerCase().includes('virtual') ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' :
-                                            item.type.toLowerCase().includes('domicilio') ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                                            'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                          }`}>
-                                            {item.type.toLowerCase().includes('virtual') ? '💻' : 
-                                             item.type.toLowerCase().includes('domicilio') ? '🏠' : '🏥'} {item.type}
-                                          </span>
-                                        )}
+                                <div className="bg-slate-900/30 border border-white/5 hover:border-white/10 rounded-[20px] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors">
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-[14px] bg-slate-800 border border-white/5 flex items-center justify-center text-slate-400 shadow-inner shrink-0">
+                                        <Calendar size={18} />
                                       </div>
-                                      <p className="text-xs font-bold text-[var(--text-secondary)] mt-0.5 opacity-70">
-                                        {formatDate(item.date)} a las {item.time}hs con <span className="text-[var(--accent-primary)] font-black">{doctor?.name || 'Profesional'}</span>
-                                      </p>
+                                      <div>
+                                        <p className="text-sm font-black text-[var(--text-primary)] uppercase tracking-tight">Turno Programado</p>
+                                        <p className="text-xs font-bold text-[var(--text-secondary)] mt-0.5 opacity-70">
+                                          {formatDate(item.date)} a las {item.time}hs con <span className="text-[var(--accent-primary)] font-black">{doctor?.name || 'Profesional'}</span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto mt-2 sm:mt-0">
+                                      <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded border shrink-0 ${
+                                        item.attendance === 'finalizado' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 
+                                        item.attendance === 'ausente' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 
+                                        'bg-[var(--bg-main)] text-[var(--text-secondary)] border-[var(--border-color)]'
+                                      }`}>
+                                        {item.attendance === 'finalizado' ? 'Asistió' : item.attendance === 'ausente' ? 'No Asistió' : 'Pendiente'}
+                                      </span>
+                                      {item.title && (
+                                        <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded border bg-purple-500/10 text-purple-600 border-purple-500/20 shrink-0">
+                                          🧠 {item.title}
+                                        </span>
+                                      )}
+                                      {item.type && !['psicologia', 'psicología', 'psiquiatria', 'psiquiatría'].includes(item.type.toLowerCase().trim()) && (
+                                        <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded border flex items-center gap-1 shrink-0 ${
+                                          item.type.toLowerCase().includes('virtual') ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' :
+                                          item.type.toLowerCase().includes('domicilio') ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                          'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                        }`}>
+                                          {item.type.toLowerCase().includes('virtual') ? '💻' : 
+                                           item.type.toLowerCase().includes('domicilio') ? '🏠' : '🏥'} {item.type}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border ${
+                                  <div className="flex items-center gap-2 mt-2 sm:mt-0 shrink-0 sm:ml-auto w-full sm:w-auto">
+                                    <span className={`flex items-center justify-center sm:justify-start gap-1.5 w-full sm:w-auto px-3 py-1.5 text-[10px] font-black uppercase rounded-lg border ${
                                       item.paymentStatus === 'pagado' ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg' :
                                       item.paymentStatus === 'señado' ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-lg' :
                                       'bg-[var(--bg-main)] text-[var(--text-secondary)] border-[var(--border-color)]'
@@ -560,11 +605,11 @@ export default function PatientHistoryViewer({
                   )}
                 </div>
                 
-                <div className="card-premium border border-[var(--glass-border)] overflow-hidden">
-                  <div className="px-6 py-4 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] flex items-center justify-between">
+                <div className="bg-slate-800/40 border border-white/5 rounded-[24px] overflow-hidden shadow-sm">
+                  <div className="px-6 py-4 border-b border-white/5 bg-slate-900/50 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <HeartPulse size={18} className="text-[var(--accent-primary)]" />
-                      <h3 className="font-black text-[var(--text-primary)] uppercase text-xs tracking-widest">Medicación Activa</h3>
+                      <HeartPulse size={18} className="text-rose-500 drop-shadow-md" />
+                      <h3 className="font-bold text-white uppercase text-[11px] tracking-[0.2em]">Medicación Activa</h3>
                     </div>
                     <button 
                       onClick={() => setIsAddingMed(true)}
@@ -602,15 +647,15 @@ export default function PatientHistoryViewer({
                 </div>
               </>
             ) : (
-              <FileSection patientId={patient.id} />
+              <FileSection patientId={patient.id} setConfirmConfig={setConfirmConfig} />
             )}
           </div>
         </div>
       </div>
 
       {/* MODAL DE NUEVA EVOLUCIÓN (SOAP) */}
-      {isAddingNote && (
-        <div className="fixed inset-0 bg-slate-900/60 z-[120] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in-quick">
+      {isAddingNote && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 z-[1050] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in-quick">
           <div className="bg-[var(--bg-card)] rounded-[2.5rem] w-full max-w-4xl shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh] border border-[var(--glass-border)]">
             <div className="p-8 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-sidebar)]">
               <div>
@@ -625,10 +670,10 @@ export default function PatientHistoryViewer({
               <button onClick={() => { setIsAddingNote(false); setIsEditingNote(false); setEditingNoteId(null); }} className="p-3 hover:bg-[var(--bg-main)] rounded-2xl text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"><X size={24} /></button>
             </div>
             
-            <div className="p-8 overflow-y-auto custom-scrollbar bg-[var(--bg-card)]">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5 sm:p-8 overflow-y-auto custom-scrollbar bg-[var(--bg-card)]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 flex items-center gap-2 opacity-70">
+                  <label htmlFor="subjective" className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 flex items-center gap-2 opacity-70">
                     <span className="w-5 h-5 rounded bg-sky-500/10 text-[var(--accent-primary)] flex items-center justify-center font-black border border-sky-500/20">S</span> Subjetivo
                   </label>
                   <textarea id="subjective" name="subjective" 
@@ -639,7 +684,7 @@ export default function PatientHistoryViewer({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 flex items-center gap-2 opacity-70">
+                  <label htmlFor="objective" className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 flex items-center gap-2 opacity-70">
                     <span className="w-5 h-5 rounded bg-amber-500/10 text-amber-500 flex items-center justify-center font-black border border-amber-500/20">O</span> Objetivo
                   </label>
                   <textarea id="objective" name="objective" 
@@ -650,7 +695,7 @@ export default function PatientHistoryViewer({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 flex items-center gap-2 opacity-70">
+                  <label htmlFor="analysis" className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 flex items-center gap-2 opacity-70">
                     <span className="w-5 h-5 rounded bg-purple-500/10 text-purple-500 flex items-center justify-center font-black border border-purple-500/20">A</span> Análisis
                   </label>
                   <textarea id="analysis" name="analysis" 
@@ -661,7 +706,7 @@ export default function PatientHistoryViewer({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 flex items-center gap-2 opacity-70">
+                  <label htmlFor="plan" className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 flex items-center gap-2 opacity-70">
                     <span className="w-5 h-5 rounded bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-black border border-emerald-500/20">P</span> Plan
                   </label>
                   <textarea id="plan" name="plan" 
@@ -677,7 +722,7 @@ export default function PatientHistoryViewer({
               {extraSections.map((sec, idx) => (
                 <div key={idx} className="space-y-2 mt-4">
                   <div className="flex items-center gap-2">
-                    <input id="title" name="title"
+                    <input
                       type="text"
                       placeholder="Nombre de la categoría (ej: Seguimiento, Interconsulta)..."
                       value={sec.title}
@@ -691,7 +736,7 @@ export default function PatientHistoryViewer({
                       <X size={16} />
                     </button>
                   </div>
-                  <textarea id="content" name="content"
+                  <textarea
                     value={sec.content}
                     onChange={e => setExtraSections(prev => prev.map((s, i) => i === idx ? { ...s, content: e.target.value } : s))}
                     placeholder="Escribe el contenido de esta sección..."
@@ -706,17 +751,17 @@ export default function PatientHistoryViewer({
                 <Plus size={14} /> Agregar Sección
               </button>
 
-              <div className="mt-8 p-6 bg-[var(--bg-main)] rounded-3xl border border-[var(--border-color)] flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center text-[var(--accent-primary)] shadow-md">
+              <div className="mt-8 p-4 sm:p-6 bg-[var(--bg-main)] rounded-3xl border border-[var(--border-color)] flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full md:w-auto">
+                  <div className="w-12 h-12 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center text-[var(--accent-primary)] shadow-md shrink-0">
                     <User size={24} />
                   </div>
-                  <div>
-                    <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-70">Profesional Responsable</p>
+                  <div className="flex-1 min-w-0">
+                    <label htmlFor="activeDoctorId" className="block text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-70 mb-1">Profesional Responsable</label>
                     <select id="activeDoctorId" name="activeDoctorId" 
                       value={activeDoctorId} 
                       onChange={e => setActiveDoctorId(e.target.value)}
-                      className="bg-transparent font-black text-[var(--text-primary)] outline-none cursor-pointer hover:text-[var(--accent-primary)] transition-colors"
+                      className="bg-transparent font-black text-[var(--text-primary)] outline-none cursor-pointer hover:text-[var(--accent-primary)] transition-colors w-full truncate"
                     >
                       {doctors.map(d => (
                         <option key={d.id} value={d.id} className="bg-[var(--bg-card)]">{d.name}</option>
@@ -724,68 +769,69 @@ export default function PatientHistoryViewer({
                     </select>
                   </div>
                 </div>
-                <div className="text-right flex flex-col items-end gap-2">
-                  <p className="text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-70">Fecha y Hora del Registro</p>
+                <div className="flex flex-col md:items-end gap-2 w-full md:w-auto shrink-0">
+                  <label htmlFor="date" className="block text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-70">Fecha y Hora del Registro</label>
                   <input id="date" name="date"
                     type="datetime-local"
                     value={soapData.date}
                     onChange={e => setSoapData({...soapData, date: e.target.value})}
-                    className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-black text-[var(--text-primary)] focus:border-[var(--accent-primary)] outline-none transition-all"
+                    className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-black text-[var(--text-primary)] focus:border-[var(--accent-primary)] outline-none transition-all w-full"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="p-8 border-t border-[var(--border-color)] bg-[var(--bg-sidebar)] flex gap-4 shrink-0">
+            <div className="p-5 sm:p-8 border-t border-[var(--border-color)] bg-[var(--bg-sidebar)] flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 shrink-0">
               <button 
                 onClick={() => setIsAddingNote(false)} 
-                className="flex-1 py-4 text-sm font-black text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                className="w-full sm:flex-1 py-4 text-sm font-black text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
               >
                 Cancelar
               </button>
               <button 
                 onClick={handleSaveNote} 
-                className="flex-[2] bg-[var(--accent-primary)] text-white font-black py-4 rounded-3xl shadow-xl hover:bg-[var(--accent-hover)] transition-all flex items-center justify-center gap-2"
+                className="w-full sm:flex-[2] bg-[var(--accent-primary)] text-white font-black py-4 rounded-3xl shadow-xl hover:bg-[var(--accent-hover)] transition-all flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 <CheckCircle2 size={18} /> Sellar y Guardar Reporte
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* MODAL DE EDICIÓN DE DATOS BÁSICOS */}
-      {isEditingInfo && (
-        <div className="fixed inset-0 bg-slate-900/60 z-[120] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in-quick">
+      {isEditingInfo && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 z-[1050] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in-quick">
           <div className="bg-[var(--bg-card)] rounded-[2.5rem] w-full max-w-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh] border border-[var(--glass-border)]">
-            <div className="p-8 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-sidebar)]">
+            <div className="p-5 sm:p-8 border-b border-[var(--border-color)] flex items-center justify-between shrink-0 bg-[var(--bg-sidebar)]">
               <h3 className="text-2xl font-black text-[var(--text-primary)] flex items-center gap-3"><Pencil className="text-[var(--accent-primary)]" /> Editar Ficha Médica</h3>
               <button onClick={() => setIsEditingInfo(false)} className="p-3 hover:bg-[var(--bg-main)] rounded-2xl text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-colors"><X size={24} /></button>
             </div>
-            <div className="p-8 overflow-y-auto custom-scrollbar space-y-6 bg-[var(--bg-card)]">
-              <div className="grid grid-cols-2 gap-6">
+            <div className="p-5 sm:p-8 overflow-y-auto custom-scrollbar space-y-6 bg-[var(--bg-card)]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <Input label="Nombre Completo" value={editFormData.name} onChange={v => setEditFormData({...editFormData, name: v})} />
                 <Input label="Fecha de Nacimiento" type="date" value={editFormData.birthDate} onChange={v => setEditFormData({...editFormData, birthDate: v})} />
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <Input label="DNI" value={editFormData.dni} onChange={v => setEditFormData({...editFormData, dni: v})} />
                 <Input label="NHC" value={editFormData.nhc} disabled />
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                 <Input label="Cobertura" value={editFormData.coverage} onChange={v => setEditFormData({...editFormData, coverage: v})} />
                 <Input label="N° Carnet" value={editFormData.coverageNumber} onChange={v => setEditFormData({...editFormData, coverageNumber: v})} />
                 <Input label="Plan" value={editFormData.plan} onChange={v => setEditFormData({...editFormData, plan: v})} />
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <Input label="Teléfono" value={editFormData.phone} onChange={v => setEditFormData({...editFormData, phone: v})} />
                 <Input label="Email" value={editFormData.email} onChange={v => setEditFormData({...editFormData, email: v})} />
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <Input label="Dirección" value={editFormData.address} onChange={v => setEditFormData({...editFormData, address: v})} />
                 <Input label="Contacto de Emergencia" value={editFormData.emergencyContact} onChange={v => setEditFormData({...editFormData, emergencyContact: v})} />
               </div>
               <div className="space-y-2">
-                <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">Alergias</label>
+                <label htmlFor="allergies" className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">Alergias</label>
                 <textarea id="allergies" name="allergies" 
                   value={editFormData.allergies} 
                   onChange={e => setEditFormData({...editFormData, allergies: e.target.value})} 
@@ -795,27 +841,28 @@ export default function PatientHistoryViewer({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">Diagnóstico Principal</label>
+                <label htmlFor="diagnosis" className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">Diagnóstico Principal</label>
                 <textarea id="diagnosis" name="diagnosis" value={editFormData.diagnosis} onChange={e => setEditFormData({...editFormData, diagnosis: e.target.value})} rows="2" className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl px-5 py-3.5 text-sm font-bold text-[var(--text-primary)] focus:border-[var(--accent-primary)] outline-none transition-all resize-none placeholder:text-[var(--text-secondary)]/30" />
               </div>
             </div>
-            <div className="p-8 border-t border-[var(--border-color)] bg-[var(--bg-sidebar)] flex gap-4 shrink-0">
-              <button onClick={() => setIsEditingInfo(false)} className="flex-1 py-4 text-sm font-black text-[var(--text-secondary)]">Cancelar</button>
-              <button onClick={handleSaveInfo} className="flex-[2] bg-[var(--accent-primary)] text-white font-black py-4 rounded-3xl shadow-xl hover:bg-[var(--accent-hover)] transition-all flex items-center justify-center gap-2"><Save size={18} /> Guardar Cambios</button>
+            <div className="p-5 sm:p-8 border-t border-[var(--border-color)] bg-[var(--bg-sidebar)] flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 shrink-0">
+              <button onClick={() => setIsEditingInfo(false)} className="w-full sm:flex-1 py-4 text-sm font-black text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">Cancelar</button>
+              <button onClick={handleSaveInfo} className="w-full sm:flex-[2] bg-[var(--accent-primary)] text-white font-black py-4 rounded-3xl shadow-xl hover:bg-[var(--accent-hover)] transition-all flex items-center justify-center gap-2"><Save size={18} /> Guardar Cambios</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* MODAL DE NUEVA MEDICACIÓN */}
-      {isAddingMed && (
-        <div className="fixed inset-0 bg-slate-900/60 z-[120] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in-quick">
+      {isAddingMed && createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 z-[1050] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in-quick">
           <div className="bg-[var(--bg-card)] rounded-[2.5rem] w-full max-w-lg shadow-2xl relative overflow-hidden flex flex-col border border-[var(--glass-border)]">
-            <div className="p-8 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] flex items-center justify-between shrink-0">
+            <div className="p-5 sm:p-8 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] flex items-center justify-between shrink-0">
               <h3 className="text-2xl font-black text-[var(--text-primary)] flex items-center gap-3"><HeartPulse className="text-[var(--accent-primary)]" /> Recetar Medicamento</h3>
               <button onClick={() => setIsAddingMed(false)} className="p-3 hover:bg-[var(--bg-main)] rounded-2xl text-[var(--text-secondary)] transition-colors"><X size={24} /></button>
             </div>
-            <div className="p-8 space-y-6 bg-[var(--bg-card)]">
+            <div className="p-5 sm:p-8 space-y-6 bg-[var(--bg-card)]">
               <DrugAutocomplete
                 value={medData.drug}
                 onChange={v => setMedData({...medData, drug: v})}
@@ -830,7 +877,7 @@ export default function PatientHistoryViewer({
               />
               <div className="grid grid-cols-2 gap-4 relative">
                 <div className="space-y-2 col-span-2 sm:col-span-1">
-                  <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">Dosis (Ej: 500mg)</label>
+                  <label htmlFor="dose" className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">Dosis (Ej: 500mg)</label>
                   <input id="dose" name="dose" 
                     type="text"
                     value={medData.dose} 
@@ -854,7 +901,7 @@ export default function PatientHistoryViewer({
                   )}
                 </div>
                 <div className="space-y-2 col-span-2 sm:col-span-1">
-                  <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">Frecuencia (Ej: Cada 8hs)</label>
+                  <label htmlFor="frequency" className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">Frecuencia (Ej: Cada 8hs)</label>
                   <input id="frequency" name="frequency" 
                     type="text"
                     value={medData.frequency} 
@@ -865,12 +912,13 @@ export default function PatientHistoryViewer({
                 </div>
               </div>
             </div>
-            <div className="p-8 border-t border-[var(--border-color)] bg-[var(--bg-sidebar)] flex gap-4 shrink-0">
-              <button onClick={() => setIsAddingMed(false)} className="flex-1 py-4 text-sm font-black text-[var(--text-secondary)]">Cancelar</button>
-              <button onClick={handleSaveMedication} className="flex-[2] bg-[var(--accent-primary)] text-white font-black py-4 rounded-3xl shadow-xl hover:bg-[var(--accent-hover)] transition-all flex items-center justify-center gap-2"><Plus size={18} /> Confirmar Receta</button>
+            <div className="p-5 sm:p-8 border-t border-[var(--border-color)] bg-[var(--bg-sidebar)] flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 shrink-0">
+              <button onClick={() => setIsAddingMed(false)} className="w-full sm:flex-1 py-4 text-sm font-black text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">Cancelar</button>
+              <button onClick={handleSaveMedication} className="w-full sm:flex-[2] bg-[var(--accent-primary)] text-white font-black py-4 rounded-3xl shadow-xl hover:bg-[var(--accent-hover)] transition-all flex items-center justify-center gap-2"><Plus size={18} /> Confirmar Receta</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* DIÁLOGO DE CONFIRMACIÓN PROFESIONAL */}
@@ -888,7 +936,7 @@ export default function PatientHistoryViewer({
   );
 }
 
-function FileSection({ patientId }) {
+function FileSection({ patientId, setConfirmConfig }) {
   const store = useStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -920,7 +968,7 @@ function FileSection({ patientId }) {
           await store.deleteFile(patientId, fileId);
           toast.success('Archivo eliminado');
           setConfirmConfig(prev => ({ ...prev, open: false }));
-        } catch (err) {
+        } catch {
           toast.error('Error al eliminar');
         }
       }
@@ -933,6 +981,22 @@ function FileSection({ patientId }) {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const handleDownloadFile = async (file) => {
+    try {
+      const blob = await store.downloadFile(patientId, file.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error('Error al descargar el archivo');
+    }
   };
 
   return (
@@ -982,7 +1046,7 @@ function FileSection({ patientId }) {
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button 
-                  onClick={() => window.open(`${import.meta.env.VITE_API_URL}/../../uploads/${file.path || file.file_path}`, '_blank')}
+                  onClick={() => handleDownloadFile(file)}
                   className="p-2 text-[var(--accent-primary)] hover:bg-[var(--accent-light)] rounded-lg transition-colors"
                   title="Ver / Descargar"
                 >
@@ -1004,15 +1068,18 @@ function FileSection({ patientId }) {
   );
 }
 
-function Input({ label, value, onChange, type = "text", disabled = false }) {
+function Input({ label, value, onChange, type = "text", disabled = false, id, name }) {
+  const generatedId = id || name || label.replace(/\s+/g, '-').toLowerCase();
+  const inputName = name || generatedId;
   return (
     <div className="space-y-2">
-      <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">{label}</label>
-      <input id="value" name="value" 
+      <label htmlFor={generatedId} className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">{label}</label>
+      <input id={generatedId} name={inputName} 
         type={type} 
         value={value} 
         disabled={disabled} 
         onChange={e => onChange?.(e.target.value)} 
+        autoComplete="off"
         className={`w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-2xl px-5 py-3.5 text-sm font-bold text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--accent-light)] outline-none transition-all ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`} 
       />
     </div>
@@ -1047,12 +1114,12 @@ function DrugAutocomplete({ value, onChange, onSelectMed }) {
 
   return (
     <div className="space-y-2 relative" ref={ref}>
-      <label className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">Fármaco / Droga</label>
+      <label htmlFor="drug" className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-wider pl-1 opacity-70">Fármaco / Droga</label>
       <div className="relative group">
         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-primary)] transition-colors">
           <HeartPulse size={18} />
         </div>
-        <input id="value" name="value"
+        <input id="drug" name="drug"
           type="text"
           value={value}
           onChange={e => handleChange(e.target.value)}

@@ -16,6 +16,7 @@ import { playPopSound, playSuccessSound, playCashSound, playErrorSound } from '.
 import CustomDatePicker from '../../../components/ui/CustomDatePicker';
 import CustomTimePicker from '../../../components/ui/CustomTimePicker';
 import { socket } from '../../../services/socket';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AgendaPage() {
   const store = useStore();
@@ -157,23 +158,61 @@ export default function AgendaPage() {
   const [formData, setFormData] = useState(defaultForm);
   const [cashReceived, setCashReceived] = useState('');
 
-  const isDateDisabled = (dateStr) => {
+  const isDateDisabled = (dateStr, doctorId = formData.doctorId) => {
     if (!globalConfig || !globalConfig.hours) return false;
     const d = new Date(dateStr + 'T12:00:00Z');
     const dayOfWeek = d.getDay();
     const configDay = globalConfig.hours[dayOfWeek];
     if (configDay && configDay.enabled === false) return true;
+
+    if (doctorId) {
+       const doctor = doctors.find(doc => doc.id === Number(doctorId));
+       if (doctor && doctor.schedule) {
+          const docDay = doctor.schedule[dayOfWeek];
+          if (!docDay) return true; // Doctor no atiende este día
+       }
+    }
     return false;
   };
 
-  const getDayConfig = (dateStr) => {
-    if (!globalConfig || !globalConfig.hours || !dateStr) return { start: '06:00', end: '22:00' };
-    const d = new Date(dateStr + 'T12:00:00Z');
-    const configDay = globalConfig.hours[d.getDay()];
-    if (configDay && configDay.enabled) {
-      return { start: configDay.start, end: configDay.end };
+  const getDayConfig = (dateStr, doctorId = formData.doctorId) => {
+    let start = '06:00';
+    let end = '22:00';
+    let foundGlobal = false;
+    
+    const d = new Date((dateStr || currentSelectedDateString) + 'T12:00:00Z');
+    const dayOfWeek = d.getDay();
+
+    if (globalConfig && globalConfig.hours) {
+      const configDay = globalConfig.hours[dayOfWeek];
+      if (configDay && configDay.enabled) {
+        start = configDay.start;
+        end = configDay.end;
+        foundGlobal = true;
+      }
     }
-    return { start: '06:00', end: '22:00' };
+    
+    if (doctorId) {
+       const doctor = doctors.find(doc => doc.id === Number(doctorId));
+       if (doctor && doctor.schedule) {
+          const docDay = doctor.schedule[dayOfWeek];
+          if (docDay) {
+             const formatTime = (h) => `${String(h).padStart(2, '0')}:00`;
+             const docStart = formatTime(docDay.start);
+             const docEnd = formatTime(docDay.end);
+             
+             // Intersect
+             if (foundGlobal) {
+                if (docStart > start) start = docStart;
+                if (docEnd < end) end = docEnd;
+             } else {
+                start = docStart;
+                end = docEnd;
+             }
+          }
+       }
+    }
+    return { start, end };
   };
   const currentDayConfig = getDayConfig(formData.date);
 
@@ -207,8 +246,15 @@ export default function AgendaPage() {
        colDate.setDate(startOfWeek.getDate() + i);
        const dayNum = colDate.getDay();
        
-       // Verificar si el día está habilitado en la config
-       if (config.hours[dayNum]?.enabled) {
+       let isDayEnabled = config.hours[dayNum]?.enabled;
+       
+       if (activeDoctor && activeDoctor.schedule) {
+          if (!activeDoctor.schedule[dayNum]) {
+             isDayEnabled = false;
+          }
+       }
+
+       if (isDayEnabled) {
          const dateStr = getLocalDayString(colDate);
          columns.push({
             id: `day-${dateStr}`,
@@ -299,20 +345,35 @@ export default function AgendaPage() {
       return;
     }
 
-    // 2. Validar Rango Horario
+    const selectedDoctor = doctors.find(doc => doc.id === Number(formData.doctorId));
+    if (selectedDoctor && selectedDoctor.schedule) {
+        if (!selectedDoctor.schedule[dayOfWeek]) {
+           const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+           setWorkHoursAlert({
+             title: 'Profesional no disponible',
+             description: `El profesional seleccionado no atiende los días ${dayNames[dayOfWeek]}. Por favor, selecciona otra fecha u otro profesional.`,
+             variant: 'danger'
+           });
+           return;
+        }
+    }
+
+    // 2. Validar Rango Horario (Global + Médico)
     const getMinutes = (ts) => {
       const [h, m] = ts.split(':').map(Number);
       return h * 60 + m;
     };
     const startM = getMinutes(formData.time);
     const endM = startM + (formData.duration * 60);
-    const configStartM = getMinutes(dayConfig.start);
-    const configEndM = getMinutes(dayConfig.end);
+    
+    const combinedConfig = getDayConfig(formData.date, formData.doctorId);
+    const configStartM = getMinutes(combinedConfig.start);
+    const configEndM = getMinutes(combinedConfig.end);
 
     if (startM < configStartM || endM > configEndM) {
       setWorkHoursAlert({
         title: 'Horario Restringido',
-        description: `El horario seleccionado (${formData.time}) se encuentra fuera del rango de atención para el día ${['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayOfWeek]} (${dayConfig.start} a ${dayConfig.end}).`,
+        description: `El horario seleccionado (${formData.time}) se encuentra fuera del rango de atención del profesional para el día ${['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayOfWeek]} (${combinedConfig.start} a ${combinedConfig.end}).`,
         variant: 'warning'
       });
       return;
@@ -528,6 +589,16 @@ export default function AgendaPage() {
     store.fetchDoctors();
   }, []);
 
+  // -- Prevenir scroll del fondo en móviles cuando un modal o el bottom sheet están abiertos --
+  useEffect(() => {
+    if (isModalOpen || menuApp || receiptApp || activeDropdown) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => { document.body.style.overflow = 'unset'; };
+  }, [isModalOpen, menuApp, receiptApp, activeDropdown]);
+
   // -- Paginación inteligente basada en fechas --
   // Descarga el mes actual, el anterior y el próximo para navegación fluida
   useEffect(() => {
@@ -547,7 +618,38 @@ export default function AgendaPage() {
   const handleStatusChange = async (e, id, newStatus) => {
     if (e) e.stopPropagation();
     try {
-      await store.updateAppointmentStatus(id, newStatus);
+      const updatedApp = await store.updateAppointmentStatus(id, newStatus);
+      const app = updatedApp || store.appointments.find(a => a.id === id);
+
+      if (newStatus === 'finalizado' && app && !app.hasEvolution) {
+         playErrorSound();
+         toast.custom((t) => (
+          <div className={`${t.visible ? 'animate-fade-in-up' : 'animate-fade-out-down'} max-w-sm w-full bg-[var(--bg-card)] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-[var(--border-color)] overflow-hidden backdrop-blur-xl border border-[var(--glass-border)]`}>
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <AlertCircle className="h-10 w-10 text-rose-500 p-2 bg-rose-500/10 rounded-xl animate-pulse" />
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-[10px] font-black text-rose-500 uppercase tracking-wider mb-1">Evolución Pendiente</p>
+                  <p className="text-sm text-[var(--text-primary)] font-bold">
+                    ¡Atención! Este turno ha finalizado pero falta completar la Evolución Médica.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex border-l border-[var(--border-color)]/20 bg-[var(--bg-sidebar)]/50">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="w-full border border-transparent rounded-none rounded-r-2xl px-4 flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-light)] transition-colors focus:outline-none"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        ), { duration: 6000, position: 'top-right' });
+      }
+
       if (newStatus === 'finalizado') playSuccessSound();
       else playPopSound();
       setMenuApp(null);
@@ -647,6 +749,18 @@ export default function AgendaPage() {
       return;
     }
     navigate(`/dashboard/pacientes?view=${patientRecord.id}`);
+    setMenuApp(null);
+    setActiveDropdown(null);
+  };
+
+  const handleGoToAddEvolution = (app) => {
+    const patientRecord = store.patients.find(p => p.id === app.patientId || p.name === app.patient);
+    if (!patientRecord?.id) {
+      toast.error('No se pudo localizar el registro del paciente');
+      return;
+    }
+    const dateStr = `${app.date}T${app.time || '00:00'}`;
+    navigate(`/dashboard/pacientes?view=${patientRecord.id}&action=add_evolution&date=${dateStr}`);
     setMenuApp(null);
     setActiveDropdown(null);
   };
@@ -814,6 +928,11 @@ export default function AgendaPage() {
                         {app.attendance === 'en_espera' && (
                           <span className="flex h-2 w-2 rounded-full bg-indigo-500 animate-ping"></span>
                         )}
+                        {app.attendance === 'finalizado' && !app.hasEvolution && (
+                          <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-[9px] font-black uppercase rounded-md shadow-sm border border-red-300 animate-pulse">
+                            ⚠️ Falta Evolución
+                          </span>
+                        )}
                       </div>
                       <button 
                         onClick={(e) => {
@@ -835,7 +954,14 @@ export default function AgendaPage() {
                         <span>{app.patient}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Stethoscope size={12} />
+                        {(() => {
+                          const doc = doctors.find(d => d.id === app.doctorId);
+                          return doc?.profile_picture ? (
+                            <img src={doc.profile_picture} alt="Doc" className="w-4 h-4 rounded-full object-cover shadow-sm border border-white/50" />
+                          ) : (
+                            <Stethoscope size={12} />
+                          );
+                        })()}
                         <span>{doctors.find(d => d.id === app.doctorId)?.name?.split(' ')[0] || 'Doc'}</span>
                       </div>
                       {app.modalidad && (
@@ -998,6 +1124,15 @@ export default function AgendaPage() {
           </div>
           {columns.map(col => (
             <div key={col.id} className="flex-1 p-2 sm:p-4 flex flex-col items-center justify-center border-r border-[var(--border-color)] last:border-0 min-w-[140px] sm:min-w-[200px]">
+              {col.type === 'doctor' && (
+                col.doctor?.profile_picture ? (
+                  <img src={col.doctor.profile_picture} alt={col.title} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover mb-2 border-2 border-[var(--bg-card)] shadow-md" />
+                ) : (
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-hover)] flex items-center justify-center text-white font-black text-xs sm:text-sm mb-2 shadow-md">
+                    {(col.title || '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                  </div>
+                )
+              )}
               <div className="font-extrabold text-xs sm:text-base text-[var(--text-primary)] truncate w-full text-center tracking-tight">{col.title}</div>
               <div className="text-[10px] sm:text-xs font-bold text-[var(--text-secondary)] uppercase truncate w-full text-center opacity-70 tracking-wider font-mono">{col.subtitle}</div>
             </div>
@@ -1143,6 +1278,7 @@ export default function AgendaPage() {
                                   
                                   {/* Asistencia Visual */}
                                   {app.attendance === 'confirmado' && <span className="inline-block px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase rounded-md shadow-sm border border-emerald-200">OK</span>}
+                                  {app.attendance === 'finalizado' && !app.hasEvolution && <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-black uppercase rounded-md shadow-sm border border-red-300 animate-pulse">⚠️ FALTA EVOLUCIÓN</span>}
                                   {app.attendance === 'en_curso' && <span className="inline-block px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-md shadow-md border border-emerald-400 animate-pulse">ATENDIENDO</span>}
                                   {app.attendance === 'en_espera' && <span className="inline-block px-1.5 py-0.5 bg-indigo-600 text-white text-[10px] font-bold uppercase rounded-md animate-pulse shadow-sm shadow-indigo-300">Sala: {app.waitTicket || "Llamar"}</span>}
                                   
@@ -1206,184 +1342,6 @@ export default function AgendaPage() {
                               <div className="w-12 h-1.5 bg-[var(--border-color)] rounded-full mx-auto mb-3 sm:hidden opacity-50 shrink-0"></div>
 
                               <div className="overflow-y-auto custom-scrollbar flex-1 pb-2 sm:pb-0">
-                              {!['medico'].includes(userRole) && !isBlock && (
-                                <>
-                                  <div className="px-5 py-2.5 text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-[0.2em] bg-[var(--bg-sidebar)]/30 border-b border-[var(--border-color)]/30 sticky top-0 z-10 backdrop-blur-md">Caja / Cobros</div>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          const resetData = { paymentStatus: 'pendiente', paidAmount: 0 };
-                                          store.updateAppointmentPaymentStatus(app.id, resetData);
-                                          setActiveDropdown(null);
-                                        }}
-                                        className={`w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold transition-all flex items-center justify-between border-b border-[var(--border-color)]/10 ${app.paymentStatus === 'pendiente' ? 'text-[var(--accent-primary)] bg-[var(--accent-primary)]/10' : 'text-[var(--text-primary)] hover:bg-[var(--accent-light)]'}`}
-                                      >
-                                        Pendiente
-                                        {app.paymentStatus === 'pendiente' && <CheckCircle2 size={12} />}
-                                      </button>
-                                      
-                                      <button
-                                         onClick={async (e) => {
-                                           e.stopPropagation();
-                                           if (app.paymentStatus === 'pagado') return;
-
-                                           const totalFee = Number(app.paymentAmount) > 0 ? Number(app.paymentAmount) : 35000;
-                                           const prevPaid = Number(app.paidAmount || 0);
-                                           const amountToPay = totalFee - prevPaid;
-                                           
-                                           toast(`⏳ Procesando... Total: $${totalFee}, Pagado: $${prevPaid}, Resta: $${amountToPay}`, { duration: 3000 });
-                                           let updateOk = false;
-                                           
-                                           try {
-                                             const { data: d1 } = await import('../../../services/api').then(m => m.default).then(api => api.patch(`/appointments/${app.id}/payment`, {
-                                               paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee
-                                             }));
-                                             updateOk = true;
-                                             playCashSound();
-                                             store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee }).catch(()=>{});
-                                           } catch(err) {
-                                             const msg = err.response?.data?.message || err.message;
-                                             toast.error(`❌ Error turno: ${msg}`);
-                                           }
-
-                                           if (updateOk && amountToPay > 0) {
-                                             try {
-                                               const { data: d2 } = await import('../../../services/api').then(m => m.default).then(api => api.post(`/transactions/`, {
-                                                 type: 'Ingreso',
-                                                 concept: `Cobro Restante ${app.title} — ${app.patient}`,
-                                                 method: app.paymentMethod || 'Efectivo',
-                                                 amount: amountToPay,
-                                                 date: nowForAPI(),
-                                                 notes: `Cobro desde Agenda (Turno #${app.id})`,
-                                                 doctor_id: app.doctorId,
-                                                 patient_id: app.patientId
-                                               }));
-                                               toast.success(`✅ Restante de $${amountToPay.toLocaleString()} registrado en Finanzas!`);
-                                             } catch(err) {
-                                               const msg = err.response?.data?.message || err.message;
-                                               toast.error(`❌ Error finanzas: ${msg}`);
-                                             }
-                                           } else if (updateOk && amountToPay <= 0) {
-                                              toast('ℹ️ El turno ya estaba totalmente pagado. No se creó transacción extra.', { icon: '👏' });
-                                           }
-
-                                           setActiveDropdown(null);
-                                         }}
-                                         className={`w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold transition-all flex items-center justify-between border-b border-[var(--border-color)]/10 ${app.paymentStatus === 'pagado' ? 'text-emerald-500 bg-emerald-500/10 cursor-default' : 'text-[var(--text-primary)] hover:bg-[var(--accent-light)]'}`}
-                                       >
-                                         Abonado
-                                         {app.paymentStatus === 'pagado' && <CheckCircle2 size={12} />}
-                                       </button>
-
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          const defaultAmount = app.paymentAmount || 35000;
-                                          setSenasInput({ appId: app.id, value: String(Math.floor(defaultAmount / 2)) });
-                                        }}
-                                        className={`w-full text-left px-5 py-3 sm:py-2.5 text-xs font-bold border-b border-[var(--border-color)]/10 transition-all flex items-center justify-between ${app.paymentStatus === 'señado' ? 'text-indigo-400 bg-indigo-500/10' : 'text-[var(--text-primary)] hover:bg-[var(--accent-light)]'}`}
-                                      >
-                                        Señado
-                                        {app.paymentStatus === 'señado' && <CheckCircle2 size={12} />}
-                                      </button>
-
-                                      {/* Inline seña input - aparece dentro del dropdown */}
-                                      {senasInput.appId === app.id && (
-                                        <div className="px-5 py-4 border-b border-[var(--border-color)]/30 bg-[var(--accent-primary)]/5" onClick={e => e.stopPropagation()}>
-                                          <p className="text-[10px] font-black text-[var(--accent-primary)] uppercase tracking-widest mb-3">Monto de la seña</p>
-                                          <div className="flex flex-wrap gap-2">
-                                            <div className="relative flex-1">
-                                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-[var(--accent-primary)]">$</span>
-                                              <input id="value" name="value"
-                                                type="number"
-                                                autoFocus
-                                                min="0"
-                                                value={senasInput.value}
-                                                onChange={e => setSenasInput(prev => ({ ...prev, value: e.target.value }))}
-                                                onKeyDown={async e => {
-                                                  if (e.key === 'Enter') {
-                                                    const amount = Number(senasInput.value);
-                                                    if (amount <= 0) { toast.error('Ingresá un monto válido'); return; }
-                                                    try {
-                                                      await store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'señado', paidAmount: amount });
-                                                      await store.createTransaction({
-                                                        date: nowForAPI(),
-                                                        type: 'Ingreso',
-                                                        concept: `Seña ${app.title} — ${app.patient}`,
-                                                        method: app.paidMethod || app.paymentMethod || 'Efectivo',
-                                                        amount,
-                                                        notes: `Seña desde Agenda (Turno #${app.id})`,
-                                                        doctor_id: app.doctorId,
-                                                        patient_id: app.patientId
-                                                      });
-                                                      toast.success('Seña registrada en Finanzas');
-                                                    } catch(err) {
-                                                      toast.error('Error al registrar la seña: ' + (err?.response?.data?.message || err.message));
-                                                    }
-                                                    setSenasInput({ appId: null, value: '' });
-                                                    setActiveDropdown(null);
-                                                  }
-                                                  if (e.key === 'Escape') setSenasInput({ appId: null, value: '' });
-                                                }}
-                                                className="w-full pl-7 pr-3 py-2 text-sm font-bold text-[var(--text-primary)] bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl outline-none focus:border-[var(--accent-primary)]/50 transition-all shadow-inner"
-                                                placeholder="0"
-                                              />
-                                            </div>
-                                            <button
-                                              onClick={async e => {
-                                                e.stopPropagation();
-                                                const amount = Number(senasInput.value);
-                                                if (amount <= 0) { toast.error('Ingresá un monto válido'); return; }
-                                                
-                                                // PASO 1: Actualizar estado del turno
-                                                toast('⏳ Actualizando turno...', { duration: 2000 });
-                                                let paso1Ok = false;
-                                                try {
-                                                  const { data: d1 } = await import('../../../services/api').then(m => m.default).then(api => api.patch(`/appointments/${app.id}/payment`, {
-                                                    paymentStatus: 'señado', paidAmount: amount
-                                                  }));
-                                                  paso1Ok = true;
-                                                  // Actualizar store localmente
-                                                  store.updateAppointmentPaymentStatus(app.id, { paymentStatus: 'señado', paidAmount: amount }).catch(()=>{});
-                                                } catch(e1) {
-                                                  const msg = e1.response?.data?.message || e1.message;
-                                                  toast.error(`❌ Red (turno): ${msg}`);
-                                                }
-                                                
-                                                // PASO 2: Crear transacción en Finanzas
-                                                if (paso1Ok) {
-                                                  try {
-                                                    const txBody = {
-                                                      type: 'Ingreso',
-                                                      concept: `Seña ${app.title} — ${app.patient}`,
-                                                      method: app.paidMethod || app.paymentMethod || 'Efectivo',
-                                                      amount,
-                                                      date: nowForAPI(),
-                                                      notes: `Seña desde Agenda (Turno #${app.id})`,
-                                                      doctor_id: app.doctorId,
-                                                      patient_id: app.patientId
-                                                    };
-                                                    const { data: d2 } = await import('../../../services/api').then(m => m.default).then(api => api.post(`/transactions/`, txBody));
-                                                    toast.success(`✅ Seña $${amount.toLocaleString()} registrada en Finanzas`);
-                                                  } catch(e2) {
-                                                    const msg = e2.response?.data?.message || e2.message;
-                                                    toast.error(`❌ Red (finanzas): ${msg}`);
-                                                  }
-                                                }
-                                                
-                                                setSenasInput({ appId: null, value: '' });
-                                                setActiveDropdown(null);
-                                              }}
-                                              className="px-2.5 py-1.5 bg-indigo-600 text-white text-xs font-black rounded-lg hover:bg-indigo-700 transition-colors shrink-0"
-                                            >
-                                              OK
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-
                                   {!['medico'].includes(userRole) && (
                                     <>
                                       <div className="px-5 py-2.5 text-[10px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-[0.2em] bg-[var(--bg-sidebar)]/30 border-y border-[var(--border-color)]/30 sticky top-0 z-10 backdrop-blur-md">Estados de Asistencia</div>
@@ -1402,77 +1360,86 @@ export default function AgendaPage() {
                                 </div>
                               )}
 
-                               {/* — Comprobante button (only when paid or señado) — */}
-                               {(!['medico'].includes(userRole) && (app.paymentStatus === 'pagado' || app.paymentStatus === 'señado')) && (
-                                 <button
-                                   onClick={(e) => {
-                                     e.stopPropagation();
-                                     setReceiptApp(app);
-                                     setActiveDropdown(null);
-                                   }}
-                                   className="w-full text-left px-5 py-3 text-xs font-black text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"
-                                 >
-                                   <Receipt size={16} className="opacity-70" /> Imprimir Comprobante
-                                 </button>
-                               )}
+                              {/* ── BARRA DE ACCIONES HORIZONTALES ── */}
+                              <div className="flex items-center justify-evenly p-2 bg-[var(--bg-sidebar)]/50 border-t border-[var(--border-color)]/30 mt-1 shrink-0">
+                                {(!['medico'].includes(userRole) && (app.paymentStatus === 'pagado' || app.paymentStatus === 'señado')) && (
+                                  <button
+                                    title="Imprimir Comprobante"
+                                    onClick={(e) => { e.stopPropagation(); setReceiptApp(app); setActiveDropdown(null); }}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 hover:scale-110 transition-all"
+                                  >
+                                    <Receipt size={18} />
+                                  </button>
+                                )}
 
-                               {(!['medico'].includes(userRole) && store.globalConfig?.whatsappEnabled) && (
-                                 <button 
-                                   onClick={(e) => {
-                                     e.stopPropagation();
-                                     handleSendWhatsApp(app);
-                                     setActiveDropdown(null);
-                                   }}
-                                   className="w-full text-left px-5 py-3 text-xs font-bold text-emerald-600 hover:bg-emerald-500/10 transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"
-                                 >
-                                   <MessageCircle size={16} className="opacity-70" /> Recordatorio WhatsApp
-                                 </button>
-                               )}
+                                {(!['medico'].includes(userRole) && store.globalConfig?.whatsappEnabled) && (
+                                  <button 
+                                    title="Recordatorio WhatsApp"
+                                    onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(app); setActiveDropdown(null); }}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl text-emerald-600 hover:bg-emerald-500/10 hover:scale-110 transition-all"
+                                  >
+                                    <MessageCircle size={18} />
+                                  </button>
+                                )}
 
-                               {app.modalidad === 'virtual' && userRole === 'medico' && (
-                                 <button 
-                                   onClick={(e) => handleStartVirtualCall(e, app)}
-                                   className="w-full text-left px-5 py-3 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3 shadow-[0_0_15px_rgba(79,70,229,0.3)]"
-                                 >
-                                   <Video size={16} /> Iniciar Consulta Virtual
-                                 </button>
-                               )}
+                                {app.modalidad === 'virtual' && userRole === 'medico' && (
+                                  <button 
+                                    title="Iniciar Consulta Virtual"
+                                    onClick={(e) => handleStartVirtualCall(e, app)}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 hover:scale-110 transition-all shadow-[0_0_15px_rgba(79,70,229,0.3)]"
+                                  >
+                                    <Video size={18} />
+                                  </button>
+                                )}
 
-                               {app.modalidad === 'virtual' && (
-                                 <button 
-                                   onClick={(e) => handleCopyVirtualLink(app, e)}
-                                   className="w-full text-left px-5 py-3 text-xs font-bold text-indigo-500 hover:bg-indigo-50 transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"
-                                 >
-                                   <Copy size={16} className="opacity-70" /> Copiar Link Acceso (Paciente)
-                                 </button>
-                               )}
+                                {!['medico'].includes(userRole) && app.modalidad === 'virtual' && (
+                                  <button 
+                                    title="Copiar Link Acceso (Paciente)"
+                                    onClick={(e) => handleCopyVirtualLink(app, e)}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl text-indigo-500 hover:bg-indigo-50 hover:scale-110 transition-all"
+                                  >
+                                    <Copy size={18} />
+                                  </button>
+                                )}
 
-                              <button
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   if (false) {
-                                     handleViewPatient(app);
-                                   } else {
-                                     handleOpenEdit(app);
-                                   }
-                                 }}
-                                className="w-full text-left px-5 py-3 text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--accent-light)] transition-all border-b border-[var(--border-color)]/30 flex items-center gap-3"
-                              >
-                                <Eye size={16} className="opacity-40" /> {['medico'].includes(userRole) ? 'Ver ficha detallada' : 'Editar detalles'}
-                              </button>
-                              
-                              {!['medico'].includes(userRole) && (
+                                {['medico', 'admin'].includes(userRole) && app.attendance === 'finalizado' && !app.hasEvolution && (
+                                  <button
+                                    title="Redactar Evolución Olvidada"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleGoToAddEvolution(app);
+                                    }}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl text-rose-500 hover:bg-rose-50 hover:scale-110 transition-all"
+                                  >
+                                    <Activity size={18} />
+                                  </button>
+                                )}
+
                                 <button
+                                  title={['medico'].includes(userRole) ? 'Ver ficha detallada' : 'Editar detalles'}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setActiveDropdown(null);
-                                    setConfirmDelete(app.id);
+                                    handleOpenEdit(app);
                                   }}
-                                  className="w-full text-left px-5 py-3 text-xs font-black text-rose-500 hover:bg-rose-500/10 transition-all flex items-center gap-3"
+                                  className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--text-primary)] hover:bg-[var(--accent-light)] hover:scale-110 transition-all"
                                 >
-                                  <Trash2 size={16} className="opacity-60" /> Eliminar {isBlock ? 'bloqueo' : 'turno'}
+                                  <Eye size={18} />
                                 </button>
-                              )}
+                                
+                                {!['medico'].includes(userRole) && (
+                                  <button
+                                    title={`Eliminar ${isBlock ? 'bloqueo' : 'turno'}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveDropdown(null);
+                                      setConfirmDelete(app.id);
+                                    }}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl text-rose-500 hover:bg-rose-500/10 hover:scale-110 transition-all"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+                              </div>
                               </div>
                             </div>
                           </>
@@ -2309,14 +2276,35 @@ export default function AgendaPage() {
       )}
 
       {/* GLOBAL MOBILE MENU - Desacoplado para evitar conflictos de eventos y remounting */}
-      {isMobile && menuApp && createPortal(
-        <div className="fixed inset-0 z-[99999] flex items-end justify-center">
-          <div 
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" 
-            onClick={() => { setMenuApp(null); setMobileSeñaInput({ active: false, value: '' }); }}
-          ></div>
-          <div className="relative w-full bg-[var(--bg-card)] rounded-t-[32px] p-6 pb-12 animate-fade-in-up shadow-2xl border-t border-[var(--border-color)] max-h-[85vh] overflow-y-auto custom-scrollbar">
-            <div className="w-12 h-1.5 bg-slate-400/20 rounded-full mx-auto mb-4"></div>
+      {isMobile && createPortal(
+        <AnimatePresence>
+          {menuApp && (
+            <div className="fixed inset-0 z-[99999] flex items-end justify-center overflow-hidden">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" 
+                onClick={() => { setMenuApp(null); setMobileSeñaInput({ active: false, value: '' }); }}
+              />
+              <motion.div 
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                drag="y"
+                dragConstraints={{ top: 0 }}
+                dragElastic={0.2}
+                onDragEnd={(e, info) => {
+                  if (info.offset.y > 100 || info.velocity.y > 500) {
+                    setMenuApp(null);
+                    setMobileSeñaInput({ active: false, value: '' });
+                  }
+                }}
+                className="relative w-full bg-[var(--bg-card)] rounded-t-[32px] p-6 pb-12 shadow-2xl border-t border-[var(--border-color)] max-h-[85vh] overflow-y-auto custom-scrollbar"
+              >
+                <div className="w-12 h-1.5 bg-slate-400/20 rounded-full mx-auto mb-4 cursor-grab active:cursor-grabbing shrink-0"></div>
             
             {/* Encabezado del bottom sheet */}
             <div className="px-2 pb-4 border-b border-[var(--border-color)]/30 mb-3">
@@ -2331,150 +2319,49 @@ export default function AgendaPage() {
               )}
             </div>
 
-            {/* ── SECCIÓN COBROS ── */}
-            {userRole !== 'medico' && (
+
+            {/* ── SECCIÓN ASISTENCIA ── */}
+            {!['medico'].includes(userRole) && (
               <div className="mb-3">
-                <p className="px-2 py-1.5 text-[9px] font-black text-[var(--text-secondary)] opacity-40 uppercase tracking-widest">Caja / Cobros</p>
-
-                {/* Pendiente */}
-                <button
-                  onClick={() => {
-                    store.updateAppointmentPaymentStatus(menuApp.id, { paymentStatus: 'pendiente', paidAmount: 0 });
-                    setMenuApp(null);
-                  }}
-                  className={`w-full text-left px-5 py-3.5 text-sm font-bold flex items-center justify-between rounded-xl transition-all ${
-                    menuApp.paymentStatus === 'pendiente' ? 'text-rose-500 bg-rose-50' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'
-                  }`}
-                >
-                  <span className="flex items-center gap-3"><span className="text-lg">⏳</span> Pendiente</span>
-                  {menuApp.paymentStatus === 'pendiente' && <CheckCircle2 size={16} className="text-rose-500" />}
+                <p className="px-2 py-1.5 text-[9px] font-black text-[var(--text-secondary)] opacity-40 uppercase tracking-widest">Estado de Asistencia</p>
+                <button onClick={(e) => { handleStatusChange(e, menuApp.id, 'en_espera'); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-sky-500 hover:bg-sky-500/10 flex items-center gap-3 transition-all rounded-xl">
+                  <CalendarDays size={20} /> Llegó a Sala
                 </button>
-
-                {/* Abonado */}
-                <button
-                  onClick={async () => {
-                    if (menuApp.paymentStatus === 'pagado') { setMenuApp(null); return; }
-                    const totalFee = Number(menuApp.paymentAmount) > 0 ? Number(menuApp.paymentAmount) : 35000;
-                    const prevPaid = Number(menuApp.paidAmount || 0);
-                    const amountToPay = totalFee - prevPaid;
-                    toast('⏳ Procesando cobro...', { duration: 2000 });
-                    try {
-                      const { data: d1 } = await import('../../../services/api').then(m => m.default).then(api => api.patch(`/appointments/${menuApp.id}/payment`, {
-                        paymentStatus: 'pagado', paidAmount: totalFee, paymentAmount: totalFee
-                      }));
-                      store.updateAppointmentPaymentStatus(menuApp.id, { paymentStatus: 'pagado', paidAmount: totalFee }).catch(()=>{});
-                      
-                      if (amountToPay > 0) {
-                        await import('../../../services/api').then(m => m.default).then(api => api.post(`/transactions/`, {
-                          type: 'Ingreso', concept: `Cobro ${menuApp.title} — ${menuApp.patient}`, method: menuApp.paymentMethod || 'Efectivo', amount: amountToPay, date: nowForAPI(), notes: `Cobro desde Agenda mobile (Turno #${menuApp.id})`, doctor_id: menuApp.doctorId, patient_id: menuApp.patientId
-                        }));
-                        toast.success(`✅ $${amountToPay.toLocaleString()} registrado en Finanzas`);
-                      } else {
-                        toast('✅ Turno marcado como abonado');
-                      }
-                    } catch(e) {
-                      const msg = e.response?.data?.message || e.message;
-                      toast.error('❌ Error: ' + msg);
-                    }
-                    setMenuApp(null);
-                  }}
-                  className={`w-full text-left px-5 py-3.5 text-sm font-bold flex items-center justify-between rounded-xl transition-all ${
-                    menuApp.paymentStatus === 'pagado' ? 'text-emerald-600 bg-emerald-50 cursor-default' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'
-                  }`}
-                >
-                  <span className="flex items-center gap-3"><span className="text-lg">✅</span> Abonado completo</span>
-                  {menuApp.paymentStatus === 'pagado' && <CheckCircle2 size={16} className="text-emerald-600" />}
+                <button onClick={(e) => { handleStatusChange(e, menuApp.id, 'finalizado'); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-blue-500 hover:bg-blue-500/10 flex items-center gap-3 transition-all rounded-xl">
+                  <CheckCircle2 size={20} /> Finalizado
                 </button>
-
-                {/* Señado */}
-                <button
-                  onClick={() => setMobileSeñaInput({ active: true, value: String(Math.floor(Number(menuApp.paymentAmount || 35000) / 2)) })}
-                  className={`w-full text-left px-5 py-3.5 text-sm font-bold flex items-center justify-between rounded-xl transition-all ${
-                    menuApp.paymentStatus === 'señado' ? 'text-indigo-600 bg-indigo-50' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'
-                  }`}
-                >
-                  <span className="flex items-center gap-3"><span className="text-lg">💰</span> Registrar Seña</span>
-                  {menuApp.paymentStatus === 'señado' && <CheckCircle2 size={16} className="text-indigo-600" />}
+                <button onClick={(e) => { handleStatusChange(e, menuApp.id, 'ausente'); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 flex items-center gap-3 transition-all rounded-xl">
+                  <UserX size={20} /> Ausente / Canceló
                 </button>
-
-                {/* Input de monto de seña */}
-                {mobileSeñaInput.active && (
-                  <div className="mx-2 mt-1 mb-3 p-4 bg-indigo-50 rounded-2xl border border-indigo-100" onClick={e => e.stopPropagation()}>
-                    <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-3">Monto de la seña</p>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-indigo-500">$</span>
-                        <input id="value" name="value"
-                          type="number"
-                          autoFocus
-                          value={mobileSeñaInput.value}
-                          onChange={e => setMobileSeñaInput(p => ({ ...p, value: e.target.value }))}
-                          className="w-full pl-7 pr-3 py-3 text-lg font-black text-indigo-700 bg-white border border-indigo-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200"
-                          placeholder="0"
-                        />
-                      </div>
-                      <button
-                        onClick={async () => {
-                          const amount = Number(mobileSeñaInput.value);
-                          if (amount <= 0) { toast.error('Ingresá un monto válido'); return; }
-                          toast('⏳ Registrando seña...', { duration: 2000 });
-                          try {
-                            const { data: d1 } = await import('../../../services/api').then(m => m.default).then(api => api.patch(`/appointments/${menuApp.id}/payment`, {
-                              paymentStatus: 'señado', paidAmount: amount
-                            }));
-                            store.updateAppointmentPaymentStatus(menuApp.id, { paymentStatus: 'señado', paidAmount: amount }).catch(()=>{});
-                            
-                            await import('../../../services/api').then(m => m.default).then(api => api.post(`/transactions/`, {
-                              type: 'Ingreso', concept: `Seña ${menuApp.title} — ${menuApp.patient}`, method: menuApp.paymentMethod || 'Efectivo', amount, date: nowForAPI(), notes: `Seña desde Agenda mobile (Turno #${menuApp.id})`, doctor_id: menuApp.doctorId, patient_id: menuApp.patientId
-                            }));
-                            toast.success(`✅ Seña $${amount.toLocaleString()} registrada`);
-                          } catch(e) {
-                            const msg = e.response?.data?.message || e.message;
-                            toast.error('❌ Error: ' + msg);
-                          }
-                          setMobileSeñaInput({ active: false, value: '' });
-                          setMenuApp(null);
-                        }}
-                        className="px-4 py-3 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 transition-colors text-sm"
-                      >
-                        OK
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* ── SECCIÓN ASISTENCIA ── */}
-            <div className="mb-3">
-              <p className="px-2 py-1.5 text-[9px] font-black text-[var(--text-secondary)] opacity-40 uppercase tracking-widest">Estado de Asistencia</p>
-              <button onClick={(e) => { handleStatusChange(e, menuApp.id, 'en_espera'); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-sky-500 hover:bg-sky-500/10 flex items-center gap-3 transition-all rounded-xl">
-                <CalendarDays size={20} /> Llegó a Sala
-              </button>
-              <button onClick={(e) => { handleStatusChange(e, menuApp.id, 'finalizado'); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-blue-500 hover:bg-blue-500/10 flex items-center gap-3 transition-all rounded-xl">
-                <CheckCircle2 size={20} /> Finalizado
-              </button>
-              <button onClick={(e) => { handleStatusChange(e, menuApp.id, 'ausente'); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 flex items-center gap-3 transition-all rounded-xl">
-                <UserX size={20} /> Ausente / Canceló
-              </button>
-            </div>
-
             {/* ── OTRAS ACCIONES ── */}
             <div className="border-t border-[var(--border-color)]/30 pt-3">
-              {store.globalConfig?.whatsappEnabled && (
+              {menuApp.modalidad === 'virtual' && userRole === 'medico' && (
+                <button onClick={(e) => { handleStartVirtualCall(e, menuApp); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 flex items-center gap-3 transition-all rounded-xl mb-1 shadow-[0_0_15px_rgba(79,70,229,0.3)]">
+                  <Video size={20} /> Iniciar Consulta Virtual
+                </button>
+              )}
+              {!['medico'].includes(userRole) && store.globalConfig?.whatsappEnabled && (
                 <button onClick={() => { handleSendWhatsApp(menuApp); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-emerald-500 hover:bg-emerald-500/10 flex items-center gap-3 transition-all rounded-xl">
                   <MessageCircle size={20} /> Recordatorio WhatsApp
                 </button>
               )}
-              {menuApp.modalidad === 'virtual' && (
-                <button onClick={(e) => handleCopyVirtualLink(menuApp, e)} className="w-full text-left px-5 py-3.5 text-sm font-bold text-indigo-500 hover:bg-indigo-50 flex items-center gap-3 transition-all rounded-xl">
+              {!['medico'].includes(userRole) && menuApp.modalidad === 'virtual' && (
+                <button onClick={(e) => { handleCopyVirtualLink(menuApp, e); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-indigo-500 hover:bg-indigo-50 flex items-center gap-3 transition-all rounded-xl">
                   <Copy size={20} /> Copiar Link (Paciente)
+                </button>
+              )}
+              {['medico', 'admin'].includes(userRole) && menuApp.attendance === 'finalizado' && !menuApp.hasEvolution && (
+                <button onClick={(e) => { e.stopPropagation(); handleGoToAddEvolution(menuApp); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-3 transition-all rounded-xl">
+                  <Activity size={20} /> Redactar Evolución Olvidada
                 </button>
               )}
               <button onClick={() => { handleOpenEdit(menuApp); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--accent-light)] flex items-center gap-3 transition-all rounded-xl">
                 <Eye size={20} /> Editar Ficha del Turno
               </button>
-              {(menuApp.paymentStatus === 'pagado' || menuApp.paymentStatus === 'señado') && (
+              {!['medico'].includes(userRole) && (menuApp.paymentStatus === 'pagado' || menuApp.paymentStatus === 'señado') && (
                 <button onClick={() => { setReceiptApp(menuApp); setMenuApp(null); }} className="w-full text-left px-5 py-3.5 text-sm font-bold text-[var(--accent-primary)] hover:bg-[var(--accent-light)] flex items-center gap-3 transition-all rounded-xl">
                   <Receipt size={20} /> Imprimir Comprobante
                 </button>
@@ -2489,9 +2376,12 @@ export default function AgendaPage() {
             <button onClick={() => { setMenuApp(null); setMobileSeñaInput({ active: false, value: '' }); }} className="w-full py-4 text-sm font-black text-slate-400 mt-2 hover:text-[var(--text-primary)] transition-colors">
               Cancelar
             </button>
+            </motion.div>
           </div>
-        </div>
-      , document.body)}
+        )}
+      </AnimatePresence>,
+      document.body
+      )}
     </div>
   );
 }

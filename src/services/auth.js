@@ -9,13 +9,10 @@ export const authService = {
     const storage = rememberMe ? localStorage : sessionStorage;
     
     // Limpiar ambos primero por si había sesión vieja
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('refresh_token');
-    sessionStorage.removeItem('auth_token');
-    sessionStorage.removeItem('refresh_token');
+    localStorage.removeItem('has_session');
+    sessionStorage.removeItem('has_session');
 
-    if (data.token) storage.setItem('auth_token', data.token);
-    if (data.refreshToken) storage.setItem('refresh_token', data.refreshToken);
+    if (data.token) storage.setItem('has_session', 'true');
     
     return data;
   },
@@ -26,10 +23,8 @@ export const authService = {
     } catch {
       // Ignorar errores en logout
     } finally {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('refresh_token');
-      sessionStorage.removeItem('auth_token');
-      sessionStorage.removeItem('refresh_token');
+      localStorage.removeItem('has_session');
+      sessionStorage.removeItem('has_session');
     }
   },
 
@@ -39,7 +34,7 @@ export const authService = {
   },
 
   isAuthenticated() {
-    return !!(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'));
+    return !!(localStorage.getItem('has_session') || sessionStorage.getItem('has_session'));
   },
 
   async changePassword(currentPassword, newPassword) {

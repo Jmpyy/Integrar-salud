@@ -119,16 +119,16 @@ export default function MedicamentosPage() {
       </div>
 
       {/* TABS */}
-      <div className="flex gap-2 p-1.5 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl w-fit shadow-sm">
+      <div className="flex items-center gap-1 sm:gap-2 p-1.5 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl w-full sm:w-fit shadow-sm overflow-x-auto hide-scrollbar">
         <button 
           onClick={() => setActiveTab('vademecum')}
-          className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'vademecum' ? 'bg-rose-500 text-white shadow-md' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
+          className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'vademecum' ? 'bg-rose-500 text-white shadow-md' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
         >
           Vademécum
         </button>
         <button 
           onClick={() => setActiveTab('prescripciones')}
-          className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'prescripciones' ? 'bg-rose-500 text-white shadow-md' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
+          className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'prescripciones' ? 'bg-rose-500 text-white shadow-md' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
         >
           Pacientes en Tratamiento
         </button>
@@ -195,9 +195,9 @@ export default function MedicamentosPage() {
           )}
         </div>
       ) : (
-        <div className="card-premium overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+        <div className="card-premium overflow-hidden border border-[var(--glass-border)] rounded-2xl sm:rounded-[2.5rem] shadow-xl">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse hidden md:table">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Paciente</th>
@@ -242,6 +242,44 @@ export default function MedicamentosPage() {
                 )}
               </tbody>
             </table>
+
+            {/* MÓVIL */}
+            <div className="md:hidden divide-y divide-[var(--border-color)]/20">
+              {activePrescriptions.length === 0 ? (
+                <div className="px-6 py-20 text-center text-slate-400 font-bold italic">No hay prescripciones activas.</div>
+              ) : (
+                activePrescriptions.map((pres, idx) => (
+                  <div key={idx} className="p-5 transition-all flex flex-col gap-3 active:bg-[var(--accent-light)]">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center font-black shadow-inner shrink-0">
+                          <Pill size={18} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-black text-[var(--text-primary)] text-base">{pres.drug}</span>
+                          <span className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 uppercase tracking-widest">{pres.patientName}</span>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase rounded-full border border-emerald-200">Activa</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-1">
+                      <div>
+                        <p className="text-[9px] font-black text-[var(--text-secondary)] uppercase tracking-widest mb-0.5">Dosis</p>
+                        <p className="text-xs font-bold text-[var(--text-primary)] opacity-80">{pres.dose}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-[var(--text-secondary)] uppercase tracking-widest mb-0.5">Frecuencia</p>
+                        <p className="text-xs font-bold text-[var(--text-primary)] opacity-80">{pres.frequency}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-[9px] font-black text-[var(--text-secondary)] uppercase tracking-widest mb-0.5">Inicio</p>
+                        <p className="text-xs font-bold text-[var(--text-primary)] opacity-80">{new Date(pres.start_date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}

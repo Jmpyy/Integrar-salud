@@ -13,6 +13,7 @@ import { APPOINTMENT_STATUS } from '../../../config/constants';
 import { socket } from '../../../services/socket';
 import DailyMeeting from '../../../components/DailyMeeting';
 import api from '../../../services/api';
+import { playErrorSound } from '../../../utils/sounds';
 
 export default function ConsultorioPage() {
   const store = useStore();
@@ -129,8 +130,38 @@ export default function ConsultorioPage() {
 
   const handleStatusChange = async (appId, newStatus) => {
     try {
-      await store.updateAppointmentStatus(appId, newStatus);
-      const app = appointments.find(a => a.id === appId);
+      const updatedApp = await store.updateAppointmentStatus(appId, newStatus);
+      const app = updatedApp || appointments.find(a => a.id === appId);
+
+      if (newStatus === APPOINTMENT_STATUS.FINALIZADO && app && !app.hasEvolution) {
+         playErrorSound();
+         toast.custom((t) => (
+          <div className={`${t.visible ? 'animate-fade-in-up' : 'animate-fade-out-down'} max-w-sm w-full bg-[var(--bg-card)] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-[var(--border-color)] overflow-hidden backdrop-blur-xl border border-[var(--glass-border)]`}>
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <AlertCircle className="h-10 w-10 text-rose-500 p-2 bg-rose-500/10 rounded-xl animate-pulse" />
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-[10px] font-black text-rose-500 uppercase tracking-wider mb-1">Evolución Pendiente</p>
+                  <p className="text-sm text-[var(--text-primary)] font-bold">
+                    ¡Atención! Este turno ha finalizado pero falta completar la Evolución Médica.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex border-l border-[var(--border-color)]/20 bg-[var(--bg-sidebar)]/50">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="w-full border border-transparent rounded-none rounded-r-2xl px-4 flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-light)] transition-colors focus:outline-none"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        ), { duration: 6000, position: 'top-right' });
+      }
+
       if (app?.modalidad === 'virtual') {
         if (newStatus === APPOINTMENT_STATUS.EN_CURSO) {
           await store.updateAppointmentVideoStatus(appId, 'activa');
@@ -264,30 +295,30 @@ export default function ConsultorioPage() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-2 p-1.5 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl w-full sm:w-fit shadow-sm">
+      <div className="flex items-center gap-1 sm:gap-2 p-1.5 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl w-full sm:w-fit shadow-sm overflow-x-auto hide-scrollbar">
         <button
           onClick={() => setActiveTab('hoy')}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'hoy' ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap ${activeTab === 'hoy' ? 'bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
         >
-          <Clock size={16} /> Hoy
+          <Clock size={16} className="hidden sm:block" /> Hoy
         </button>
         <button
           onClick={() => setActiveTab('sala')}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'sala' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap ${activeTab === 'sala' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
         >
-          <Users size={16} /> En Sala
+          <Users size={16} className="hidden sm:block" /> En Sala
           {waitingRoomAppointments.length > 0 && <span className="ml-1 w-5 h-5 flex items-center justify-center bg-white/20 rounded-full text-[10px]">{waitingRoomAppointments.length}</span>}
         </button>
         <button
           onClick={() => setActiveTab('mensual')}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === 'mensual' ? 'bg-[var(--text-primary)] text-[var(--bg-main)] shadow-lg shadow-[var(--text-primary)]/10 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap ${activeTab === 'mensual' ? 'bg-[var(--text-primary)] text-[var(--bg-main)] shadow-lg shadow-[var(--text-primary)]/10 translate-y-[-1px]' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'}`}
         >
-          <CalendarRange size={16} /> Mensual
+          <CalendarRange size={16} className="hidden sm:block" /> Mensual
         </button>
       </div>
 
       {activeTab === 'hoy' && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="flex sm:grid sm:grid-cols-5 gap-2 sm:gap-3 overflow-x-auto hide-scrollbar pb-2 sm:pb-0 snap-x snap-mandatory">
           {[
             { label: 'Total Hoy', value: stats.total, icon: CalendarDays, color: 'text-[var(--accent-primary)]', bg: 'bg-[var(--accent-light)]' },
             { label: 'En Consulta', value: stats.enCurso, icon: HeartPulse, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
@@ -297,13 +328,13 @@ export default function ConsultorioPage() {
           ].map((stat, idx) => {
             const Icon = stat.icon;
             return (
-              <div key={idx} className="card-premium rounded-2xl p-4 border border-[var(--glass-border)] flex items-center gap-3">
-                <div className={`${stat.bg} p-2.5 rounded-xl shrink-0`}>
-                  <Icon size={18} className={stat.color} />
+              <div key={idx} className="card-premium rounded-2xl p-3 sm:p-4 border border-[var(--glass-border)] flex items-center gap-2.5 sm:gap-3 shrink-0 min-w-[140px] sm:min-w-0 snap-start">
+                <div className={`${stat.bg} p-2 sm:p-2.5 rounded-xl shrink-0`}>
+                  <Icon size={16} className={`${stat.color} sm:w-[18px] sm:h-[18px]`} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-60 uppercase tracking-wider">{stat.label}</p>
-                  <p className="text-xl font-black text-[var(--text-primary)]">{stat.value}</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-[var(--text-secondary)] opacity-60 uppercase tracking-wider">{stat.label}</p>
+                  <p className="text-lg sm:text-xl font-black text-[var(--text-primary)]">{stat.value}</p>
                 </div>
               </div>
             );
@@ -340,15 +371,17 @@ export default function ConsultorioPage() {
               return (
                 <div
                   key={app.id}
-                  className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 transition-all duration-200 group
-                    ${isFinalizado ? 'opacity-40 grayscale-[0.5]' : 'hover:bg-[var(--accent-light)]'}
+                  className={`p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-4 sm:gap-5 transition-all duration-200 group
+                    ${(isFinalizado && app.hasEvolution) ? 'opacity-40 grayscale-[0.5]' : 'hover:bg-[var(--accent-light)]'}
+                    ${(isFinalizado && !app.hasEvolution) ? 'bg-red-500/5 border-l-4 border-red-500' : ''}
                     ${isEnCurso ? 'bg-emerald-500/5 border-l-4 border-l-emerald-500' : ''}
                   `}
                 >
-                  <div className="flex items-center gap-4 shrink-0">
-                    <div className="text-center w-16">
-                      <p className={`text-lg font-black ${isEnCurso ? 'text-emerald-500' : 'text-[var(--text-primary)]'}`}>
-                        {app.time}
+                  {/* Info del paciente */}
+                  <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+                    <div className="text-center w-14 shrink-0 mt-1">
+                      <p className={`text-lg sm:text-xl font-black tracking-tight ${isEnCurso ? 'text-emerald-500' : 'text-[var(--text-primary)]'}`}>
+                        {app.time?.slice(0, 5)}
                       </p>
                       {activeTab === 'mensual' && (
                         <p className="text-[10px] font-bold text-[var(--accent-primary)] uppercase">
@@ -356,160 +389,147 @@ export default function ConsultorioPage() {
                         </p>
                       )}
                       {activeTab !== 'mensual' && (
-                        <p className="text-[10px] font-bold text-[var(--text-secondary)] opacity-40 uppercase">HS</p>
+                        <p className="text-[9px] font-bold text-[var(--text-secondary)] opacity-40 uppercase">HS</p>
                       )}
                     </div>
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm uppercase shrink-0
+                    
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-sm sm:text-base uppercase shrink-0
                       ${isFinalizado ? 'bg-[var(--bg-main)] text-[var(--text-secondary)] border border-[var(--border-color)]' :
                         isEnCurso ? 'bg-emerald-500 text-white ring-4 ring-emerald-500/20' :
                         'bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-hover)] text-white shadow-lg'
                       }`}>
                       {app.patient?.charAt(0) || '?'}
                     </div>
-                  </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      <h4 className={`text-base font-extrabold ${isFinalizado ? 'text-[var(--text-secondary)] line-through' : 'text-[var(--text-primary)]'}`}>
-                        {app.patient}
-                      </h4>
-                      {getStatusBadge(app)}
-                      {app.modalidad === 'virtual' && isWaiting && (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] uppercase font-black rounded-md border border-emerald-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute opacity-75"></span>
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative"></span>
-                          Paciente en Línea
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)] flex-wrap">
-                      <span className="font-semibold opacity-80">{app.title}</span>
-                      {app.type && (
-                         <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/50 border border-[var(--border-color)]/30 text-[var(--text-primary)] text-[9px] font-black rounded-md uppercase">
-                            {app.type.toLowerCase().includes('virtual') ? '💻' : app.type.toLowerCase().includes('domicilio') ? '🏠' : '🏥'} {app.type}
-                         </span>
-                      )}
-                      {patientData?.nhc && (
-                        <span className="text-[10px] font-black text-[var(--text-secondary)] bg-[var(--bg-main)] px-2 py-0.5 rounded-md border border-[var(--border-color)]/30 font-mono">NHC: {patientData.nhc}</span>
-                      )}
-                    </div>
-                    {patientData?.allergies && (
-                      <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-red-500 animate-pulse">
-                        <ShieldAlert size={12} />
-                        ALERTA: {patientData.allergies}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h4 className={`text-sm sm:text-base font-extrabold truncate ${isFinalizado ? 'text-[var(--text-secondary)] line-through' : 'text-[var(--text-primary)]'}`}>
+                          {app.patient}
+                        </h4>
+                        {getStatusBadge(app)}
+                        {app.modalidad === 'virtual' && isWaiting && (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] uppercase font-black rounded-md border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute opacity-75"></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative"></span>
+                            Paciente en Línea
+                          </span>
+                        )}
                       </div>
-                    )}
+                      <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] flex-wrap">
+                        <span className="font-semibold opacity-80">{app.title}</span>
+                        {app.type && (
+                           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--bg-main)] border border-[var(--border-color)]/50 text-[var(--text-primary)] text-[9px] font-black rounded-md uppercase">
+                              {app.type.toLowerCase().includes('virtual') ? '💻' : app.type.toLowerCase().includes('domicilio') ? '🏠' : '🏥'} {app.type}
+                           </span>
+                        )}
+                        {patientData?.nhc && (
+                          <span className="text-[10px] font-black text-[var(--text-secondary)] bg-[var(--bg-main)] px-2 py-0.5 rounded-md border border-[var(--border-color)]/30 font-mono">NHC: {patientData.nhc}</span>
+                        )}
+                      </div>
+                      {patientData?.allergies && (
+                        <div className="flex items-center gap-1.5 mt-2 text-xs font-bold text-red-500 animate-pulse">
+                          <ShieldAlert size={12} />
+                          ALERTA: {patientData.allergies}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
+                  {/* Acciones */}
                   {isDoctorOrAdmin && (
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 mt-2 sm:mt-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 shrink-0 w-full lg:w-auto mt-2 lg:mt-0 pt-3 lg:pt-0 border-t border-[var(--border-color)]/50 lg:border-none">
                       <button
                         onClick={(e) => { e.stopPropagation(); handleOpenPatient(patientData); }}
                         disabled={!patientData}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 transition-all
-                          ${patientData
-                            ? 'bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] shadow-sm'
-                            : 'bg-[var(--bg-sidebar)] text-[var(--text-secondary)]/30 border-[var(--border-color)]/20 cursor-not-allowed opacity-50'
+                        className={`w-full sm:w-auto px-4 py-3 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black flex items-center justify-center gap-2 transition-all shrink-0
+                          ${!patientData
+                            ? 'bg-[var(--bg-sidebar)] text-[var(--text-secondary)]/30 border-[var(--border-color)]/20 cursor-not-allowed opacity-50'
+                            : (isFinalizado && !app.hasEvolution)
+                              ? 'bg-red-500/10 border-2 border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white shadow-md animate-pulse'
+                              : 'bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] shadow-sm'
                           }`}
                         title={patientData ? 'Abrir historia clínica completa' : 'Paciente sin registro básico'}
                       >
-                        <FileText size={16} />
-                        <span className="hidden sm:inline">HISTORIA CLÍNICA</span>
+                        {isFinalizado && !app.hasEvolution ? <AlertCircle size={16} /> : <FileText size={16} />}
+                        <span>{isFinalizado && !app.hasEvolution ? 'FALTA EVOLUCIÓN' : 'HISTORIA CLÍNICA'}</span>
                       </button>
 
                       {!isFinalizado && app.attendance !== APPOINTMENT_STATUS.AUSENTE && (
-                        <div className="flex flex-col gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                          <div className="flex gap-2 w-full flex-wrap sm:flex-nowrap">
-                            {!isEnCurso ? (
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto flex-1">
+                          {!isEnCurso ? (
+                            <button
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                if (app.modalidad === 'virtual') {
+                                  if (app.paymentStatus !== 'pagado') {
+                                    toast.error('No podés iniciar la videollamada porque el paciente aún no ha abonado la consulta.', { icon: '💳' });
+                                    return;
+                                  }
+                                  if (app.date && app.time) {
+                                    const now = new Date();
+                                    const [year, month, day] = app.date.split('-').map(Number);
+                                    const [hour, minute] = app.time.split(':').map(Number);
+                                    const appDateTime = new Date(year, month - 1, day, hour, minute);
+                                    if (Math.floor((appDateTime.getTime() - now.getTime()) / 60000) > 5) {
+                                      toast.error('Solo se permite iniciar 5 minutos antes del turno.', { icon: '⏳' });
+                                      return;
+                                    }
+                                  }
+                                  store.setActiveCallApp(app);
+                                } else {
+                                  handleStatusChange(app.id, APPOINTMENT_STATUS.EN_CURSO);
+                                }
+                              }}
+                              className={`w-full sm:w-auto flex-1 px-5 py-3 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black flex items-center justify-center gap-2 transition-all shadow-md
+                                ${isWaiting && app.modalidad === 'virtual'
+                                  ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20 scale-[1.02] ring-2 ring-offset-2 ring-emerald-500 ring-offset-[var(--bg-main)]'
+                                  : isWaiting 
+                                    ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20' 
+                                    : 'bg-[var(--text-primary)] text-[var(--bg-main)] hover:opacity-90 shadow-[var(--text-primary)]/10'}
+                              `}
+                            >
+                              {app.modalidad === 'virtual' ? <Video size={16} className={isWaiting ? "animate-pulse" : ""} /> : <HeartPulse size={16} />}
+                              <span>{app.modalidad === 'virtual' ? 'INICIAR VIDEOLLAMADA' : 'INICIAR CONSULTA'}</span>
+                            </button>
+                          ) : (
+                            <div className="flex flex-col sm:flex-row gap-2 w-full flex-1">
+                              {app.modalidad === 'virtual' && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); store.setActiveCallApp(app); }}
+                                  className="w-full sm:w-auto flex-1 px-4 py-3 sm:py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-md shadow-indigo-500/20 transition-all"
+                                >
+                                  <Video size={16} />
+                                  <span>VOLVER AL VIDEO</span>
+                                </button>
+                              )}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleOpenPatient(patientData); }}
+                                className="w-full sm:w-auto flex-1 px-4 py-3 sm:py-2.5 bg-emerald-600 text-white rounded-xl text-[11px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md shadow-emerald-500/20 transition-all"
+                              >
+                                <FileText size={16} />
+                                <span>EVOLUCIÓN</span>
+                              </button>
                               <button
                                 onClick={(e) => { 
                                   e.stopPropagation(); 
-                                  if (app.modalidad === 'virtual') {
-                                    if (app.paymentStatus !== 'pagado') {
-                                      toast.error('No podés iniciar la videollamada porque el paciente aún no ha abonado la consulta.', {
-                                        icon: '💳',
-                                        duration: 5000,
-                                      });
-                                      return;
-                                    }
-                                    
-                                    // Validar tiempo (5 mins antes)
-                                    if (app.date && app.time) {
-                                      const now = new Date();
-                                      const [year, month, day] = app.date.split('-').map(Number);
-                                      const [hour, minute] = app.time.split(':').map(Number);
-                                      const appDateTime = new Date(year, month - 1, day, hour, minute);
-                                      const diffMins = Math.floor((appDateTime.getTime() - now.getTime()) / 60000);
-                                      
-                                      if (diffMins > 5) {
-                                        toast.error('No podés iniciar una consulta con tanta anticipación. Solo se permite 5 minutos antes del turno.', {
-                                          icon: '⏳',
-                                          duration: 5000,
-                                        });
-                                        return;
-                                      }
-                                    }
-                                    
-                                    store.setActiveCallApp(app);
-                                    // Eliminado: socket.emit('call-started', `appointment-${app.id}`);
-                                  } else {
-                                    handleStatusChange(app.id, APPOINTMENT_STATUS.EN_CURSO);
-                                  }
+                                  handleStatusChange(app.id, APPOINTMENT_STATUS.FINALIZADO); 
+                                  if (app.modalidad === 'virtual') socket.emit('call-ended', `appointment-${app.id}`);
                                 }}
-                                className={`flex-1 sm:flex-none px-5 py-3 rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 transition-all shadow-lg
-                                  ${isWaiting && app.modalidad === 'virtual'
-                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20 scale-[1.02] ring-2 ring-offset-2 ring-emerald-500 ring-offset-[var(--bg-main)]'
-                                    : isWaiting 
-                                      ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20' 
-                                      : 'bg-[var(--text-primary)] text-[var(--bg-main)] hover:opacity-90 shadow-[var(--text-primary)]/10'}
-                                `}
+                                className="w-full sm:w-auto flex-1 px-4 py-3 sm:py-2.5 bg-[var(--accent-primary)] text-white rounded-xl text-[11px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] shadow-md shadow-[var(--accent-primary)]/20 transition-all"
                               >
-                                {app.modalidad === 'virtual' ? <Video size={16} className={isWaiting ? "animate-pulse" : ""} /> : <HeartPulse size={16} />}
-                                <span>{app.modalidad === 'virtual' ? 'INICIAR VIDEOLLAMADA' : 'INICIAR CONSULTA'}</span>
-                              </button>
-                            ) : (
-                              <div className="flex gap-2 w-full flex-wrap sm:flex-nowrap">
-                                {app.modalidad === 'virtual' && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); store.setActiveCallApp(app); }}
-                                    className="flex-1 sm:flex-none px-4 py-3 bg-indigo-600 text-white rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-md shadow-indigo-500/20 transition-all"
-                                  >
-                                    <Video size={16} />
-                                    <span>VOLVER AL VIDEO</span>
-                                  </button>
-                                )}
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleOpenPatient(patientData); }}
-                                  className="flex-1 sm:flex-none px-4 py-3 bg-emerald-600 text-white rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md shadow-emerald-500/20 transition-all"
-                                >
-                                  <FileText size={16} />
-                                  <span className="hidden sm:inline">EVOLUCIÓN</span>
-                                  <span className="sm:hidden">EVOLUCION</span>
-                                </button>
-                                <button
-                                  onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    handleStatusChange(app.id, APPOINTMENT_STATUS.FINALIZADO); 
-                                    if (app.modalidad === 'virtual') socket.emit('call-ended', `appointment-${app.id}`);
-                                  }}
-                                  className="flex-1 sm:flex-none px-4 py-3 bg-[var(--accent-primary)] text-white rounded-xl text-[10px] sm:text-xs font-black flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] shadow-lg shadow-[var(--accent-primary)]/20 transition-all"
-                                >
-                                  <UserCheck size={16} />
-                                  <span>FINALIZAR</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {app.modalidad === 'virtual' && (
-                            <div className="flex gap-2 w-full mt-1">
-                              <button
-                                onClick={(e) => handleSetDelay(app, e)}
-                                className="flex-1 px-3 py-2 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-amber-100 transition-colors"
-                              >
-                                <AlertCircle size={14} /> Avisar Demora
+                                <UserCheck size={16} />
+                                <span>FINALIZAR</span>
                               </button>
                             </div>
+                          )}
+
+                          {app.modalidad === 'virtual' && (
+                            <button
+                              onClick={(e) => handleSetDelay(app, e)}
+                              className="w-full sm:w-auto px-4 py-3 sm:py-2.5 bg-amber-50 text-amber-600 border border-amber-200 rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors shrink-0"
+                            >
+                              <AlertCircle size={16} /> Avisar Demora
+                            </button>
                           )}
                         </div>
                       )}

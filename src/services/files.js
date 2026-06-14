@@ -10,6 +10,16 @@ export const filesService = {
   },
 
   /**
+   * Descarga un archivo de forma segura mediante un Blob
+   */
+  downloadFile: async (patientId, fileId) => {
+    const response = await api.get(`/patients/${patientId}/files/${fileId}/download`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  /**
    * Sube un archivo para un paciente
    */
   uploadFile: async (patientId, file) => {

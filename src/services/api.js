@@ -14,13 +14,9 @@ const api = axios.create({
   },
 });
 
-// ─── Request Interceptor: adjunta token ───
+// ─── Request Interceptor ───
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -48,13 +44,16 @@ api.interceptors.response.use(
     const url = originalRequest?.url || '';
     const is401 = error.response?.status === 401;
 
-    // Si es 401 en login o refresh o auth/me, desloguear definitivamente
-    if (is401 && (url.includes('auth/me') || url.includes('auth/refresh') || url.includes('auth/login'))) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('refresh_token');
-      sessionStorage.removeItem('auth_token');
-      sessionStorage.removeItem('refresh_token');
-      window.location.href = '/login';
+    // Si falla el login (401 o 429), simplemente devolvemos el error al componente
+    if (url.includes('auth/login')) {
+      return Promise.reject(error);
+    }
+
+    // Si es 401 en refresh o auth/me, desloguear definitivamente
+    if (is401 && (url.includes('auth/me') || url.includes('auth/refresh'))) {
+      localStorage.removeItem('has_session');
+      sessionStorage.removeItem('has_session');
+      window.location.href = '/#/login';
       return Promise.reject(error);
     }
 
@@ -63,8 +62,7 @@ api.interceptors.response.use(
       if (isRefreshing) {
         return new Promise(function(resolve, reject) {
           failedQueue.push({ resolve, reject });
-        }).then(token => {
-          originalRequest.headers['Authorization'] = 'Bearer ' + token;
+        }).then(() => {
           return api(originalRequest);
         }).catch(err => {
           return Promise.reject(err);
@@ -74,28 +72,24 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const refreshToken = localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token');
+      const hasSession = localStorage.getItem('has_session') || sessionStorage.getItem('has_session');
 
-      if (!refreshToken) {
+      if (!hasSession) {
         isRefreshing = false;
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('refresh_token');
-        sessionStorage.removeItem('auth_token');
-        sessionStorage.removeItem('refresh_token');
-        window.location.href = '/login';
+        localStorage.removeItem('has_session');
+        sessionStorage.removeItem('has_session');
+        window.location.href = '/#/login';
         return Promise.reject(error);
       }
 
       try {
-        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
         
-        // Guardar el nuevo token donde estuviera el original
-        const storage = localStorage.getItem('refresh_token') ? localStorage : sessionStorage;
-        storage.setItem('auth_token', data.token);
-        storage.setItem('refresh_token', data.refreshToken);
+        // El backend responde con Set-Cookie, así que la sesión se mantiene
+        const storage = localStorage.getItem('has_session') ? localStorage : sessionStorage;
+        storage.setItem('has_session', 'true');
 
-        api.defaults.headers.common['Authorization'] = 'Bearer ' + data.token;
-        originalRequest.headers['Authorization'] = 'Bearer ' + data.token;
+        // Note: No more Authorization header logic!
 
         processQueue(null, data.token);
         isRefreshing = false;
