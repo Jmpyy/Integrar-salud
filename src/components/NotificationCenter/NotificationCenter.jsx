@@ -50,15 +50,20 @@ export default function NotificationCenter() {
   const now      = new Date();
 
   useEffect(() => {
-    if ('Notification' in window && 'serviceWorker' in navigator && Notification.permission === 'granted') {
-      navigator.serviceWorker.ready.then(reg => {
-        reg.pushManager.getSubscription().then(sub => {
+    const checkSub = async () => {
+      if ('Notification' in window && 'serviceWorker' in navigator && Notification.permission === 'granted') {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
           setHasSubscription(!!sub);
-        });
-      });
-    } else if ('Notification' in window && Notification.permission !== 'granted') {
-      setHasSubscription(false);
-    }
+        } catch (e) {
+          console.error('Error checking push subscription:', e);
+        }
+      } else if ('Notification' in window && Notification.permission !== 'granted') {
+        setHasSubscription(false);
+      }
+    };
+    checkSub();
   }, []);
 
   /* ── Compute notifications ── */

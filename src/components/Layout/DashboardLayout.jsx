@@ -20,98 +20,98 @@ const NAV = [
   {
     label: 'Principal',
     items: [
-      { path: '/dashboard',           icon: LayoutDashboard, label: 'Panel Principal', roles: ['admin', 'medico', 'recepcion'] },
-      { path: '/dashboard/tareas',    icon: Sparkles,        label: 'Centro de Tareas', roles: ['admin', 'medico', 'recepcion'] },
+      { path: '/dashboard', icon: LayoutDashboard, label: 'Panel Principal', roles: ['admin', 'medico', 'recepcion'] },
+      { path: '/dashboard/tareas', icon: Sparkles, label: 'Centro de Tareas', roles: ['admin', 'medico', 'recepcion'] },
     ],
   },
   {
     label: 'Clínico',
     items: [
-      { path: '/dashboard/agenda',      icon: CalendarDays,    label: 'Agenda',          roles: ['admin', 'medico', 'recepcion'] },
-      { path: '/dashboard/consultorio', icon: Stethoscope,     label: 'Consultorio',     roles: ['admin', 'medico'] },
-      { path: '/dashboard/pacientes',   icon: Users,           label: 'Pacientes',       roles: ['admin', 'medico', 'recepcion'] },
-      { path: '/dashboard/medicamentos', icon: Pill,            label: 'Medicamentos',    roles: ['admin', 'medico'] },
+      { path: '/dashboard/agenda', icon: CalendarDays, label: 'Agenda', roles: ['admin', 'medico', 'recepcion'] },
+      { path: '/dashboard/consultorio', icon: Stethoscope, label: 'Consultorio', roles: ['admin', 'medico'] },
+      { path: '/dashboard/pacientes', icon: Users, label: 'Pacientes', roles: ['admin', 'medico', 'recepcion'] },
+      { path: '/dashboard/medicamentos', icon: Pill, label: 'Medicamentos', roles: ['admin', 'medico'] },
     ],
   },
   {
     label: 'Gestión',
     items: [
-      { path: '/dashboard/finanzas',    icon: Wallet,          label: 'Finanzas',        roles: ['admin', 'administracion'] },
-      { path: '/dashboard/personal',    icon: UserCog,         label: 'Personal',        roles: ['admin'] },
-      { path: '/dashboard/reportes',    icon: BarChart3,       label: 'Reportes',        roles: ['admin', 'administracion'] },
-      { path: '/dashboard/reseñas',    icon: Star,            label: 'Reseñas',         roles: ['admin', 'medico'] },
+      { path: '/dashboard/finanzas', icon: Wallet, label: 'Finanzas', roles: ['admin', 'administracion'] },
+      { path: '/dashboard/personal', icon: UserCog, label: 'Personal', roles: ['admin'] },
+      { path: '/dashboard/reportes', icon: BarChart3, label: 'Reportes', roles: ['admin', 'administracion'] },
+      { path: '/dashboard/reseñas', icon: Star, label: 'Reseñas', roles: ['admin', 'medico'] },
     ],
   },
   {
     label: 'Sistema',
     items: [
-      { path: '/dashboard/configuracion', icon: Settings,      label: 'Configuración',   roles: ['admin'] },
-      { path: '/dashboard/logs',          icon: Shield,        label: 'Seguridad / Logs', roles: ['admin'] },
+      { path: '/dashboard/configuracion', icon: Settings, label: 'Configuración', roles: ['admin'] },
+      { path: '/dashboard/logs', icon: Shield, label: 'Seguridad / Logs', roles: ['admin'] },
     ],
   },
 ];
 
 /* ─── Role metadata ──────────────────────────────────────────── */
 const ROLES = {
-  admin:          { label: 'Administrador',     badgeBg: 'rgba(239,68,68,0.18)',   badgeText: '#fca5a5', dotColor: 'bg-rose-500'  },
-  medico:         { label: 'Médico',           badgeBg: 'var(--accent-light)',    badgeText: 'var(--accent-primary)', dotColor: 'bg-[var(--accent-primary)]'},
-  recepcion:  { label: 'Recepcionista',     badgeBg: 'rgba(16,185,129,0.18)',  badgeText: '#6ee7b7', dotColor: 'bg-emerald-400'},
-  administracion: { label: 'Administración',    badgeBg: 'rgba(245,158,11,0.18)',  badgeText: '#fcd34d', dotColor: 'bg-amber-400'},
+  admin: { label: 'Administrador', badgeBg: 'rgba(239,68,68,0.18)', badgeText: '#fca5a5', dotColor: 'bg-rose-500' },
+  medico: { label: 'Médico', badgeBg: 'var(--accent-light)', badgeText: 'var(--accent-primary)', dotColor: 'bg-[var(--accent-primary)]' },
+  recepcion: { label: 'Recepcionista', badgeBg: 'rgba(16,185,129,0.18)', badgeText: '#6ee7b7', dotColor: 'bg-emerald-400' },
+  administracion: { label: 'Administración', badgeBg: 'rgba(245,158,11,0.18)', badgeText: '#fcd34d', dotColor: 'bg-amber-400' },
 };
 
 /* ─── Page metadata ──────────────────────────────────────────── */
 const PAGE_META = {
-  '/dashboard':               { title: 'Panel Principal', subtitle: 'Resumen de actividad del consultorio' },
-  '/dashboard/agenda':        { title: 'Agenda',          subtitle: 'Gestión de turnos y horarios' },
-  '/dashboard/consultorio':   { title: 'Consultorio',     subtitle: 'Atención clínica del día' },
-  '/dashboard/pacientes':     { title: 'Pacientes',        subtitle: 'Directorio e historias clínicas' },
-  '/dashboard/finanzas':      { title: 'Finanzas',         subtitle: 'Caja, ingresos y egresos' },
-  '/dashboard/personal':      { title: 'Personal',         subtitle: 'Staff y gestión de RRHH' },
-  '/dashboard/perfil':        { title: 'Mi Perfil',         subtitle: 'Gestión de tu cuenta y contraseña' },
-  '/dashboard/reportes':      { title: 'Reportes',         subtitle: 'Estadísticas y análisis' },
-  '/dashboard/medicamentos':  { title: 'Medicamentos',     subtitle: 'Catálogo y seguimiento de fármacos' },
-  '/dashboard/configuracion': { title: 'Configuración',    subtitle: 'Preferencias del sistema' },
-  '/dashboard/logs':          { title: 'Auditoría',        subtitle: 'Registro de seguridad' },
+  '/dashboard': { title: 'Panel Principal', subtitle: 'Resumen de actividad del consultorio' },
+  '/dashboard/agenda': { title: 'Agenda', subtitle: 'Gestión de turnos y horarios' },
+  '/dashboard/consultorio': { title: 'Consultorio', subtitle: 'Atención clínica del día' },
+  '/dashboard/pacientes': { title: 'Pacientes', subtitle: 'Directorio e historias clínicas' },
+  '/dashboard/finanzas': { title: 'Finanzas', subtitle: 'Caja, ingresos y egresos' },
+  '/dashboard/personal': { title: 'Personal', subtitle: 'Staff y gestión de RRHH' },
+  '/dashboard/perfil': { title: 'Mi Perfil', subtitle: 'Gestión de tu cuenta y contraseña' },
+  '/dashboard/reportes': { title: 'Reportes', subtitle: 'Estadísticas y análisis' },
+  '/dashboard/medicamentos': { title: 'Medicamentos', subtitle: 'Catálogo y seguimiento de fármacos' },
+  '/dashboard/configuracion': { title: 'Configuración', subtitle: 'Preferencias del sistema' },
+  '/dashboard/logs': { title: 'Auditoría', subtitle: 'Registro de seguridad' },
 };
 
 export default function DashboardLayout({ onLogout }) {
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isJitsiCollapsed, setIsJitsiCollapsed] = useState(false);
   const dragControls = useDragControls();
 
-  const { 
+  const {
     userRole, user, theme, toggleTheme, globalConfig, fetchAppointments,
     activeCallApp, setActiveCallApp, isJitsiMaximized, setIsJitsiMaximized,
     updateAppointmentStatus, updateAppointmentVideoStatus,
     appointments, appointmentsLoading
   } = useStore();
-  const role     = ROLES[userRole] || ROLES.recepcion;
-  const meta     = PAGE_META[location.pathname] || { title: 'Panel', subtitle: '' };
-  const name     = user?.name || role.label;
+  const role = ROLES[userRole] || ROLES.recepcion;
+  const meta = PAGE_META[location.pathname] || { title: 'Panel', subtitle: '' };
+  const name = user?.name || role.label;
   const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   const hasNotifiedEvolutionsRef = useRef(false);
 
   useEffect(() => {
     if (appointmentsLoading || !appointments || appointments.length === 0) return;
-    
+
     if (!hasNotifiedEvolutionsRef.current) {
       // Local date string format YYYY-MM-DD
       const dt = new Date();
       dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
       const todayStr = dt.toISOString().split('T')[0];
-      
-      const missingEvolutions = appointments.filter(a => 
-        a.attendance === APPOINTMENT_STATUS.FINALIZADO && 
-        !a.hasEvolution && 
-        user?.doctor_id && 
+
+      const missingEvolutions = appointments.filter(a =>
+        a.attendance === APPOINTMENT_STATUS.FINALIZADO &&
+        !a.hasEvolution &&
+        user?.doctor_id &&
         a.doctorId === user.doctor_id
       );
-      
+
       if (missingEvolutions.length > 0) {
         import('../../utils/sounds').then(({ playErrorSound }) => playErrorSound());
         toast.custom((t) => (
@@ -161,13 +161,13 @@ export default function DashboardLayout({ onLogout }) {
     if (token) {
       socket.auth = { token };
     }
-    
+
     const handleConnect = () => {
       socket.emit('join-room', 'doctors');
     };
-    
+
     socket.on('connect', handleConnect);
-    
+
     if (socket.connected) {
       handleConnect();
     } else {
@@ -231,13 +231,13 @@ export default function DashboardLayout({ onLogout }) {
   const handleJitsiClose = useCallback(async () => {
     if (!activeCallApp) return;
     const appId = activeCallApp.id;
-    
+
     // Emitir inmediatamente para que el paciente sea expulsado al instante
     socket.emit('call-ended', `appointment-${appId}`);
-    
+
     setActiveCallApp(null);
     setIsJitsiMaximized(false);
-    
+
     try {
       await updateAppointmentStatus(appId, APPOINTMENT_STATUS.FINALIZADO);
       await updateAppointmentVideoStatus(appId, 'finalizada');
@@ -335,16 +335,16 @@ export default function DashboardLayout({ onLogout }) {
       </nav>
 
       {/* User card — links to /mi-perfil */}
-      <div className="px-2.5 shrink-0 mb-[80px] lg:mb-0" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      <div className="px-2.5 shrink-0" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
         <Link
           to="/dashboard/perfil"
           onClick={() => setOpen(false)}
           className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-3 transition-all group hover:border-[var(--accent-primary)]"
         >
           {user?.profile_picture ? (
-            <img 
-              src={user.profile_picture} 
-              alt="Perfil" 
+            <img
+              src={user.profile_picture}
+              alt="Perfil"
               className="w-9 h-9 rounded-xl object-cover shrink-0 border border-[var(--border-color)]"
             />
           ) : (
@@ -375,25 +375,24 @@ export default function DashboardLayout({ onLogout }) {
 
   // Items de la barra inferior (móvil) — filtramos por rol
   const MOBILE_NAV_PATHS = [
-    { path: '/dashboard',           icon: LayoutDashboard, label: 'Inicio',    roles: ['admin', 'medico', 'recepcion'] },
-    { path: '/dashboard/agenda',      icon: CalendarDays,    label: 'Agenda',    roles: ['admin', 'medico', 'recepcion'] },
-    { path: '/dashboard/consultorio', icon: Stethoscope,     label: 'Clínica',   roles: ['admin', 'medico'] },
-    { path: '/dashboard/pacientes',   icon: Users,           label: 'Pacientes', roles: ['admin', 'medico', 'recepcion'] },
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Inicio', roles: ['admin', 'medico', 'recepcion'] },
+    { path: '/dashboard/agenda', icon: CalendarDays, label: 'Agenda', roles: ['admin', 'medico', 'recepcion'] },
+    { path: '/dashboard/consultorio', icon: Stethoscope, label: 'Clínica', roles: ['admin', 'medico'] },
+    { path: '/dashboard/pacientes', icon: Users, label: 'Pacientes', roles: ['admin', 'medico', 'recepcion'] },
   ];
 
   const visibleMobileItems = MOBILE_NAV_PATHS.filter(item => item.roles.includes(userRole));
 
   const MobileBottomNav = () => (
-    <div className="mobile-bottom-nav flex lg:hidden items-center justify-around w-full">
+    <div className="mobile-bottom-nav flex lg:hidden items-center justify-around w-full relative" style={{ zIndex: 10 }}>
       {visibleMobileItems.map(item => (
         <Link
           key={item.path}
           to={item.path}
-          className={`flex flex-col items-center justify-center flex-1 h-full gap-1 ${
-            location.pathname === item.path
-              ? 'text-[var(--accent-primary)]'
-              : 'text-[var(--text-secondary)] opacity-60'
-          }`}
+          className={`flex flex-col items-center justify-center flex-1 h-full gap-1 ${location.pathname === item.path
+            ? 'text-[var(--accent-primary)]'
+            : 'text-[var(--text-secondary)] opacity-60'
+            }`}
         >
           <item.icon size={20} />
           <span className="text-[10px] font-bold">{item.label}</span>
@@ -408,24 +407,25 @@ export default function DashboardLayout({ onLogout }) {
       {/* Mobile overlay */}
       {open && (
         <div
-          className="lg:hidden fixed inset-0 bg-slate-950/70 z-40 backdrop-blur-sm print:hidden"
+          className="lg:hidden fixed inset-0 bg-slate-950/70 z-[45] backdrop-blur-sm print:hidden"
           onClick={() => setOpen(false)}
         />
       )}
 
       {/* ── Sidebar ── */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-[230px] h-screen glass-effect flex flex-col
+        fixed inset-y-0 left-0 z-[99] w-[230px] h-full glass-effect flex flex-col
         border-r border-[var(--border-color)]
         transform transition-transform duration-300 ease-in-out print:hidden
         ${open ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0 lg:sticky lg:top-0 lg:flex-shrink-0
-      `}>
+      `}
+        style={{ zIndex: 999 }}>
         {sidebarContent}
       </aside>
 
       {/* ── Main ── */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden print:block print:overflow-visible">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden print:block print:overflow-visible relative z-0" style={{ zIndex: 1 }}>
 
         {/* Header */}
         <header className="h-16 lg:h-[4.5rem] bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between px-4 sm:px-8 z-50 sticky top-0 print:hidden gap-4 shadow-sm">
@@ -494,7 +494,7 @@ export default function DashboardLayout({ onLogout }) {
               transform: none !important;
             }
           `}</style>
-          <motion.div 
+          <motion.div
             key={`jitsi-window-${activeCallApp.id}`}
             id="jitsi-motion-container"
             drag={!isJitsiMaximized}
@@ -506,18 +506,17 @@ export default function DashboardLayout({ onLogout }) {
             onDragEnd={() => setIsDragging(false)}
             initial={{ opacity: 0, y: 50, scale: 0.9 }}
             animate={
-              isJitsiMaximized 
-                ? { opacity: 1, scale: 1, x: 0, y: 0 } 
+              isJitsiMaximized
+                ? { opacity: 1, scale: 1, x: 0, y: 0 }
                 : isJitsiCollapsed
                   ? { opacity: 1, scale: 1, x: 0, y: 0 }
                   : { opacity: 1, scale: 1 }
             }
             transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className={`fixed flex flex-col bg-slate-900 shadow-2xl overflow-hidden border border-slate-700 z-[99999] ${
-              isJitsiMaximized 
-                ? 'rounded-3xl' 
-                : `bottom-4 right-4 sm:bottom-6 sm:right-6 w-[calc(100vw-32px)] sm:w-[420px] ${isJitsiCollapsed ? 'h-[44px] min-h-[44px]' : 'h-[500px] sm:h-[550px]'} rounded-2xl top-auto left-auto`
-            }`}
+            className={`fixed flex flex-col bg-slate-900 shadow-2xl overflow-hidden border border-slate-700 z-[99999] ${isJitsiMaximized
+              ? 'rounded-3xl'
+              : `bottom-4 right-4 sm:bottom-6 sm:right-6 w-[calc(100vw-32px)] sm:w-[420px] ${isJitsiCollapsed ? 'h-[44px] min-h-[44px]' : 'h-[500px] sm:h-[550px]'} rounded-2xl top-auto left-auto`
+              }`}
             style={isJitsiMaximized ? {
               position: 'fixed',
               top: '16px',
@@ -530,7 +529,7 @@ export default function DashboardLayout({ onLogout }) {
             } : undefined}
           >
             {/* Header de la videollamada estilo macOS */}
-            <div 
+            <div
               className="grid grid-cols-3 items-center px-4 py-2 bg-gradient-to-b from-[#3a3a3a] to-[#2a2a2a] border-b border-black/50 shrink-0 cursor-move min-h-[44px] relative z-50 shadow-sm"
               onPointerDown={(e) => dragControls.start(e)}
               style={{ touchAction: 'none' }}
