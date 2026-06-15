@@ -7,6 +7,7 @@ import {
 import { useStore } from '../../stores/useStore';
 import { toast } from 'react-hot-toast';
 import { APPOINTMENT_STATUS } from '../../config/constants';
+import api from '../../services/api';
 
 /* ── helpers ── */
 const toLocalDateStr = (d = new Date()) => {
@@ -294,7 +295,7 @@ export default function NotificationCenter() {
                         const swReg = await navigator.serviceWorker.ready;
                         
                         // Fetch public key from backend
-                        const { data } = await import('../../services/api').then(m => m.default).then(api => api.get('/push/public_key'));
+                        const { data } = await api.get('/push/public_key');
                         const { publicKey } = data;
                         if (!publicKey) throw new Error('VAPID key missing');
 
