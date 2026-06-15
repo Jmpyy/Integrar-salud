@@ -314,7 +314,8 @@ export default function NotificationCenter() {
                         });
 
                         // Send to backend
-                        await import('../../services/api').then(m => m.default).then(api => api.post('/push/subscribe', subscription));
+                        await api.post('/push/subscribe', subscription);
+                        setHasSubscription(true);
                         toast.success('¡Notificaciones activadas!');
                       }
                     } catch (e) {
