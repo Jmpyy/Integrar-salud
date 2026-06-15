@@ -1160,7 +1160,7 @@ export default function FinanzasPage() {
                            </thead>
                            <tbody className="divide-y divide-[var(--border-color)]/30">
                               {doctors.map(doc => {
-                                 const turnos = stats.currentPeriodApps.filter(a => a.doctorId === doc.id && (a.attendance === 'confirmado' || a.attendance === 'finalizado')).length;
+                                 const turnos = stats.currentPeriodApps.filter(a => a.doctorId === doc.id && (a.attendance === 'confirmado' || a.attendance === 'finalizado' || a.attendance === 'en_espera' || a.attendance === 'en_curso')).length;
                                  const facturacion = stats.currentPeriodTxs
                                     .filter(t => t.doctor_id === doc.id && t.type === 'Ingreso')
                                     .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
@@ -1218,7 +1218,7 @@ export default function FinanzasPage() {
                         {/* MÓVIL PROFESIONALES */}
                         <div className="md:hidden space-y-4 mt-4">
                            {doctors.map(doc => {
-                              const turnos = stats.currentPeriodApps.filter(a => a.doctorId === doc.id && (a.attendance === 'confirmado' || a.attendance === 'finalizado')).length;
+                              const turnos = stats.currentPeriodApps.filter(a => a.doctorId === doc.id && (a.attendance === 'confirmado' || a.attendance === 'finalizado' || a.attendance === 'en_espera' || a.attendance === 'en_curso')).length;
                               const facturacion = stats.currentPeriodTxs
                                  .filter(t => t.doctor_id === doc.id && t.type === 'Ingreso')
                                  .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
