@@ -162,6 +162,29 @@ export default function FinanzasPage() {
          }
       });
 
+      const currentPeriodApps = [];
+      (appointments || []).forEach(a => {
+         const aDateStr = toLocalDateStr(a.date);
+         if (!aDateStr) {
+            currentPeriodApps.push(a);
+            return;
+         }
+         
+         if (dateRange === 'Hoy') {
+            if (aDateStr === todayStr) currentPeriodApps.push(a);
+         } else if (dateRange === 'Esta Semana') {
+            const weekAgo = new Date(now);
+            weekAgo.setDate(now.getDate() - 7);
+            if (aDateStr >= toLocalDateStr(weekAgo.toISOString())) currentPeriodApps.push(a);
+         } else if (dateRange === 'Mes en curso') {
+            if (aDateStr.startsWith(currentMonthStr)) currentPeriodApps.push(a);
+         } else if (dateRange === 'Personalizado' && customDateRange.dateFrom && customDateRange.dateTo) {
+            if (aDateStr >= customDateRange.dateFrom && aDateStr <= customDateRange.dateTo) currentPeriodApps.push(a);
+         } else {
+            if (aDateStr.startsWith(`${now.getFullYear()}`)) currentPeriodApps.push(a);
+         }
+      });
+
       const dynamicExpenses = currentPeriodTxs.filter(t => t.type === 'Egreso').reduce((acc, t) => acc + Number(t.amount || 0), 0);
       const dynamicIncome = currentPeriodTxs.filter(t => t.type === 'Ingreso').reduce((acc, t) => acc + Number(t.amount || 0), 0);
       
@@ -227,9 +250,10 @@ export default function FinanzasPage() {
          donutData: categoryDistribution,
          evolutionData,
          totalTxs: currentPeriodTxs.length,
-         currentPeriodTxs
+         currentPeriodTxs,
+         currentPeriodApps
       };
-   }, [dateRange, transactions]);
+   }, [dateRange, transactions, appointments]);
 
    if (userRole !== 'admin') {
       return (
@@ -1133,11 +1157,11 @@ export default function FinanzasPage() {
                            </thead>
                            <tbody className="divide-y divide-[var(--border-color)]/30">
                               {doctors.map(doc => {
-                                 const turnos = appointments.filter(a => a.doctorId === doc.id && (a.attendance === 'confirmado' || a.attendance === 'finalizado')).length;
-                                 const facturacion = transactions
+                                 const turnos = stats.currentPeriodApps.filter(a => a.doctorId === doc.id && (a.attendance === 'confirmado' || a.attendance === 'finalizado')).length;
+                                 const facturacion = stats.currentPeriodTxs
                                     .filter(t => t.doctor_id === doc.id && t.type === 'Ingreso')
                                     .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-                                 const pagado = transactions
+                                 const pagado = stats.currentPeriodTxs
                                     .filter(t => t.doctor_id === doc.id && t.type === 'Egreso')
                                     .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
 
@@ -1191,11 +1215,11 @@ export default function FinanzasPage() {
                         {/* MÓVIL PROFESIONALES */}
                         <div className="md:hidden space-y-4 mt-4">
                            {doctors.map(doc => {
-                              const turnos = appointments.filter(a => a.doctorId === doc.id && (a.attendance === 'confirmado' || a.attendance === 'finalizado')).length;
-                              const facturacion = transactions
+                              const turnos = stats.currentPeriodApps.filter(a => a.doctorId === doc.id && (a.attendance === 'confirmado' || a.attendance === 'finalizado')).length;
+                              const facturacion = stats.currentPeriodTxs
                                  .filter(t => t.doctor_id === doc.id && t.type === 'Ingreso')
                                  .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-                              const pagado = transactions
+                              const pagado = stats.currentPeriodTxs
                                  .filter(t => t.doctor_id === doc.id && t.type === 'Egreso')
                                  .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
 
