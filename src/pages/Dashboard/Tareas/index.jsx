@@ -214,12 +214,13 @@ export default function TareasPage() {
     
     const monthlyTransactions = transactions.filter(t => {
       if (!t.date) return false;
-      const tDate = new Date(t.date);
+      const safeDateStr = typeof t.date === 'string' ? t.date.replace(' ', 'T') : t.date;
+      const tDate = new Date(safeDateStr);
       return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
     });
 
-    const income = monthlyTransactions.filter(t => t.type === 'ingreso').reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const expenses = monthlyTransactions.filter(t => t.type === 'egreso').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const income = monthlyTransactions.filter(t => (t.type || '').toLowerCase() === 'ingreso').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const expenses = monthlyTransactions.filter(t => (t.type || '').toLowerCase() === 'egreso').reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const profit = income - expenses;
     const margin = income > 0 ? (profit / income) * 100 : 0;
     

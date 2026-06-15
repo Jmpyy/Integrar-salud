@@ -863,8 +863,8 @@ export default function FinanzasPage() {
                      <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] print:text-[10px] print:text-slate-400 truncate">Egresos Totales</p>
                      <h3 className="text-2xl sm:text-3xl font-black mt-1 print:text-slate-800 print:text-lg print:tracking-tighter truncate leading-none">{formatMoney(stats.egresos)}</h3>
                      {dateRange === 'Mes en curso' && stats.prevEgresos > 0 && (
-                        <div className="mt-2 text-[11px] font-bold text-white bg-white/20 px-2.5 py-1 rounded-full w-max backdrop-blur-sm">
-                           {stats.egresos <= stats.prevEgresos ? '↓ (Bien)' : '↑ (Cuidado)'} {Math.abs(((stats.egresos / stats.prevEgresos) - 1) * 100).toFixed(1)}% vs Mes Anterior
+                        <div className={`mt-2 text-[11px] font-bold text-white px-2.5 py-1 rounded-full w-max backdrop-blur-sm ${stats.egresos <= stats.prevEgresos ? 'bg-emerald-500/80' : 'bg-red-500/80'}`}>
+                           {stats.egresos <= stats.prevEgresos ? '↓ Ahorro de' : '↑ Aumento del'} {Math.abs(((stats.egresos / stats.prevEgresos) - 1) * 100).toFixed(1)}% vs Mes Anterior
                         </div>
                      )}
                   </div>
