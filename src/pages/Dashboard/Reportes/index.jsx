@@ -62,7 +62,7 @@ export default function ReportesPage() {
   // Helpers de filtro
   const isInRange = (dStr) => {
      if (!dStr) return false;
-     const dStrLocal = dStr.includes('T') ? dStr.split('T')[0] : dStr;
+     const dStrLocal = dStr.split('T')[0].split(' ')[0];
      if (isRangeMode) {
         return dStrLocal >= customRange.dateFrom && dStrLocal <= customRange.dateTo;
      } else {
@@ -78,7 +78,10 @@ export default function ReportesPage() {
   const currentYear = selectedDate.getFullYear();
 
   // Stats Helpers
-  const getTxMonth = (t) => new Date(t.date);
+  const getTxMonth = (t) => {
+    const safeDateStr = typeof t.date === 'string' ? t.date.replace(' ', 'T') : t.date;
+    return new Date(safeDateStr);
+  };
 
   const last6Months = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(currentYear, currentMonth - (5 - i), 1);
@@ -146,7 +149,8 @@ export default function ReportesPage() {
   const totalAppsByDay = Array(7).fill(0);
   
   thisMonthApps.forEach(a => {
-    const d = new Date(a.date + 'T12:00:00Z').getDay();
+    const safeDateStr = a.date.split(' ')[0].split('T')[0];
+    const d = new Date(safeDateStr + 'T12:00:00Z').getDay();
     totalAppsByDay[d]++;
     if (a.attendance === 'ausente' || a.attendance === 'suspended') {
       absenteeismByDay[d]++;

@@ -148,7 +148,12 @@ export default function FinanzasPage() {
             if (txDateStr.startsWith(currentMonthStr)) {
                currentPeriodTxs.push(t);
             } else if (txDateStr.startsWith(prevMonthStr)) {
-               prevPeriodTxs.push(t);
+               // MTD (Month-To-Date) Comparison: 
+               // Para una comparación justa, solo sumamos los días del mes pasado hasta el día actual.
+               const txDay = parseInt(txDateStr.split('-')[2], 10);
+               if (txDay <= now.getDate()) {
+                  prevPeriodTxs.push(t);
+               }
             }
          } else if (dateRange === 'Personalizado' && customDateRange.dateFrom && customDateRange.dateTo) {
             if (txDateStr >= customDateRange.dateFrom && txDateStr <= customDateRange.dateTo) currentPeriodTxs.push(t);
