@@ -838,8 +838,8 @@ export default function FinanzasPage() {
          </div>
 
          {/* KPIS DE RENTABILIDAD - RESPONSIVO (CARRUSEL MÓVIL) */}
-         <div className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar gap-3 sm:gap-4 pb-6 px-4 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-6 md:mb-8 md:pb-0 print:grid print:grid-cols-3 print:gap-2">
-            <div className="w-[75%] sm:w-[85%] shrink-0 snap-center md:w-auto bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-hover)] p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl shadow-[var(--accent-primary)]/10 border border-white/10 relative overflow-hidden group text-white print:bg-white print:text-slate-800 print:border-slate-200 print:shadow-none">
+         <div className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar gap-3 sm:gap-4 py-6 px-4 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-6 md:mb-8 md:py-0 print:grid print:grid-cols-3 print:gap-2 -mt-2 md:mt-0">
+            <div className="w-[85%] sm:w-[85%] shrink-0 snap-center md:w-auto bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-hover)] p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl shadow-[var(--accent-primary)]/20 border border-white/10 relative overflow-hidden group text-white print:bg-white print:text-slate-800 print:border-slate-200 print:shadow-none mt-2 md:mt-0">
                <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-bl-full -z-0 opacity-50 group-hover:scale-125 transition-transform duration-700 print:hidden"></div>
                <div className="relative z-10 flex items-start gap-3 sm:gap-4 print:gap-0">
                   <div className="bg-white/20 p-2 sm:p-3 rounded-xl sm:rounded-2xl backdrop-blur-md print:hidden"><ArrowUpRight size={20} className="sm:w-6 sm:h-6 text-white" /></div>
@@ -847,15 +847,15 @@ export default function FinanzasPage() {
                      <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] print:text-[10px] print:text-slate-400 truncate">Ingresos Brutos</p>
                      <h3 className="text-2xl sm:text-3xl font-black mt-1 print:text-slate-800 print:text-lg print:tracking-tighter truncate leading-none">{formatMoney(stats.ingresos)}</h3>
                      {dateRange === 'Mes en curso' && stats.prevIngresos > 0 && (
-                        <div className="mt-2 text-[11px] font-bold text-white bg-white/20 px-2.5 py-1 rounded-full w-max backdrop-blur-sm">
-                           {stats.ingresos >= stats.prevIngresos ? '↑' : '↓'} {Math.abs(((stats.ingresos / stats.prevIngresos) - 1) * 100).toFixed(1)}% vs Mes Anterior
+                        <div className="mt-2 text-[10px] sm:text-[11px] font-bold text-white bg-white/20 px-2.5 py-1 rounded-full w-fit max-w-full truncate backdrop-blur-sm">
+                           {stats.ingresos >= stats.prevIngresos ? '↑' : '↓'} {Math.abs(((stats.ingresos / stats.prevIngresos) - 1) * 100).toFixed(1)}% vs Mes Ant.
                         </div>
                      )}
                   </div>
                </div>
             </div>
 
-            <div className="w-[75%] sm:w-[85%] shrink-0 snap-center md:w-auto bg-gradient-to-br from-rose-500 to-rose-600 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl shadow-rose-500/10 border border-white/10 relative overflow-hidden group text-white print:bg-white print:text-slate-800 print:border-slate-200 print:shadow-none">
+            <div className="w-[85%] sm:w-[85%] shrink-0 snap-center md:w-auto bg-gradient-to-br from-rose-500 to-rose-600 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl shadow-rose-500/20 border border-white/10 relative overflow-hidden group text-white print:bg-white print:text-slate-800 print:border-slate-200 print:shadow-none mt-2 md:mt-0">
                <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-bl-full -z-0 opacity-50 group-hover:scale-125 transition-transform duration-700 print:hidden"></div>
                <div className="relative z-10 flex items-start gap-3 sm:gap-4 print:gap-0">
                   <div className="bg-white/20 p-2 sm:p-3 rounded-xl sm:rounded-2xl backdrop-blur-md print:hidden"><ArrowDownRight size={20} className="sm:w-6 sm:h-6 text-white" /></div>
@@ -863,15 +863,15 @@ export default function FinanzasPage() {
                      <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] print:text-[10px] print:text-slate-400 truncate">Egresos Totales</p>
                      <h3 className="text-2xl sm:text-3xl font-black mt-1 print:text-slate-800 print:text-lg print:tracking-tighter truncate leading-none">{formatMoney(stats.egresos)}</h3>
                      {dateRange === 'Mes en curso' && stats.prevEgresos > 0 && (
-                        <div className={`mt-2 text-[11px] font-bold text-white px-2.5 py-1 rounded-full w-max backdrop-blur-sm ${stats.egresos <= stats.prevEgresos ? 'bg-emerald-500/80' : 'bg-red-500/80'}`}>
-                           {stats.egresos <= stats.prevEgresos ? '↓ Ahorro de' : '↑ Aumento del'} {Math.abs(((stats.egresos / stats.prevEgresos) - 1) * 100).toFixed(1)}% vs Mes Anterior
+                        <div className={`mt-2 text-[10px] sm:text-[11px] font-bold text-white px-2.5 py-1 rounded-full w-fit max-w-full truncate backdrop-blur-sm ${stats.egresos <= stats.prevEgresos ? 'bg-emerald-500/80' : 'bg-red-500/80'}`}>
+                           {stats.egresos <= stats.prevEgresos ? '↓ Ahorro' : '↑ Aumento'} {Math.abs(((stats.egresos / stats.prevEgresos) - 1) * 100).toFixed(1)}% vs Mes Ant.
                         </div>
                      )}
                   </div>
                </div>
             </div>
 
-            <div className={`w-[75%] sm:w-[85%] shrink-0 snap-center md:w-auto bg-gradient-to-br ${stats.neta >= 0 ? 'from-emerald-500 to-emerald-600 shadow-emerald-500/10' : 'from-slate-700 to-slate-800 shadow-slate-900/10'} p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-white/10 relative overflow-hidden group text-white print:bg-white print:text-slate-800 print:border-slate-200 print:shadow-none`}>
+            <div className={`w-[85%] sm:w-[85%] shrink-0 snap-center md:w-auto bg-gradient-to-br ${stats.neta >= 0 ? 'from-emerald-500 to-emerald-600 shadow-emerald-500/20' : 'from-slate-700 to-slate-800 shadow-slate-900/20'} p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-white/10 relative overflow-hidden group text-white print:bg-white print:text-slate-800 print:border-slate-200 print:shadow-none mt-2 md:mt-0`}>
                <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-bl-full -z-0 opacity-50 group-hover:scale-125 transition-transform duration-700 print:hidden"></div>
                <div className="relative z-10 flex items-start gap-3 sm:gap-4 print:gap-0">
                   <div className="bg-white/20 p-2 sm:p-3 rounded-xl sm:rounded-2xl backdrop-blur-md print:hidden"><Activity size={20} className="sm:w-6 sm:h-6 text-white" /></div>
@@ -879,8 +879,8 @@ export default function FinanzasPage() {
                      <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] print:text-[10px] print:text-slate-400 truncate">Rentabilidad Neta</p>
                      <h3 className="text-2xl sm:text-3xl font-black mt-1 print:text-slate-800 print:text-lg print:tracking-tighter truncate leading-none">{formatMoney(stats.neta)}</h3>
                      {dateRange === 'Mes en curso' && stats.prevNeta > 0 && (
-                        <div className="mt-2 text-[11px] font-bold text-white bg-white/20 px-2.5 py-1 rounded-full w-max backdrop-blur-sm">
-                           {stats.neta >= stats.prevNeta ? '↑' : '↓'} {Math.abs(((stats.neta / stats.prevNeta) - 1) * 100).toFixed(1)}% vs Mes Anterior
+                        <div className="mt-2 text-[10px] sm:text-[11px] font-bold text-white bg-white/20 px-2.5 py-1 rounded-full w-fit max-w-full truncate backdrop-blur-sm">
+                           {stats.neta >= stats.prevNeta ? '↑' : '↓'} {Math.abs(((stats.neta / stats.prevNeta) - 1) * 100).toFixed(1)}% vs Mes Ant.
                         </div>
                      )}
                   </div>
@@ -895,14 +895,24 @@ export default function FinanzasPage() {
                   <Lightbulb size={24} />
                </div>
                <div className="flex-1">
-                  <h3 className="text-lg font-black text-indigo-900 dark:text-indigo-300 mb-1">Asesor Financiero Inteligente</h3>
+                  <h3 className="text-lg font-black text-indigo-900 dark:text-indigo-300 mb-1">Resumen</h3>
                   <div className="text-sm text-indigo-800/80 dark:text-indigo-200/70 space-y-2">
                      <p>
                         Este mes tienes <strong>{formatMoney(stats.fixedExpenses)}</strong> registrados en Costos Fijos y <strong>{formatMoney(stats.variableExpenses)}</strong> en Variables.
                      </p>
                      {(() => {
                         const estimatedFixedCost = Math.max(stats.fixedExpenses, stats.prevFixedExpenses);
-                        if (estimatedFixedCost === 0) return <p>Marca tus próximos pagos recurrentes como "Gasto Fijo" para activar el análisis de punto de equilibrio.</p>;
+                        if (estimatedFixedCost === 0) {
+                           // Dynamic tip selection based on current day so it changes but doesn't flicker on re-renders
+                           const tips = [
+                              "Marca tus próximos pagos recurrentes como \"Gasto Fijo\" para activar el análisis de punto de equilibrio.",
+                              "Para que pueda darte predicciones precisas, recuerda clasificar alquileres o servicios mensuales como \"Gasto Fijo\".",
+                              "Ve a Nuevo Egreso y marca la casilla de Costo Fijo para descubrir cuánto necesitas facturar para no perder dinero.",
+                              "El análisis inteligente requiere que diferencies entre Costos Fijos y Variables. ¡Registra uno para ver cómo funciona!"
+                           ];
+                           const tipIndex = new Date().getDate() % tips.length;
+                           return <p>💡 {tips[tipIndex]}</p>;
+                        }
                         
                         const margin = stats.ingresos > 0 ? (stats.neta / stats.ingresos) * 100 : 0;
                         const faltante = estimatedFixedCost - stats.ingresos;

@@ -475,7 +475,7 @@ export default function DashboardLayout({ onLogout }) {
         </header>
 
         {/* Page content: pb extra en mobile para que el bottom nav no tape el contenido */}
-        <div className="flex-1 overflow-auto p-3 sm:p-6 lg:p-8 lg:pb-8 custom-scrollbar"
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6 lg:p-8 lg:pb-8 custom-scrollbar"
           style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}
         >
           <div className="max-w-full mx-auto space-y-4 sm:space-y-6 animate-fade-in-quick">

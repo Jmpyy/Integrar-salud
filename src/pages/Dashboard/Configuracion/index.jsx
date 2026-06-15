@@ -59,6 +59,7 @@ export default function ConfiguracionPage() {
   const [config, setConfig]         = useState(store.globalConfig || DEFAULT_CONFIG);
   const [activeSection, setSection] = useState('negocio');
   const [saved, setSaved]           = useState(false);
+  const [isSaving, setIsSaving]     = useState(false);
 
   const [afipConfig, setAfipConfig] = useState(null);
   const [afipStatus, setAfipStatus] = useState(null);
@@ -125,6 +126,8 @@ export default function ConfiguracionPage() {
   };
 
   const handleSave = async () => {
+    if (saved || isSaving) return;
+    setIsSaving(true);
     try {
       await store.setGlobalConfig(config);
       toast.success('Configuración sincronizada con el servidor.');
@@ -132,8 +135,17 @@ export default function ConfiguracionPage() {
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       toast.error('Error al sincronizar con el servidor.');
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  const mergedConfig = store.globalConfig ? { 
+    ...DEFAULT_CONFIG, 
+    ...store.globalConfig,
+    hours: { ...DEFAULT_CONFIG.hours, ...(store.globalConfig.hours || {}) }
+  } : DEFAULT_CONFIG;
+  const isDirty = JSON.stringify(config) !== JSON.stringify(mergedConfig);
 
   const update    = (k, v)            => setConfig(p => ({ ...p, [k]: v }));
   const updateDay = (d, k, v)         => setConfig(p => ({
@@ -172,11 +184,12 @@ export default function ConfiguracionPage() {
         </div>
         <button
           onClick={handleSave}
-          className={`flex items-center gap-2.5 px-6 py-3 font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95
+          disabled={saved || isSaving || !isDirty}
+          className={`flex items-center gap-2.5 px-6 py-3 font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
             ${saved ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-[var(--accent-primary)] text-white shadow-[var(--accent-primary)]/20 hover:brightness-110'}`}
         >
-          {saved ? <Check size={18} /> : <Save size={18} />}
-          {saved ? 'Cambios Guardados' : 'Sincronizar Ajustes'}
+          {saved ? <Check size={18} /> : isSaving ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
+          {saved ? 'Cambios Guardados' : isSaving ? 'Guardando...' : 'Sincronizar Ajustes'}
         </button>
       </div>
 

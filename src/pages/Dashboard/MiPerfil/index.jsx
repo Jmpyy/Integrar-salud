@@ -331,7 +331,7 @@ export default function MiPerfilPage() {
               <div className="pt-2">
                 <button
                   onClick={handleSaveProfile}
-                  disabled={savingProfile || !profileName.trim()}
+                  disabled={savingProfile || !profileName.trim() || profileName.trim() === user?.name}
                   className="flex items-center gap-2 px-6 py-3 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white font-black text-sm rounded-2xl shadow-lg shadow-[var(--accent-primary)]/20 transition-all hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                 >
                   <Save size={16} />

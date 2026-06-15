@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Bell, Clock, DollarSign, CalendarDays,
@@ -44,9 +44,22 @@ const DOT = {
 export default function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const { appointments, user } = useStore();
+  const [hasSubscription, setHasSubscription] = useState(true); // Asumir true por defecto para no parpadear
 
   const todayStr = toLocalDateStr();
   const now      = new Date();
+
+  useEffect(() => {
+    if ('Notification' in window && 'serviceWorker' in navigator && Notification.permission === 'granted') {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.pushManager.getSubscription().then(sub => {
+          setHasSubscription(!!sub);
+        });
+      });
+    } else if ('Notification' in window && Notification.permission !== 'granted') {
+      setHasSubscription(false);
+    }
+  }, []);
 
   /* ── Compute notifications ── */
   const notifications = useMemo(() => {
@@ -267,7 +280,7 @@ export default function NotificationCenter() {
             <div className="px-5 py-4 border-t border-[var(--border-color)]/30 bg-[var(--bg-sidebar)]/50 backdrop-blur-md flex flex-col gap-3">
               
               {/* Push Subscription Button */}
-              {('Notification' in window && Notification.permission !== 'granted') && (
+              {('Notification' in window && (!hasSubscription || Notification.permission !== 'granted')) && (
                 <button
                   onClick={async () => {
                     try {
