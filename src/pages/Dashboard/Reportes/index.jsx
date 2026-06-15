@@ -141,6 +141,29 @@ export default function ReportesPage() {
     return acc;
   }, {});
 
+  // ABSENTEEISM BY DAY OF WEEK (0 = Sunday, 1 = Monday...)
+  const absenteeismByDay = Array(7).fill(0);
+  const totalAppsByDay = Array(7).fill(0);
+  
+  thisMonthApps.forEach(a => {
+    const d = new Date(a.date + 'T12:00:00Z').getDay();
+    totalAppsByDay[d]++;
+    if (a.attendance === 'ausente' || a.attendance === 'suspended') {
+      absenteeismByDay[d]++;
+    }
+  });
+
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const absenteeismRatesByDay = absenteeismByDay.map((abs, i) => ({
+    day: dayNames[i],
+    rate: totalAppsByDay[i] > 0 ? Math.round((abs / totalAppsByDay[i]) * 100) : 0,
+    total: totalAppsByDay[i],
+    absent: abs
+  }));
+  
+  const maxAbsenteeismRate = Math.max(...absenteeismRatesByDay.map(d => d.rate), 1);
+  const maxIncomeMonth = Math.max(...incomeByMonth, 1);
+
   // Doctors Profitability (based on REAL transactions)
   const profitabilityByDoc = (doctors || []).map(doc => {
     const docTxs = (transactions || [])
@@ -167,8 +190,10 @@ export default function ReportesPage() {
   return (
     <div className="space-y-6 animate-fade-in-quick pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4 glass-effect p-6 rounded-[2rem] border border-[var(--glass-border)] shadow-[var(--glass-shadow)] relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent-light)] rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+      <div className="flex items-center justify-between flex-wrap gap-4 glass-effect p-6 rounded-[2rem] border border-[var(--glass-border)] shadow-[var(--glass-shadow)] relative z-[100]">
+        <div className="absolute inset-0 rounded-[2rem] overflow-hidden pointer-events-none">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent-light)] rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/2"></div>
+        </div>
         
         <div className="relative z-10">
           <h2 className="text-2xl font-black text-[var(--text-primary)] flex items-center gap-3 tracking-tight">
@@ -446,6 +471,103 @@ export default function ReportesPage() {
                 <p className="font-bold uppercase tracking-widest text-xs">No hay sesiones finalizadas aún</p>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* ADVANCED CHARTS (BUSINESS INTELLIGENCE) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* Gráfico de Ingresos de los Últimos 6 Meses */}
+        <div className="card-premium p-6 sm:p-8 border border-[var(--glass-border)] shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-lg font-black text-[var(--text-primary)] tracking-tight">Evolución de Ingresos</h3>
+              <p className="text-xs text-[var(--text-secondary)] font-medium mt-1">Comparativa de los últimos 6 meses</p>
+            </div>
+            <div className="p-3 bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] rounded-xl">
+              <TrendingUp size={20} />
+            </div>
+          </div>
+          
+          <div className="flex-1 flex items-end gap-2 sm:gap-4 h-48 mt-4">
+            {last6Months.map((m, i) => {
+              const income = incomeByMonth[i] || 0;
+              const heightPct = (income / maxIncomeMonth) * 100;
+              const isCurrent = i === 5;
+              
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group">
+                  {/* Tooltip on hover */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded mb-2 whitespace-nowrap z-10 pointer-events-none shadow-xl">
+                    {formatMoney(income)}
+                  </div>
+                  
+                  {/* Bar */}
+                  <div className="w-full relative flex items-end justify-center h-full">
+                    <div 
+                      className={`w-full max-w-[40px] rounded-t-xl transition-all duration-1000 ease-out relative overflow-hidden ${isCurrent ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700 group-hover:bg-indigo-400'}`}
+                      style={{ height: `${Math.max(heightPct, 2)}%` }}
+                    >
+                      {isCurrent && (
+                         <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)', transform: 'skewX(-20deg)' }} />
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Label */}
+                  <p className={`text-[10px] sm:text-xs font-black uppercase mt-3 tracking-widest ${isCurrent ? 'text-emerald-500' : 'text-[var(--text-secondary)]'}`}>
+                    {m.label}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Mapa de Calor: Ausentismo por Día */}
+        <div className="card-premium p-6 sm:p-8 border border-[var(--glass-border)] shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-lg font-black text-[var(--text-primary)] tracking-tight">Ausentismo por Día</h3>
+              <p className="text-xs text-[var(--text-secondary)] font-medium mt-1">Qué días de la semana faltan más los pacientes</p>
+            </div>
+            <div className="p-3 bg-rose-500/10 text-rose-500 rounded-xl">
+              <CalendarDays size={20} />
+            </div>
+          </div>
+          
+          <div className="flex-1 flex items-end gap-2 sm:gap-4 h-48 mt-4">
+            {/* Omitimos Domingo (índice 0) si no trabajan, pero lo renderizamos de Lunes a Sábado */}
+            {[1, 2, 3, 4, 5, 6].map(dayIndex => {
+              const data = absenteeismRatesByDay[dayIndex];
+              const heightPct = (data.rate / maxAbsenteeismRate) * 100 || 0;
+              
+              // Color base de la barra dependiente del %
+              let barColor = 'bg-slate-200 dark:bg-slate-700';
+              if (data.rate > 30) barColor = 'bg-rose-500';
+              else if (data.rate > 15) barColor = 'bg-orange-400';
+              else if (data.rate > 0) barColor = 'bg-amber-400';
+
+              return (
+                <div key={dayIndex} className="flex-1 flex flex-col items-center justify-end h-full group">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded mb-2 whitespace-nowrap z-10 pointer-events-none shadow-xl text-center">
+                    {data.rate}% <br/>
+                    <span className="text-[9px] opacity-70">{data.absent} de {data.total} turnos</span>
+                  </div>
+                  
+                  <div className="w-full relative flex items-end justify-center h-full">
+                    <div 
+                      className={`w-full max-w-[40px] rounded-t-xl transition-all duration-1000 ease-out ${barColor} group-hover:brightness-110`}
+                      style={{ height: `${Math.max(heightPct, 2)}%` }}
+                    />
+                  </div>
+                  
+                  <p className="text-[10px] sm:text-xs font-black uppercase mt-3 tracking-widest text-[var(--text-secondary)]">
+                    {data.day}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

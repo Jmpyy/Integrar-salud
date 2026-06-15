@@ -624,7 +624,7 @@ export default function AgendaPage() {
       if (newStatus === 'finalizado' && app && !app.hasEvolution) {
          playErrorSound();
          toast.custom((t) => (
-          <div className={`${t.visible ? 'animate-fade-in-up' : 'animate-fade-out-down'} max-w-sm w-full bg-[var(--bg-card)] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-[var(--border-color)] overflow-hidden backdrop-blur-xl border border-[var(--glass-border)]`}>
+          <div className={`${t.visible ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 max-w-sm w-full bg-[var(--bg-card)] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-[var(--border-color)] overflow-hidden backdrop-blur-xl border border-[var(--glass-border)]`}>
             <div className="flex-1 w-0 p-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0 pt-0.5">

@@ -36,17 +36,9 @@
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
 }
 
-@keyframes ambientLight {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
-  50% { transform: translate(5%, 5%) scale(1.1); opacity: 0.8; }
-}
-
 body {
   background-color: var(--bg-main);
-  background-image: 
-    radial-gradient(at 0% 0%, var(--accent-light) 0, transparent 50%),
-    radial-gradient(at 100% 100%, var(--accent-light) 0, transparent 50%);
-  background-attachment: fixed;
+  /* Eliminado background-image y background-attachment: fixed porque destruyen el rendimiento al hacer scroll en móviles y CPUs sin GPU */
   color: var(--text-primary);
   transition: background-color 0.4s ease, color 0.4s ease;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -67,18 +59,23 @@ body::before {
   /* Gradiente más suave para no necesitar el filtro de desenfoque */
   background: radial-gradient(circle at center, var(--accent-light) 0%, transparent 60%);
   z-index: -1;
-  animation: ambientLight 15s ease-in-out infinite alternate;
   pointer-events: none;
-  /* Eliminado: filter: blur(60px); -> Esto colapsaba la GPU de teléfonos gama media/baja */
+  /* Eliminado: animación ambientLight y filter blur porque colapsan la CPU/GPU de teléfonos gama media/baja y PCs sin aceleración */
 }
 
 /* --- Glassmorphism Utils --- */
 .glass-effect {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  background: var(--bg-card); /* Más opaco para compensar la falta de blur */
+  /* backdrop-filter: blur(12px); - REMOVED FOR PERFORMANCE */
+  /* -webkit-backdrop-filter: blur(12px); - REMOVED FOR PERFORMANCE */
+  border: 1px solid var(--border-color);
   box-shadow: var(--glass-shadow);
+}
+
+/* Global Performance Override for Weak Devices */
+*, ::before, ::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .card-premium {
@@ -224,7 +221,7 @@ body::before {
   }
 
   .animate-fade-in-quick {
-    animation: fadeInQuick 0.8s ease-out forwards;
+    animation: fadeInQuick 0.2s ease-out forwards;
   }
 
   /* --- FIX BUGS DE RENDERIZADO EN IOS SAFARI --- */

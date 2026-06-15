@@ -1,9 +1,11 @@
 import { authService } from '../../services/auth';
+import { toast } from 'react-hot-toast';
 
 const getNormalizedRole = (role) => {
   if (!role) return 'recepcion';
   const r = role.toLowerCase();
-  if (r.includes('admin') || r.includes('coordinación') || r.includes('coordinacion')) return 'admin';
+  if (r.includes('administra') || r.includes('contab') || r.includes('facturaci')) return 'administracion';
+  if (r === 'admin' || r.includes('dueño') || r.includes('director') || r.includes('coordinación') || r.includes('coordinacion')) return 'admin';
   if (r.includes('secretaría') || r.includes('secretaria') || r.includes('recepción') || r.includes('recepcion') || r.includes('recepcionista')) return 'recepcion';
   if (r.includes('medico') || r.includes('médico') || r.includes('doctor')) return 'medico';
   return role;
@@ -55,6 +57,7 @@ export const createAuthSlice = (set, get) => ({
 
     logout: async () => {
       await authService.logout();
+      toast.dismiss();
       set({ user: null, userRole: null, isAuthenticated: false });
     },
 
@@ -67,6 +70,7 @@ export const createAuthSlice = (set, get) => ({
         // Token inválido o expirado → limpiar COMPLETAMENTE (estado + storage)
         localStorage.removeItem('has_session');
         sessionStorage.removeItem('has_session');
+        toast.dismiss();
         set({ user: null, userRole: null, isAuthenticated: false });
       }
     },

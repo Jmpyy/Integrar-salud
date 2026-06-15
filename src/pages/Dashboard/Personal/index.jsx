@@ -311,18 +311,18 @@ export default function PersonalPage() {
                         const dayNames = {1:'Lunes', 2:'Martes', 3:'Miércoles', 4:'Jueves', 5:'Viernes', 6:'Sábado', 0:'Domingo'};
                         const data = form.schedule?.[day] || { enabled: false, start: '09:00', end: '18:00' };
                         return (
-                           <div key={day} className="flex items-center justify-between p-3 sm:p-4 hover:bg-[var(--bg-card)] transition-colors">
+                           <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 hover:bg-[var(--bg-card)] transition-colors gap-2">
                              <label className="flex items-center gap-3 cursor-pointer">
                                <input 
                                  type="checkbox" 
                                  checked={data.enabled}
                                  onChange={(e) => setForm({...form, schedule: {...form.schedule, [day]: {...data, enabled: e.target.checked}}})}
-                                 className="w-4 h-4 text-[var(--accent-primary)] rounded border-[var(--border-color)] focus:ring-[var(--accent-primary)]/50"
+                                 className="w-4 h-4 text-[var(--accent-primary)] rounded border-[var(--border-color)] focus:ring-[var(--accent-primary)]/50 shrink-0"
                                />
                                <span className={`text-sm font-bold ${data.enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] opacity-50'}`}>{dayNames[day]}</span>
                              </label>
                              
-                             <div className={`flex items-center gap-2 transition-opacity ${data.enabled ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+                             <div className={`flex items-center gap-1.5 sm:gap-2 transition-opacity ${data.enabled ? 'opacity-100' : 'opacity-30 pointer-events-none'} self-start sm:self-auto pl-7 sm:pl-0`}>
                                <input 
                                   type="time" 
                                   value={data.start}

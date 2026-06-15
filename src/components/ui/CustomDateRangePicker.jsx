@@ -34,7 +34,7 @@ export default function CustomDateRangePicker({ dateFrom, dateTo, onChange, plac
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 p-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl shadow-black/50 z-[100] min-w-[320px] animate-fade-in-quick">
+        <div className="absolute top-full left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto sm:right-0 mt-2 p-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl shadow-black/50 z-[100] w-[calc(100vw-32px)] max-w-[320px] sm:w-auto sm:min-w-[320px] animate-fade-in-quick origin-top sm:origin-top-right">
             <div className="flex justify-between items-center mb-4">
                 <span className="text-sm font-bold">Rango Personalizado</span>
                 <button onClick={() => setIsOpen(false)} className="text-[var(--text-secondary)] hover:text-rose-500"><X size={16}/></button>

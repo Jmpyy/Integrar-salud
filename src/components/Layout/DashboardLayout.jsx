@@ -5,9 +5,10 @@ import {
   LayoutDashboard, CalendarDays, Users, Wallet,
   Bell, Search, LogOut, Plus, Menu, X,
   UserCog, Stethoscope, BarChart3, Settings, ChevronRight,
-  Sun, Moon, Pill, Video, Maximize, Minimize, Shield, Star, AlertCircle
+  Sun, Moon, Pill, Video, Maximize, Minimize, Shield, Star, AlertCircle, Sparkles
 } from 'lucide-react';
 import { useStore } from '../../stores/useStore';
+import { toast } from 'react-hot-toast';
 import NotificationCenter from '../NotificationCenter/NotificationCenter';
 import DailyMeeting from '../DailyMeeting';
 import { APPOINTMENT_STATUS } from '../../config/constants';
@@ -20,6 +21,7 @@ const NAV = [
     label: 'Principal',
     items: [
       { path: '/dashboard',           icon: LayoutDashboard, label: 'Panel Principal', roles: ['admin', 'medico', 'recepcion'] },
+      { path: '/dashboard/tareas',    icon: Sparkles,        label: 'Centro de Tareas', roles: ['admin', 'medico', 'recepcion'] },
     ],
   },
   {
@@ -112,33 +114,31 @@ export default function DashboardLayout({ onLogout }) {
       
       if (missingEvolutions.length > 0) {
         import('../../utils/sounds').then(({ playErrorSound }) => playErrorSound());
-        import('react-hot-toast').then(({ default: toast }) => {
-          toast.custom((t) => (
-            <div className={`${t.visible ? 'animate-fade-in-up' : 'animate-fade-out-down'} max-w-sm w-full bg-[var(--bg-card)] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-[var(--border-color)] overflow-hidden backdrop-blur-xl border border-[var(--glass-border)]`}>
-              <div className="flex-1 w-0 p-4">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 pt-0.5">
-                    <AlertCircle className="h-10 w-10 text-rose-500 p-2 bg-rose-500/10 rounded-xl" />
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <p className="text-[10px] font-black text-rose-500 uppercase tracking-wider mb-1">Evoluciones Pendientes</p>
-                    <p className="text-sm text-[var(--text-primary)] font-bold">
-                      Tienes {missingEvolutions.length} evolución(es) médica(s) pendiente(s) por completar.
-                    </p>
-                  </div>
+        toast.custom((t) => (
+          <div className={`${t.visible ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 max-w-sm w-full bg-[var(--bg-card)] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-[var(--border-color)] overflow-hidden backdrop-blur-xl border border-[var(--glass-border)]`}>
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <AlertCircle className="h-10 w-10 text-rose-500 p-2 bg-rose-500/10 rounded-xl" />
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-[10px] font-black text-rose-500 uppercase tracking-wider mb-1">Evoluciones Pendientes</p>
+                  <p className="text-sm text-[var(--text-primary)] font-bold">
+                    Tienes {missingEvolutions.length} evolución(es) médica(s) pendiente(s) por completar.
+                  </p>
                 </div>
               </div>
-              <div className="flex border-l border-[var(--border-color)]/20 bg-[var(--bg-sidebar)]/50">
-                <button
-                  onClick={() => toast.dismiss(t.id)}
-                  className="w-full border border-transparent rounded-none rounded-r-2xl px-4 flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-light)] transition-colors focus:outline-none"
-                >
-                  Cerrar
-                </button>
-              </div>
             </div>
-          ), { duration: 8000, position: 'top-right' });
-        });
+            <div className="flex border-l border-[var(--border-color)]/20 bg-[var(--bg-sidebar)]/50">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="w-full border border-transparent rounded-none rounded-r-2xl px-4 flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-light)] transition-colors focus:outline-none"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        ), { id: 'evoluciones-pendientes-toast', duration: 8000, position: 'top-right' });
       }
       hasNotifiedEvolutionsRef.current = true;
     }
@@ -403,7 +403,7 @@ export default function DashboardLayout({ onLogout }) {
   );
 
   return (
-    <div className="h-[100dvh] overflow-hidden flex font-sans text-[var(--text-primary)] print:block print:bg-white print:h-auto print:overflow-visible">
+    <div className="h-[100dvh] w-full overflow-hidden flex font-sans text-[var(--text-primary)] print:block print:bg-white print:h-auto print:overflow-visible">
 
       {/* Mobile overlay */}
       {open && (
@@ -583,8 +583,14 @@ export default function DashboardLayout({ onLogout }) {
                 <button
                   onClick={() => {
                     socket.emit('call-started', `appointment-${activeCallApp.id}`);
-                    import('react-hot-toast').then(({ default: toast }) => {
-                      toast.success('¡Llamando al paciente!', { icon: '🔔' });
+                    toast.success('Llamando al paciente...', {
+                      id: 'calling-patient',
+                      icon: '🔊',
+                      style: {
+                        background: '#1e293b',
+                        color: '#fff',
+                        borderRadius: '1rem',
+                      }
                     });
                   }}
                   className="px-3 py-1.5 bg-[#007aff] hover:bg-[#005bb5] text-white text-[11px] font-bold rounded-md transition-colors flex items-center gap-1.5 border border-[#007aff]/50 shadow-[0_2px_8px_rgba(0,122,255,0.4)] whitespace-nowrap"

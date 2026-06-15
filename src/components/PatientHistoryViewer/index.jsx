@@ -7,6 +7,8 @@ import { patientsService } from '../../services/patients';
 import { medicationsService } from '../../services/medications';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../ConfirmDialog/ConfirmDialog';
+import SignatureModal from '../SignatureModal';
+import { generateMedicalDocumentPDF } from '../../utils/pdfGenerator';
 
 // Lista de medicamentos psicotrópicos comunes en Argentina
 const FARMACOS_AR = [
@@ -122,6 +124,58 @@ export default function PatientHistoryViewer({
     frequency: '',
   });
   const [availableDoses, setAvailableDoses] = useState([]);
+
+  // Documentos Médicos State
+  const [docType, setDocType] = useState('Receta Médica');
+  const [docContent, setDocContent] = useState('');
+  const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
+  const [patientSignatureUrl, setPatientSignatureUrl] = useState(null);
+
+  const handleTemplateSelect = (type) => {
+    setDocType(type);
+    setPatientSignatureUrl(null); // Reset signature when changing types
+    if (type === 'Receta Médica') {
+      setDocContent('');
+    } else if (type === 'Certificado Médico') {
+      setDocContent(`Certifico que el paciente ${storePatient.name || ''}${storePatient.dni ? `, DNI ${storePatient.dni}` : ''}, ha sido atendido en el día de la fecha en este centro médico, y se le indica reposo por el término de ___ horas/días a partir de la fecha.\n\nDiagnóstico: ${storePatient.diagnosis || '________________'}`);
+    } else if (type === 'Consentimiento Informado') {
+      setDocContent(`Por la presente presto mi libre y voluntario consentimiento para que el/la profesional tratante realice el procedimiento/tratamiento médico propuesto.\n\nSe me ha explicado de forma clara y comprensible la naturaleza y propósito del mismo, así como sus posibles riesgos, beneficios y alternativas disponibles.\n\nHe tenido la oportunidad de formular preguntas y todas han sido respondidas a mi entera satisfacción. Por lo tanto, AUTORIZO la realización del procedimiento.`);
+    }
+  };
+
+  const handleGenerateDocument = async () => {
+    return toast.error('Próximamente: La generación de documentos digitales requiere integración oficial con el sistema de Firma Digital gubernamental. Esta funcionalidad se implementará en el futuro.', { duration: 6000, icon: '🔒' });
+
+    // The code below is preserved for future implementation once the API is connected.
+    if (!docContent.trim()) {
+      return toast.error('El contenido del documento no puede estar vacío');
+    }
+
+    if (docType === 'Consentimiento Informado' && !patientSignatureUrl) {
+      // Trigger signature modal automatically
+      setIsSignatureModalOpen(true);
+      return;
+    }
+
+    try {
+      await generateMedicalDocumentPDF({
+        patient: storePatient,
+        doctor: loggedInDoctor,
+        content: docContent,
+        type: docType,
+        signatureDataUrl: null, // Future feature: doctor's signature
+        patientSignatureUrl: patientSignatureUrl,
+        clinicName: store.globalConfig?.businessName || 'Integrar Salud',
+        logoUrl: store.globalConfig?.logoUrl || '/pwa-192x192.png'
+      });
+      
+      toast.success(`${docType} generado correctamente`);
+      setPatientSignatureUrl(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al generar el PDF');
+    }
+  };
 
 
 
@@ -392,6 +446,12 @@ export default function PatientHistoryViewer({
             Estudios y Archivos
             {store.patientFiles.length > 0 && <span className="bg-slate-600/50 border border-white/10 px-2 py-0.5 rounded text-[10px]">{store.patientFiles.length}</span>}
           </button>
+          <button 
+            onClick={() => setActiveTab('docs')} 
+            className={`px-6 py-2.5 rounded-[12px] text-xs font-bold uppercase tracking-[0.1em] transition-all flex items-center gap-2 ${activeTab === 'docs' ? 'bg-[var(--accent-primary)] text-white shadow-[0_4px_15px_-4px_var(--accent-primary)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+          >
+            Documentos Médicos
+          </button>
         </div>
 
         {/* CUERPO: Alergias + Historia + Medicación */}
@@ -424,7 +484,70 @@ export default function PatientHistoryViewer({
 
           {/* COLUMNA CENTRAL DINÁMICA SEGÚN PESTAÑA */}
           <div className="flex-1 space-y-6 min-h-0">
-            {activeTab === 'history' ? (
+            {activeTab === 'docs' ? (
+              <div className="bg-slate-800/40 border border-white/5 rounded-[24px] overflow-hidden shadow-sm">
+                <div className="px-6 py-4 border-b border-white/5 bg-slate-900/50 flex items-center gap-2">
+                  <FileText size={18} className="text-[var(--accent-primary)] drop-shadow-md" />
+                  <h3 className="font-bold text-white uppercase text-[11px] tracking-[0.2em]">Recetas y Consentimientos</h3>
+                </div>
+                <div className="p-6 space-y-6">
+                  {/* Selectors */}
+                  <div className="flex flex-wrap gap-3">
+                    {['Receta Médica', 'Certificado Médico', 'Consentimiento Informado'].map(type => (
+                      <button
+                        key={type}
+                        onClick={() => handleTemplateSelect(type)}
+                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
+                          docType === type 
+                            ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-[0_4px_15px_-4px_var(--accent-primary)]' 
+                            : 'bg-slate-900/50 text-slate-400 border-white/5 hover:border-white/10 hover:text-slate-300'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Editor */}
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">
+                      Contenido del Documento
+                    </label>
+                    <textarea
+                      value={docContent}
+                      onChange={(e) => setDocContent(e.target.value)}
+                      placeholder={`Escriba aquí el contenido para su ${docType.toLowerCase()}...`}
+                      className="w-full bg-slate-900/50 border border-white/10 rounded-2xl p-4 text-[13px] text-slate-200 focus:outline-none focus:border-[var(--accent-primary)] transition-colors resize-y min-h-[200px]"
+                    />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5">
+                    {docType === 'Consentimiento Informado' && !patientSignatureUrl && (
+                      <button
+                        onClick={() => setIsSignatureModalOpen(true)}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 hover:border-purple-500/40 rounded-xl font-bold text-[13px] transition-all"
+                      >
+                        <Pencil size={16} />
+                        Solicitar Firma Digital
+                      </button>
+                    )}
+                    {patientSignatureUrl && (
+                      <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-xl text-[13px] font-bold">
+                        <CheckCircle2 size={16} /> Firma Capturada
+                      </div>
+                    )}
+                    <button
+                      onClick={handleGenerateDocument}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-[var(--accent-primary)] text-white rounded-xl font-bold text-[13px] hover:brightness-110 shadow-[0_4px_15px_-4px_var(--accent-primary)] transition-all active:scale-95"
+                    >
+                      <Download size={16} />
+                      Generar PDF
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : activeTab === 'history' ? (
               <>
                 <div className="bg-slate-800/40 border border-white/5 rounded-[24px] overflow-hidden shadow-sm">
                   <div className="px-6 py-4 border-b border-white/5 bg-slate-900/50 flex items-center gap-2">
@@ -1192,6 +1315,14 @@ function MedicationList({ medications }) {
           </div>
         ))}
       </div>
+      <SignatureModal 
+        isOpen={isSignatureModalOpen} 
+        onClose={() => setIsSignatureModalOpen(false)} 
+        onSave={(url) => {
+          setPatientSignatureUrl(url);
+          toast.success('Firma capturada con éxito');
+        }} 
+      />
     </div>
   );
 }

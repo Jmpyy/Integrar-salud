@@ -26,17 +26,17 @@ const INPUT_CLASS = `
 `;
 const LABEL_CLASS = 'block text-[11px] font-black text-[var(--text-secondary)] opacity-50 uppercase tracking-wider mb-1.5';
 
-const PasswordField = ({ label, value, onChange, show, onToggle, placeholder = '••••••••' }) => (
+const PasswordField = ({ id, label, value, onChange, show, onToggle, placeholder = '••••••••' }) => (
   <div>
-    <label className={LABEL_CLASS}>{label}</label>
+    <label htmlFor={id} className={LABEL_CLASS}>{label}</label>
     <div className="relative">
-      <input id="value" name="value"
+      <input id={id} name={id}
         type={show ? 'text' : 'password'}
         value={value}
         onChange={e => onChange(e.target.value)}
         className={`${INPUT_CLASS} pr-11`}
         placeholder={placeholder}
-        autoComplete="new-password"
+        autoComplete={id === 'currentPwd' ? 'current-password' : 'new-password'}
       />
       <button
         type="button"
@@ -292,7 +292,7 @@ export default function MiPerfilPage() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className={LABEL_CLASS}>Nombre completo</label>
+                  <label htmlFor="profileName" className={LABEL_CLASS}>Nombre completo</label>
                   <input id="profileName" name="profileName"
                     type="text"
                     value={profileName}
@@ -302,7 +302,7 @@ export default function MiPerfilPage() {
                   />
                 </div>
                 <div>
-                  <label className={LABEL_CLASS}>Correo electrónico</label>
+                  <label htmlFor="profileEmail" className={LABEL_CLASS}>Correo electrónico</label>
                   <div className="relative">
                     <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] opacity-30" />
                     <input id="profileEmail" name="profileEmail"
@@ -359,6 +359,7 @@ export default function MiPerfilPage() {
               )}
 
               <PasswordField
+                id="currentPwd"
                 label="Contraseña actual"
                 value={currentPwd}
                 onChange={setCurrentPwd}
@@ -370,6 +371,7 @@ export default function MiPerfilPage() {
               <div className="pt-2 border-t border-[var(--border-color)]/20" />
 
               <PasswordField
+                id="newPwd"
                 label="Nueva contraseña"
                 value={newPwd}
                 onChange={setNewPwd}
@@ -415,6 +417,7 @@ export default function MiPerfilPage() {
               )}
 
               <PasswordField
+                id="confirmPwd"
                 label="Confirmar nueva contraseña"
                 value={confirmPwd}
                 onChange={setConfirmPwd}

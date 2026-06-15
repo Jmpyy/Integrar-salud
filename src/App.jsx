@@ -33,6 +33,7 @@ const NotFoundPage      = lazy(() => import('./pages/NotFoundPage'));
 const VirtualRoomPage   = lazy(() => import('./pages/VirtualRoom'));
 const LogsPage          = lazy(() => import('./pages/Dashboard/Logs'));
 const ReseñasPage       = lazy(() => import('./pages/Dashboard/Reseñas'));
+const TareasPage        = lazy(() => import('./pages/Dashboard/Tareas'));
 const AuthSetup         = lazy(() => import('./components/AuthSetup/AuthSetup'));
 
 /** Fallback mientras carga el chunk de la página */
@@ -273,6 +274,7 @@ function App() {
             }
           >
              <Route index element={<DashboardPage />} />
+             <Route path="tareas" element={<ProtectedRoute allowedRoles={['admin', 'medico', 'recepcion']}><TareasPage /></ProtectedRoute>} />
              <Route path="agenda" element={<ProtectedRoute allowedRoles={['admin', 'medico', 'recepcion']}><AgendaPage /></ProtectedRoute>} />
              <Route path="pacientes" element={<ProtectedRoute allowedRoles={['admin', 'medico', 'recepcion']}><PacientesPage /></ProtectedRoute>} />
              <Route path="consultorio" element={<ProtectedRoute allowedRoles={['admin', 'medico']}><ConsultorioPage /></ProtectedRoute>} />

@@ -163,8 +163,8 @@ export default function PacientesPage() {
           </div>
         </div>
 
-        {/* QUICK STATS CARDS */}
-        <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto hide-scrollbar snap-x pb-2 sm:pb-0">
+        {/* STATS CARDS - Carrusel móvil, Grid desktop */}
+        <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 overflow-x-auto sm:overflow-visible hide-scrollbar snap-x py-2 sm:py-0">
           <div className="card-premium p-4 sm:p-6 border border-[var(--glass-border)] flex items-center gap-4 sm:gap-5 hover:-translate-y-1 transition-all shrink-0 min-w-[160px] sm:min-w-0 snap-start">
             <div className="w-10 h-10 sm:w-14 sm:h-14 bg-indigo-500/10 text-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner shrink-0">
                <Users size={20} className="sm:w-6 sm:h-6" />

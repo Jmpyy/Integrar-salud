@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from '../../../stores/useStore';
+import { useSearchParams } from 'react-router-dom';
 import {
   Users, Clock, UserCheck, FileText,
   HeartPulse, ShieldAlert, Search, AlertCircle,
@@ -35,6 +36,32 @@ export default function ConsultorioPage() {
   // Estados para videollamada y demoras
   const [delayModalApp, setDelayModalApp] = useState(null);
   const [delayMinutes, setDelayMinutes] = useState('');
+
+  // Soportar abrir paciente directo desde URL
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openPatientId = searchParams.get('patientId');
+  const actionParam = searchParams.get('action');
+  const dateParam = searchParams.get('date');
+
+  const [viewerAction, setViewerAction] = useState(null);
+  const [viewerDate, setViewerDate] = useState(null);
+
+  useEffect(() => {
+    if (openPatientId && patients.length > 0 && !showPatientView) {
+       const patient = patients.find(p => Number(p.id) === Number(openPatientId) || p.name === searchParams.get('patientName'));
+       if (patient) {
+          if (actionParam) setViewerAction(actionParam);
+          if (dateParam) setViewerDate(dateParam);
+          handleOpenPatient(patient);
+          
+          searchParams.delete('patientId');
+          searchParams.delete('patientName');
+          searchParams.delete('action');
+          searchParams.delete('date');
+          setSearchParams(searchParams, {replace: true});
+       }
+    }
+  }, [openPatientId, patients, showPatientView]);
 
   const handleOpenPatient = async (patient) => {
     if (!patient?.id) return;
@@ -136,7 +163,7 @@ export default function ConsultorioPage() {
       if (newStatus === APPOINTMENT_STATUS.FINALIZADO && app && !app.hasEvolution) {
          playErrorSound();
          toast.custom((t) => (
-          <div className={`${t.visible ? 'animate-fade-in-up' : 'animate-fade-out-down'} max-w-sm w-full bg-[var(--bg-card)] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-[var(--border-color)] overflow-hidden backdrop-blur-xl border border-[var(--glass-border)]`}>
+          <div className={`${t.visible ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 max-w-sm w-full bg-[var(--bg-card)] shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-[var(--border-color)] overflow-hidden backdrop-blur-xl border border-[var(--glass-border)]`}>
             <div className="flex-1 w-0 p-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0 pt-0.5">
@@ -259,7 +286,15 @@ export default function ConsultorioPage() {
       <PatientHistoryViewer
         patient={fullPatient}
         showEditActions={true}
-        onBack={() => { setShowPatientView(false); setSelectedPatientId(null); setFullPatient(null); }}
+        initialAction={viewerAction}
+        initialDate={viewerDate}
+        onBack={() => { 
+          setShowPatientView(false); 
+          setSelectedPatientId(null); 
+          setFullPatient(null); 
+          setViewerAction(null);
+          setViewerDate(null);
+        }}
       />
     );
   }
@@ -318,7 +353,7 @@ export default function ConsultorioPage() {
       </div>
 
       {activeTab === 'hoy' && (
-        <div className="flex sm:grid sm:grid-cols-5 gap-2 sm:gap-3 overflow-x-auto hide-scrollbar pb-2 sm:pb-0 snap-x snap-mandatory">
+        <div className="flex sm:grid sm:grid-cols-5 gap-2 sm:gap-3 overflow-x-auto sm:overflow-visible hide-scrollbar py-2 sm:py-0 snap-x snap-mandatory">
           {[
             { label: 'Total Hoy', value: stats.total, icon: CalendarDays, color: 'text-[var(--accent-primary)]', bg: 'bg-[var(--accent-light)]' },
             { label: 'En Consulta', value: stats.enCurso, icon: HeartPulse, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },

@@ -6,7 +6,7 @@ import {
    TrendingUp, DollarSign, Wallet, Clock, Users, ChevronDown, ChevronRight, CreditCard, ArrowLeftRight,
    Briefcase, Activity, ArrowUpRight, ArrowDownRight,
    Download, FileText, Plus, X, List, PieChart, BarChart2, Trash2, Pencil, Landmark, Receipt, CheckCircle2,
-   Phone, Printer
+   Phone, Printer, Lightbulb
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Legend } from 'recharts';
 
@@ -46,7 +46,7 @@ export default function FinanzasPage() {
    const [expandedTxId, setExpandedTxId] = useState(null);
 
    const [isAddingExpense, setIsAddingExpense] = useState(false);
-   const [newExpense, setNewExpense] = useState({ category: '', amount: '', method: 'Efectivo', date: toLocalDateString(new Date()), receipt: '', notes: '', doctor_id: '' });
+   const [newExpense, setNewExpense] = useState({ category: '', amount: '', method: 'Efectivo', date: toLocalDateString(new Date()), receipt: '', notes: '', doctor_id: '', isFixed: false });
 
    const [settlementDoctor, setSettlementDoctor] = useState(null);
    const [editingTxId, setEditingTxId] = useState(null);
@@ -79,7 +79,8 @@ export default function FinanzasPage() {
          dateFrom = f(weekAgo);
          dateTo = f(now);
       } else if (dateRange === 'Mes en curso') {
-         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+         // Fetch last month too, to calculate MoM
+         const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
          const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
          dateFrom = f(firstDay);
          dateTo = f(lastDay);
@@ -121,33 +122,67 @@ export default function FinanzasPage() {
       const todayStr = toLocalDateStr(now.toISOString());
 
       // 1. Filtrar transacciones por rango y ocultar ajustes técnicos
-      const filteredTxs = (transactions || []).filter(t => {
-         if (t.concept && t.concept.includes('Ajuste Honorarios (Redondeo)')) return false;
+      const currentPeriodTxs = [];
+      const prevPeriodTxs = [];
+
+      const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
+      (transactions || []).forEach(t => {
+         if (t.concept && t.concept.includes('Ajuste Honorarios (Redondeo)')) return;
          
          const txDateStr = toLocalDateStr(t.date);
-         if (!txDateStr) return true; // si no tiene fecha, mostrar siempre
+         if (!txDateStr) {
+            currentPeriodTxs.push(t);
+            return;
+         }
          
-         if (dateRange === 'Hoy') return txDateStr === todayStr;
-         if (dateRange === 'Esta Semana') {
+         if (dateRange === 'Hoy') {
+            if (txDateStr === todayStr) currentPeriodTxs.push(t);
+         } else if (dateRange === 'Esta Semana') {
             const weekAgo = new Date(now);
             weekAgo.setDate(now.getDate() - 7);
-            return txDateStr >= toLocalDateStr(weekAgo.toISOString());
+            if (txDateStr >= toLocalDateStr(weekAgo.toISOString())) currentPeriodTxs.push(t);
+         } else if (dateRange === 'Mes en curso') {
+            if (txDateStr.startsWith(currentMonthStr)) {
+               currentPeriodTxs.push(t);
+            } else if (txDateStr.startsWith(prevMonthStr)) {
+               prevPeriodTxs.push(t);
+            }
+         } else if (dateRange === 'Personalizado' && customDateRange.dateFrom && customDateRange.dateTo) {
+            if (txDateStr >= customDateRange.dateFrom && txDateStr <= customDateRange.dateTo) currentPeriodTxs.push(t);
+         } else {
+            if (txDateStr.startsWith(`${now.getFullYear()}`)) currentPeriodTxs.push(t);
          }
-         if (dateRange === 'Mes en curso') {
-            return txDateStr.startsWith(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-         }
-         if (dateRange === 'Personalizado' && customDateRange.dateFrom && customDateRange.dateTo) {
-            return txDateStr >= customDateRange.dateFrom && txDateStr <= customDateRange.dateTo;
-         }
-         return true; // Año en curso o fallback
       });
 
-      const dynamicExpenses = filteredTxs.filter(t => t.type === 'Egreso').reduce((acc, t) => acc + Number(t.amount || 0), 0);
-      const dynamicIncome = filteredTxs.filter(t => t.type === 'Ingreso').reduce((acc, t) => acc + Number(t.amount || 0), 0);
+      const dynamicExpenses = currentPeriodTxs.filter(t => t.type === 'Egreso').reduce((acc, t) => acc + Number(t.amount || 0), 0);
+      const dynamicIncome = currentPeriodTxs.filter(t => t.type === 'Ingreso').reduce((acc, t) => acc + Number(t.amount || 0), 0);
+      
+      const prevExpenses = prevPeriodTxs.filter(t => t.type === 'Egreso').reduce((acc, t) => acc + Number(t.amount || 0), 0);
+      const prevIncome = prevPeriodTxs.filter(t => t.type === 'Ingreso').reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
+      let fixedExpenses = 0;
+      let variableExpenses = 0;
+      currentPeriodTxs.filter(t => t.type === 'Egreso').forEach(t => {
+         if ((t.notes || '').includes('[FIJO]')) {
+             fixedExpenses += Number(t.amount || 0);
+         } else {
+             variableExpenses += Number(t.amount || 0);
+         }
+      });
+      
+      let prevFixedExpenses = 0;
+      prevPeriodTxs.filter(t => t.type === 'Egreso').forEach(t => {
+         if ((t.notes || '').includes('[FIJO]')) {
+             prevFixedExpenses += Number(t.amount || 0);
+         }
+      });
 
       // 2. Calcular Distribución de Categorías de Egresos (Donut)
       const categoryTotals = {};
-      filteredTxs.filter(t => t.type === 'Egreso').forEach(t => {
+      currentPeriodTxs.filter(t => t.type === 'Egreso').forEach(t => {
          const cat = getExpenseCategory(t.concept);
          if (!categoryTotals[cat.id]) {
             categoryTotals[cat.id] = { name: cat.label, value: 0, fill: cat.color };
@@ -158,7 +193,7 @@ export default function FinanzasPage() {
 
       // 3. Flujo Evolución (Recharts: LineChart/AreaChart)
       const dataByDate = {};
-      const sortedTxs = [...filteredTxs].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const sortedTxs = [...currentPeriodTxs].sort((a, b) => new Date(a.date) - new Date(b.date));
       sortedTxs.forEach(t => {
          const dateKey = new Date(t.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
          if (!dataByDate[dateKey]) {
@@ -173,9 +208,16 @@ export default function FinanzasPage() {
          ingresos: dynamicIncome,
          egresos: dynamicExpenses,
          neta: dynamicIncome - dynamicExpenses,
+         prevIngresos: prevIncome,
+         prevEgresos: prevExpenses,
+         prevNeta: prevIncome - prevExpenses,
+         fixedExpenses,
+         variableExpenses,
+         prevFixedExpenses,
          donutData: categoryDistribution,
          evolutionData,
-         totalTxs: filteredTxs.length
+         totalTxs: currentPeriodTxs.length,
+         currentPeriodTxs
       };
    }, [dateRange, transactions]);
 
@@ -200,7 +242,7 @@ export default function FinanzasPage() {
          concept: newExpense.category + (newExpense.receipt ? ` (#${newExpense.receipt})` : ''),
          method: newExpense.method || 'Efectivo',
          amount: Number(newExpense.amount),
-         notes: newExpense.notes,
+         notes: newExpense.isFixed ? `[FIJO] ${newExpense.notes}` : newExpense.notes,
          category: 'Gastos Generales'
       };
 
@@ -215,14 +257,14 @@ export default function FinanzasPage() {
       await store.fetchTransactions();
       setIsAddingExpense(false);
       setEditingTxId(null);
-      setNewExpense({ category: '', amount: '', method: 'Efectivo', date: toLocalDateString(new Date()), receipt: '', notes: '', doctor_id: null });
+      setNewExpense({ category: '', amount: '', method: 'Efectivo', date: toLocalDateString(new Date()), receipt: '', notes: '', doctor_id: null, isFixed: false });
       setTimeout(() => setToastMsg(''), 3000);
    };
 
    const handleExport = (type) => {
       if (type === 'CSV') {
          const headers = "ID Ref.;Fecha;Hora;Tipo de Movimiento;Concepto Registrado;Método de Pago;Monto Neto (ARS)\n";
-         const csvRows = transactions.map(tx => {
+         const csvRows = stats.currentPeriodTxs.map(tx => {
             const dObj = new Date(tx.date);
             const fDate = dObj.toLocaleDateString();
             const fTime = dObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -698,6 +740,14 @@ export default function FinanzasPage() {
                         <input id="receipt" name="receipt" type="text" value={newExpense.receipt} onChange={e => setNewExpense({ ...newExpense, receipt: e.target.value })} className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] outline-none focus:border-red-400 transition-all placeholder:text-[var(--text-secondary)]/30" placeholder="Opcional. Ej: FC-A-002-14002" />
                      </div>
 
+                     <div className="flex items-center gap-3 bg-[var(--bg-main)] p-3.5 rounded-xl border border-[var(--border-color)] cursor-pointer" onClick={() => setNewExpense({ ...newExpense, isFixed: !newExpense.isFixed })}>
+                        <input type="checkbox" id="isFixed" checked={newExpense.isFixed} onChange={e => setNewExpense({ ...newExpense, isFixed: e.target.checked })} onClick={e => e.stopPropagation()} className="w-5 h-5 text-red-500 rounded-md border-[var(--border-color)] focus:ring-red-500 cursor-pointer" />
+                        <div>
+                           <label htmlFor="isFixed" className="text-sm font-black text-[var(--text-primary)] cursor-pointer select-none block leading-none mb-1">Es un Gasto Fijo Recurrente</label>
+                           <p className="text-[10px] text-[var(--text-secondary)] font-medium leading-none">Alquiler, Sueldos, Suscripciones mensuales, etc.</p>
+                        </div>
+                     </div>
+
                      <div>
                         <label htmlFor="notes" className="block text-[10px] font-black text-[var(--text-secondary)] mb-1.5 uppercase tracking-widest opacity-70">Detalles u Observaciones</label>
                         <textarea id="notes" name="notes" value={newExpense.notes} onChange={e => setNewExpense({ ...newExpense, notes: e.target.value })} rows="2" className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-red-400 transition-all resize-none placeholder:text-[var(--text-secondary)]/30" placeholder="Opcional. Motivo del gasto..."></textarea>
@@ -786,6 +836,11 @@ export default function FinanzasPage() {
                   <div className="min-w-0 flex-1">
                      <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] print:text-[10px] print:text-slate-400 truncate">Ingresos Brutos</p>
                      <h3 className="text-2xl sm:text-3xl font-black mt-1 print:text-slate-800 print:text-lg print:tracking-tighter truncate leading-none">{formatMoney(stats.ingresos)}</h3>
+                     {dateRange === 'Mes en curso' && stats.prevIngresos > 0 && (
+                        <div className="mt-2 text-[11px] font-bold text-white bg-white/20 px-2.5 py-1 rounded-full w-max backdrop-blur-sm">
+                           {stats.ingresos >= stats.prevIngresos ? '↑' : '↓'} {Math.abs(((stats.ingresos / stats.prevIngresos) - 1) * 100).toFixed(1)}% vs Mes Anterior
+                        </div>
+                     )}
                   </div>
                </div>
             </div>
@@ -797,21 +852,75 @@ export default function FinanzasPage() {
                   <div className="min-w-0 flex-1">
                      <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] print:text-[10px] print:text-slate-400 truncate">Egresos Totales</p>
                      <h3 className="text-2xl sm:text-3xl font-black mt-1 print:text-slate-800 print:text-lg print:tracking-tighter truncate leading-none">{formatMoney(stats.egresos)}</h3>
+                     {dateRange === 'Mes en curso' && stats.prevEgresos > 0 && (
+                        <div className="mt-2 text-[11px] font-bold text-white bg-white/20 px-2.5 py-1 rounded-full w-max backdrop-blur-sm">
+                           {stats.egresos <= stats.prevEgresos ? '↓ (Bien)' : '↑ (Cuidado)'} {Math.abs(((stats.egresos / stats.prevEgresos) - 1) * 100).toFixed(1)}% vs Mes Anterior
+                        </div>
+                     )}
                   </div>
                </div>
             </div>
 
-            <div className="w-[75%] sm:w-[85%] shrink-0 snap-center md:w-auto bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl shadow-emerald-500/10 border border-white/10 relative overflow-hidden group text-white print:block print:bg-white print:text-slate-800 print:border-slate-200 print:shadow-none">
+            <div className={`w-[75%] sm:w-[85%] shrink-0 snap-center md:w-auto bg-gradient-to-br ${stats.neta >= 0 ? 'from-emerald-500 to-emerald-600 shadow-emerald-500/10' : 'from-slate-700 to-slate-800 shadow-slate-900/10'} p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] shadow-xl border border-white/10 relative overflow-hidden group text-white print:bg-white print:text-slate-800 print:border-slate-200 print:shadow-none`}>
                <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-bl-full -z-0 opacity-50 group-hover:scale-125 transition-transform duration-700 print:hidden"></div>
                <div className="relative z-10 flex items-start gap-3 sm:gap-4 print:gap-0">
-                  <div className="bg-white/20 p-2 sm:p-3 rounded-xl sm:rounded-2xl backdrop-blur-md print:hidden"><Wallet size={20} className="sm:w-6 sm:h-6 text-white" /></div>
+                  <div className="bg-white/20 p-2 sm:p-3 rounded-xl sm:rounded-2xl backdrop-blur-md print:hidden"><Activity size={20} className="sm:w-6 sm:h-6 text-white" /></div>
                   <div className="min-w-0 flex-1">
-                     <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] print:text-[10px] print:text-slate-400 truncate">Utilidad Neta</p>
+                     <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] print:text-[10px] print:text-slate-400 truncate">Rentabilidad Neta</p>
                      <h3 className="text-2xl sm:text-3xl font-black mt-1 print:text-slate-800 print:text-lg print:tracking-tighter truncate leading-none">{formatMoney(stats.neta)}</h3>
+                     {dateRange === 'Mes en curso' && stats.prevNeta > 0 && (
+                        <div className="mt-2 text-[11px] font-bold text-white bg-white/20 px-2.5 py-1 rounded-full w-max backdrop-blur-sm">
+                           {stats.neta >= stats.prevNeta ? '↑' : '↓'} {Math.abs(((stats.neta / stats.prevNeta) - 1) * 100).toFixed(1)}% vs Mes Anterior
+                        </div>
+                     )}
                   </div>
                </div>
             </div>
          </div>
+
+         {/* SMART BI ADVISOR CARD */}
+         {dateRange === 'Mes en curso' && (
+            <div className="mx-4 md:mx-0 mb-6 md:mb-8 bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-[2rem] p-6 shadow-sm flex flex-col md:flex-row gap-6 items-start md:items-center">
+               <div className="w-12 h-12 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
+                  <Lightbulb size={24} />
+               </div>
+               <div className="flex-1">
+                  <h3 className="text-lg font-black text-indigo-900 dark:text-indigo-300 mb-1">Asesor Financiero Inteligente</h3>
+                  <div className="text-sm text-indigo-800/80 dark:text-indigo-200/70 space-y-2">
+                     <p>
+                        Este mes tienes <strong>{formatMoney(stats.fixedExpenses)}</strong> registrados en Costos Fijos y <strong>{formatMoney(stats.variableExpenses)}</strong> en Variables.
+                     </p>
+                     {(() => {
+                        const estimatedFixedCost = Math.max(stats.fixedExpenses, stats.prevFixedExpenses);
+                        if (estimatedFixedCost === 0) return <p>Marca tus próximos pagos recurrentes como "Gasto Fijo" para activar el análisis de punto de equilibrio.</p>;
+                        
+                        const margin = stats.ingresos > 0 ? (stats.neta / stats.ingresos) * 100 : 0;
+                        const faltante = estimatedFixedCost - stats.ingresos;
+
+                        return (
+                           <>
+                              {faltante > 0 ? (
+                                 <p className="text-rose-600 dark:text-rose-400 font-bold">
+                                    Tu Punto de Equilibrio mensual estimado es <strong>{formatMoney(estimatedFixedCost)}</strong>. Te faltan <strong>{formatMoney(faltante)}</strong> de ingresos para no tener pérdidas este mes.
+                                 </p>
+                              ) : (
+                                 <p className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                    ✅ ¡Superaste tu Punto de Equilibrio ({formatMoney(estimatedFixedCost)})! Ahora tienes un margen neto de ganancia del {margin.toFixed(1)}%.
+                                 </p>
+                              )}
+                              
+                              {margin < 30 && stats.ingresos > 0 && faltante <= 0 && (
+                                 <p className="text-amber-600 dark:text-amber-400 text-xs mt-2">
+                                    ⚠️ Sugerencia: Aunque no pierdes dinero, tu margen neto ({margin.toFixed(1)}%) está por debajo del 30% ideal. Considera un ajuste del 10% al 15% en el valor de tus honorarios.
+                                 </p>
+                              )}
+                           </>
+                        );
+                     })()}
+                  </div>
+               </div>
+            </div>
+         )}
 
          {/* SECCION DE GRAFICOS (RECHARTS) */}
          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 px-4 md:px-0 print:block print:space-y-6">
@@ -902,8 +1011,7 @@ export default function FinanzasPage() {
 
                   {/* LISTADO DIARIO UNIFICADO (ESTILO MP) */}
                   <div className="bg-[var(--bg-card)] sm:rounded-[2rem] border-y sm:border border-[var(--glass-border)] sm:shadow-sm overflow-hidden w-full max-w-5xl mx-auto">
-                     {(transactions || [])
-                        .filter(t => !t.concept || !t.concept.includes('Ajuste Honorarios (Redondeo)'))
+                     {(stats.currentPeriodTxs || [])
                         .sort((a, b) => new Date(b.date) - new Date(a.date))
                         .map((tx, idx, arr) => (
                         <div key={tx.id} className={`flex flex-col relative transition-colors ${expandedTxId === tx.id ? 'bg-[var(--bg-main)]/50' : 'hover:bg-[var(--bg-main)]/30'} ${idx !== arr.length - 1 ? 'border-b border-[var(--border-color)]/40' : ''}`}>

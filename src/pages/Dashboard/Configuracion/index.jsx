@@ -37,6 +37,7 @@ const DEFAULT_CONFIG = {
     6: { enabled: false, start: '09:00', end: '13:00' },
     0: { enabled: false, start: '09:00', end: '13:00' },
   },
+  retentionMonths: 6,
 };
 
 const DAY_NAMES = {
@@ -352,6 +353,23 @@ export default function ConfiguracionPage() {
                     <option value="America/Lima" className="bg-[var(--bg-card)]">Lima (UTC-5)</option>
                     <option value="America/Bogota" className="bg-[var(--bg-card)]">Bogotá (UTC-5)</option>
                   </select>
+                </div>
+                <div className="sm:col-span-2 pt-4 border-t border-[var(--border-color)]/30 mt-4">
+                  <h4 className="text-[11px] font-black text-[var(--text-primary)] uppercase tracking-widest mb-4">Módulo de Retención (CRM)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="retentionMonths" className={labelClass}>Meses de inactividad para considerar "Paciente Perdido"</label>
+                      <select id="retentionMonths" name="retentionMonths" autoComplete="off" value={config.retentionMonths || 6} onChange={e => update('retentionMonths', Number(e.target.value))} className={fieldClass}>
+                        <option value={3} className="bg-[var(--bg-card)]">3 meses (Tratamientos cortos)</option>
+                        <option value={6} className="bg-[var(--bg-card)]">6 meses (Estándar)</option>
+                        <option value={12} className="bg-[var(--bg-card)]">12 meses (Chequeo anual)</option>
+                        <option value={24} className="bg-[var(--bg-card)]">24 meses</option>
+                      </select>
+                      <p className="text-[10px] text-[var(--text-secondary)] font-bold mt-2 opacity-50 italic">
+                        Los pacientes sin turnos futuros y cuya última visita superó este tiempo aparecerán en la pestaña de Retención.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
