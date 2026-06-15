@@ -181,14 +181,17 @@ export default function DashboardPage() {
   const monthlyIncome = transactions
     .filter(t => t.type === 'Ingreso')
     .filter(t => {
-       const d = new Date(t.date);
+       const safeDateStr = typeof t.date === 'string' ? t.date.replace(' ', 'T') : t.date;
+       const d = new Date(safeDateStr);
        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     })
     .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
 
   const newPatientsThisMonth = patients
     .filter(p => {
-       const d = new Date(p.created_at || new Date());
+       const dateVal = p.created_at || new Date().toISOString();
+       const safeDateStr = typeof dateVal === 'string' ? dateVal.replace(' ', 'T') : dateVal;
+       const d = new Date(safeDateStr);
        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     }).length;
 

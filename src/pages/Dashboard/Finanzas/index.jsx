@@ -193,9 +193,14 @@ export default function FinanzasPage() {
 
       // 3. Flujo Evolución (Recharts: LineChart/AreaChart)
       const dataByDate = {};
-      const sortedTxs = [...currentPeriodTxs].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const sortedTxs = [...currentPeriodTxs].sort((a, b) => {
+         const dA = new Date(typeof a.date === 'string' ? a.date.replace(' ', 'T') : a.date);
+         const dB = new Date(typeof b.date === 'string' ? b.date.replace(' ', 'T') : b.date);
+         return dA - dB;
+      });
       sortedTxs.forEach(t => {
-         const dateKey = new Date(t.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+         const safeDateStr = typeof t.date === 'string' ? t.date.replace(' ', 'T') : t.date;
+         const dateKey = new Date(safeDateStr).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
          if (!dataByDate[dateKey]) {
             dataByDate[dateKey] = { date: dateKey, Ingresos: 0, Egresos: 0 };
          }
