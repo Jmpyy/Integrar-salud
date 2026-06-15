@@ -112,7 +112,10 @@ export default function FinanzasPage() {
       // Función robusta: obtiene 'YYYY-MM-DD' de una fecha sin que la timezone la rompa
       const toLocalDateStr = (dateStr) => {
          if (!dateStr) return '';
-         // Si tiene T y Z (ISO UTC), convertir a local. Si no, tomar los primeros 10 chars.
+         // Si la fecha ya viene en formato 'YYYY-MM-DD', devolverla tal cual.
+         // Evita que new Date('YYYY-MM-DD') asuma UTC y reste 1 día por la zona horaria local.
+         if (dateStr.length === 10 && dateStr.indexOf('-') === 4) return dateStr;
+         
          const d = new Date(dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T'));
          const y = d.getFullYear();
          const m = String(d.getMonth() + 1).padStart(2, '0');
