@@ -643,15 +643,23 @@ export default function PatientHistoryViewer({ patient, onBack, initialAction, i
                                           {item.title}
                                         </span>
                                       )}
-                                      {item.type && !['psicologia', 'psicología', 'psiquiatria', 'psiquiatría'].includes(item.type.toLowerCase().trim()) && (
-                                        <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-md border flex items-center gap-1 shrink-0
-                                          ${item.type.toLowerCase().includes('virtual') ? 'bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/25' :
-                                            item.type.toLowerCase().includes('domicilio') ? 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25' :
-                                              'bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
-                                          }`}>
-                                          {item.type}
-                                        </span>
-                                      )}
+                                      {(() => {
+                                        const mod = (item.modalidad || item.type || 'Presencial').trim();
+                                        if (['psicologia', 'psicología', 'psiquiatria', 'psiquiatría'].includes(mod.toLowerCase())) return null;
+                                        
+                                        const isVirtual = mod.toLowerCase().includes('virtual');
+                                        const isDomicilio = mod.toLowerCase().includes('domicilio');
+                                        
+                                        return (
+                                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-md border flex items-center gap-1 shrink-0
+                                            ${isVirtual ? 'bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/25' :
+                                              isDomicilio ? 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25' :
+                                                'bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
+                                            }`}>
+                                            {mod}
+                                          </span>
+                                        );
+                                      })()}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2 mt-2 sm:mt-0 shrink-0 sm:ml-auto w-full sm:w-auto">

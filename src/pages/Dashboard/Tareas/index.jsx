@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../../../stores/useStore';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { 
-  Sparkles, Wallet, Activity, Users, Clock, MessageCircle, FileEdit, CheckCircle2 
+import {
+  Sparkles, Wallet, Activity, Users, Clock, MessageCircle, FileEdit,
+  CheckCircle2, Gift, Star, AlertTriangle, TrendingUp, UserX,
+  HeartPulse, Calendar, Stethoscope, Filter, ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -33,39 +35,36 @@ export default function TareasPage() {
     salud: ['admin', 'administracion'].includes(userRole),
   };
 
-  // Filtrar globalmente si el admin eligió un médico
   const appointments = userRole !== 'medico' && selectedAdminDoctor !== 'all'
     ? storeAppointments.filter(a => Number(a.doctorId) === Number(selectedAdminDoctor))
     : storeAppointments;
 
-  // Helper function to get appointment status
   const getAppointmentStatus = (app) => {
     if (app.attendance === 'finalizado') return 'finished';
     if (app.attendance === 'ausente') return 'absent';
     if (app.attendance === 'suspended') return 'suspended';
-    
+
     if (!app.date || !app.time) return 'upcoming';
     const appDateTime = new Date(`${app.date}T${app.time}`);
     const now = new Date();
-    
-    let duration = 30; // default
+
+    let duration = 30;
     if (app.time_end) {
-       const [h, m] = app.time.split(':').map(Number);
-       const [eh, em] = app.time_end.split(':').map(Number);
-       duration = (eh * 60 + em) - (h * 60 + m);
+      const [h, m] = app.time.split(':').map(Number);
+      const [eh, em] = app.time_end.split(':').map(Number);
+      duration = (eh * 60 + em) - (h * 60 + m);
     }
-    
+
     const appEndTime = new Date(appDateTime.getTime() + duration * 60000);
-    
+
     if (now < appDateTime) return 'upcoming';
     if (now >= appDateTime && now <= appEndTime) return 'in_progress';
-    return 'finished'; // past time but not marked finalized? we treat as finished for UI
+    return 'finished';
   };
 
-  // --- Calculations (similar to Dashboard) ---
   const todayString = new Date().toISOString().split('T')[0];
   const todaysAppointments = appointments.filter(a => a && a.date === todayString && !a.isBlock);
-  
+
   const myDoctor = userRole === 'medico' && user?.doctor_id
     ? (doctors.find(d => d && Number(d.id) === Number(user.doctor_id)) || null)
     : (userRole === 'medico' ? doctors.find(d => d && d.name === user?.name) : null);
@@ -85,10 +84,9 @@ export default function TareasPage() {
   pendingOrWaitingApps.forEach(a => {
     if (seenPatientIds.has(a.patientId || a.patient)) return;
     seenPatientIds.add(a.patientId || a.patient);
-    
+
     const patientRecord = patients.find(p => p.id === a.patientId || p.name === a.patient);
-    
-    // Cumpleaños
+
     if (patientRecord?.birthDate) {
       const today = new Date();
       const [y, m, d] = patientRecord.birthDate.split('-');
@@ -97,7 +95,6 @@ export default function TareasPage() {
       }
     }
 
-    // Primera Visita
     if (patientRecord?.created_at) {
       const diffTime = Math.abs(new Date() - new Date(patientRecord.created_at));
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -107,13 +104,12 @@ export default function TareasPage() {
       }
     }
 
-    // Deuda Previa
     if (userRole !== 'medico') {
-      const pastApps = appointments.filter(p => 
-        (p.patientId === a.patientId || p.patient === a.patient) && 
+      const pastApps = appointments.filter(p =>
+        (p.patientId === a.patientId || p.patient === a.patient) &&
         p.id !== a.id &&
         new Date(p.date) < new Date(todayString) &&
-        p.attendance === 'finalizado' && 
+        p.attendance === 'finalizado' &&
         p.paymentStatus !== 'pagado' &&
         !p.isBlock
       );
@@ -125,9 +121,8 @@ export default function TareasPage() {
       }
     }
 
-    // Faltador Frecuente
-    const pastAllApps = appointments.filter(p => 
-      (p.patientId === a.patientId || p.patient === a.patient) && 
+    const pastAllApps = appointments.filter(p =>
+      (p.patientId === a.patientId || p.patient === a.patient) &&
       p.id !== a.id &&
       new Date(p.date) < new Date(todayString) &&
       !p.isBlock
@@ -165,21 +160,20 @@ export default function TareasPage() {
     return false;
   });
 
-  // Módulo de Retención CRM
   const retentionMonths = globalConfig?.retentionMonths || 6;
   const lostPatients = [];
   if (userRole !== 'medico') {
     const cutoffDate = new Date();
     cutoffDate.setMonth(cutoffDate.getMonth() - retentionMonths);
-    
+
     const patientLatestApp = {};
     const patientHasFutureApp = {};
-    
+
     appointments.forEach(a => {
       if (a.isBlock) return;
       const patientKey = a.patientId || a.patient;
       const appDate = new Date(a.date);
-      
+
       if (appDate >= new Date(todayString)) {
         patientHasFutureApp[patientKey] = true;
       } else {
@@ -196,22 +190,21 @@ export default function TareasPage() {
         const lastApp = patientLatestApp[key];
         const lastAppDate = new Date(lastApp.date);
         if (lastAppDate < cutoffDate) {
-          lostPatients.push({ 
-            app: lastApp, 
-            monthsPassed: Math.floor((new Date() - lastAppDate) / (1000 * 60 * 60 * 24 * 30.4)) 
+          lostPatients.push({
+            app: lastApp,
+            monthsPassed: Math.floor((new Date() - lastAppDate) / (1000 * 60 * 60 * 24 * 30.4))
           });
         }
       }
     });
   }
 
-  // Salud Financiera (Admin/Administracion)
   const financialHealth = [];
   if (canSee.salud) {
     const dToday = new Date();
     const currentMonth = dToday.getMonth();
     const currentYear = dToday.getFullYear();
-    
+
     const monthlyTransactions = transactions.filter(t => {
       if (!t.date) return false;
       const safeDateStr = typeof t.date === 'string' ? t.date.replace(' ', 'T') : t.date;
@@ -223,7 +216,7 @@ export default function TareasPage() {
     const expenses = monthlyTransactions.filter(t => (t.type || '').toLowerCase() === 'egreso').reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const profit = income - expenses;
     const margin = income > 0 ? (profit / income) * 100 : 0;
-    
+
     if (income >= 0 || expenses >= 0) {
       financialHealth.push({ income, expenses, profit, margin });
     }
@@ -245,8 +238,7 @@ export default function TareasPage() {
 
   const setFilter = (f) => setSearchParams({ filter: f });
 
-  // UI Tabs Definition
-  const totalCount = 
+  const totalCount =
     (canSee.cumpleanos ? birthdays.length : 0) +
     (canSee.primeras ? newPatients.length : 0) +
     (canSee.demoras ? delayedPatients.length : 0) +
@@ -257,149 +249,214 @@ export default function TareasPage() {
     (canSee.salud ? financialHealth.length : 0);
 
   const tabs = [
-    { id: 'todos', label: 'Todos', count: totalCount, show: true },
-    { id: 'cumpleanos', label: 'Cumpleaños', count: birthdays.length, color: 'text-pink-500', bg: 'bg-pink-500/10', show: canSee.cumpleanos },
-    { id: 'primeras', label: 'Primeras Visitas', count: newPatients.length, color: 'text-purple-500', bg: 'bg-purple-500/10', show: canSee.primeras },
-    { id: 'demoras', label: 'Demoras en Sala', count: delayedPatients.length, color: 'text-rose-500', bg: 'bg-rose-500/10', show: canSee.demoras },
-    { id: 'evoluciones', label: 'Evoluciones Faltantes', count: missingNotes.length, color: 'text-amber-500', bg: 'bg-amber-500/10', show: canSee.evoluciones },
-    { id: 'deudas', label: 'Deudas Previas', count: previousDebts.length, color: 'text-red-500', bg: 'bg-red-500/10', show: canSee.deudas },
-    { id: 'faltadores', label: 'Faltadores', count: frequentNoShows.length, color: 'text-orange-500', bg: 'bg-orange-500/10', show: canSee.faltadores },
-    { id: 'retencion', label: 'Retención (CRM)', count: lostPatients.length, color: 'text-indigo-500', bg: 'bg-indigo-500/10', show: canSee.retencion },
-    { id: 'salud', label: 'Salud Financiera', count: financialHealth.length, color: 'text-emerald-500', bg: 'bg-emerald-500/10', show: canSee.salud },
+    { id: 'todos', label: 'Todos', count: totalCount, icon: Sparkles, color: 'indigo' },
+    { id: 'cumpleanos', label: 'Cumpleaños', count: birthdays.length, icon: Gift, color: 'pink', show: canSee.cumpleanos },
+    { id: 'primeras', label: 'Primeras Visitas', count: newPatients.length, icon: Star, color: 'purple', show: canSee.primeras },
+    { id: 'demoras', label: 'Demoras en Sala', count: delayedPatients.length, icon: Clock, color: 'rose', show: canSee.demoras },
+    { id: 'evoluciones', label: 'Evoluciones Faltantes', count: missingNotes.length, icon: FileEdit, color: 'amber', show: canSee.evoluciones },
+    { id: 'deudas', label: 'Deudas Previas', count: previousDebts.length, icon: Wallet, color: 'red', show: canSee.deudas },
+    { id: 'faltadores', label: 'Faltadores', count: frequentNoShows.length, icon: UserX, color: 'orange', show: canSee.faltadores },
+    { id: 'retencion', label: 'Retención (CRM)', count: lostPatients.length, icon: HeartPulse, color: 'indigo', show: canSee.retencion },
+    { id: 'salud', label: 'Salud Financiera', count: financialHealth.length, icon: TrendingUp, color: 'emerald', show: canSee.salud },
   ];
 
+  const visibleTabs = tabs.filter(t => !t.show || t.show);
+
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-[var(--text-primary)] flex items-center gap-3">
-            <div className="p-2 bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] rounded-xl">
+    <div className="space-y-6 animate-fade-in-quick">
+      {/* ═══ HEADER ═══ */}
+      <div className="glass-effect p-5 sm:p-6 rounded-3xl shadow-[var(--glass-shadow)] border border-[var(--glass-border)] relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl opacity-50 pointer-events-none transition-transform duration-1000 group-hover:scale-110"></div>
+
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg shadow-indigo-500/20 transform group-hover:rotate-6 transition-transform duration-500">
               <Sparkles size={24} />
             </div>
-            Centro de Tareas
-          </h1>
-          <p className="text-[var(--text-secondary)] mt-1">
-            Gestiona todas las alertas y notificaciones inteligentes de tu consultorio.
-          </p>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight">
+                Centro de <span className="text-indigo-500">Tareas</span>
+              </h1>
+              <p className="text-sm text-[var(--text-secondary)] font-medium opacity-70 mt-0.5">
+                Gestiona alertas y notificaciones inteligentes
+              </p>
+            </div>
+          </div>
+
+          {userRole !== 'medico' && (
+            <div className="relative group w-full lg:w-64">
+              <Filter size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-indigo-500 transition-colors" />
+              <select
+                value={selectedAdminDoctor}
+                onChange={(e) => setSelectedAdminDoctor(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-primary)] text-sm font-bold rounded-2xl focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 shadow-sm appearance-none cursor-pointer transition-all"
+              >
+                <option value="all">Todos los Médicos</option>
+                {doctors.map(d => (
+                  <option key={d.id} value={d.id}>Dr/a. {d.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ═══ STATS CARDS ═══ */}
+      <div className="flex md:grid md:grid-cols-4 gap-3 sm:gap-4 overflow-x-auto md:overflow-visible hide-scrollbar py-2 md:py-0 snap-x snap-mandatory">
+        <div className="card-premium rounded-2xl p-4 sm:p-5 border border-[var(--glass-border)] flex items-center gap-3 sm:gap-4 transition-all duration-300 group hover:border-indigo-500/30 hover:shadow-md shrink-0 min-w-[160px] md:min-w-0 snap-start">
+          <div className="bg-indigo-500/10 dark:bg-indigo-500/15 border border-indigo-500/20 p-2.5 sm:p-3 rounded-xl shrink-0 transition-transform duration-300 group-hover:scale-110">
+            <Sparkles size={18} className="text-indigo-500 dark:text-indigo-400 sm:w-5 sm:h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[9px] sm:text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-70 mb-0.5">Total Tareas</p>
+            <h4 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">{totalCount}</h4>
+          </div>
         </div>
 
-        {userRole !== 'medico' && (
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-bold text-[var(--text-secondary)]">Médico:</label>
-            <select
-              value={selectedAdminDoctor}
-              onChange={(e) => setSelectedAdminDoctor(e.target.value)}
-              className="bg-[var(--bg-main)] border border-[var(--border-color)] text-[var(--text-primary)] text-sm font-bold rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] shadow-sm appearance-none cursor-pointer"
-            >
-              <option value="all">Todos los Médicos</option>
-              {doctors.map(d => (
-                <option key={d.id} value={d.id}>Dr/a. {d.name}</option>
-              ))}
-            </select>
+        <div className="card-premium rounded-2xl p-4 sm:p-5 border border-[var(--glass-border)] flex items-center gap-3 sm:gap-4 transition-all duration-300 group hover:border-amber-500/30 hover:shadow-md shrink-0 min-w-[160px] md:min-w-0 snap-start">
+          <div className="bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 p-2.5 sm:p-3 rounded-xl shrink-0 transition-transform duration-300 group-hover:scale-110">
+            <FileEdit size={18} className="text-amber-500 dark:text-amber-400 sm:w-5 sm:h-5" />
           </div>
-        )}
+          <div className="flex-1 min-w-0">
+            <p className="text-[9px] sm:text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-70 mb-0.5">Evoluciones</p>
+            <h4 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">{missingNotes.length}</h4>
+          </div>
+        </div>
+
+        <div className="card-premium rounded-2xl p-4 sm:p-5 border border-[var(--glass-border)] flex items-center gap-3 sm:gap-4 transition-all duration-300 group hover:border-rose-500/30 hover:shadow-md shrink-0 min-w-[160px] md:min-w-0 snap-start">
+          <div className="bg-rose-500/10 dark:bg-rose-500/15 border border-rose-500/20 p-2.5 sm:p-3 rounded-xl shrink-0 transition-transform duration-300 group-hover:scale-110">
+            <Clock size={18} className="text-rose-500 dark:text-rose-400 sm:w-5 sm:h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[9px] sm:text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-70 mb-0.5">Demoras</p>
+            <h4 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">{delayedPatients.length}</h4>
+          </div>
+        </div>
+
+        <div className="card-premium rounded-2xl p-4 sm:p-5 border border-[var(--glass-border)] flex items-center gap-3 sm:gap-4 transition-all duration-300 group hover:border-red-500/30 hover:shadow-md shrink-0 min-w-[160px] md:min-w-0 snap-start">
+          <div className="bg-red-500/10 dark:bg-red-500/15 border border-red-500/20 p-2.5 sm:p-3 rounded-xl shrink-0 transition-transform duration-300 group-hover:scale-110">
+            <Wallet size={18} className="text-red-500 dark:text-red-400 sm:w-5 sm:h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[9px] sm:text-[10px] font-black text-[var(--text-secondary)] uppercase tracking-widest opacity-70 mb-0.5">Deudas</p>
+            <h4 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">{previousDebts.length}</h4>
+          </div>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        {tabs.filter(t => t.show && (t.id === 'todos' || t.count > 0 || currentFilter === t.id)).map(t => (
-          <button
-            key={t.id}
-            onClick={() => setFilter(t.id)}
-            className={`px-4 py-2 rounded-full font-bold text-sm flex items-center gap-2 whitespace-nowrap transition-colors ${
-              currentFilter === t.id 
-                ? 'bg-[var(--accent-primary)] text-white shadow-md' 
-                : 'bg-[var(--bg-main)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
-            }`}
-          >
-            {t.label}
-            {t.count > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                currentFilter === t.id ? 'bg-white/20 text-white' : `${t.bg} ${t.color}`
-              }`}>
-                {t.count}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* ═══ TABS ═══ */}
+      <div className="flex items-center gap-1 sm:gap-1.5 p-1.5 bg-[var(--bg-card)] border border-[var(--border-color)]/50 rounded-2xl w-full shadow-sm overflow-x-auto hide-scrollbar">
+        {visibleTabs.filter(t => t.id === 'todos' || t.count > 0 || currentFilter === t.id).map(t => {
+          const Icon = t.icon;
+          const isActive = currentFilter === t.id;
+
+          const colorMap = {
+            indigo: 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25',
+            pink: 'bg-pink-500 text-white shadow-lg shadow-pink-500/25',
+            purple: 'bg-purple-500 text-white shadow-lg shadow-purple-500/25',
+            rose: 'bg-rose-500 text-white shadow-lg shadow-rose-500/25',
+            amber: 'bg-amber-500 text-white shadow-lg shadow-amber-500/25',
+            red: 'bg-red-500 text-white shadow-lg shadow-red-500/25',
+            orange: 'bg-orange-500 text-white shadow-lg shadow-orange-500/25',
+            emerald: 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25',
+          };
+
+          return (
+            <button
+              key={t.id}
+              onClick={() => setFilter(t.id)}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap relative
+                ${isActive
+                  ? colorMap[t.color] + ' translate-y-[-1px]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--text-primary)]'
+                }`}
+            >
+              <Icon size={15} className="hidden sm:block" />
+              {t.label}
+              {t.count > 0 && (
+                <span className={`ml-0.5 min-w-[20px] h-5 flex items-center justify-center px-1 rounded-full text-[10px] font-black
+                  ${isActive
+                    ? 'bg-white/25 text-white'
+                    : `bg-${t.color}-500/10 dark:bg-${t.color}-500/15 text-${t.color}-600 dark:text-${t.color}-400 border border-${t.color}-500/20`
+                  }`}>
+                  {t.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Tasks List */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-        
+      {/* ═══ TASKS GRID ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+
         {/* Cumpleaños */}
         {canSee.cumpleanos && (currentFilter === 'todos' || currentFilter === 'cumpleanos') && birthdays.map((app, i) => (
-          <div key={`bday-${i}`} className="bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">🎂</div>
-            <h3 className="font-bold text-pink-500 mb-1 flex items-center gap-2">
-              <span className="p-1 bg-pink-500/20 rounded-md">🎂</span> Cumpleañero
-            </h3>
-            <p className="text-[var(--text-primary)] font-bold text-lg mb-1">{app.patient}</p>
-            <p className="text-[var(--text-secondary)] text-sm mb-4">Turno hoy a las {app.time}hs</p>
-            <button 
-              onClick={() => handleWhatsApp(getPhone(app), `¡Hola ${app.patient}! De parte de todo el equipo te deseamos un muy feliz cumpleaños 🎂. Te esperamos hoy a las ${app.time}hs.`)}
-              className="w-full py-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-            >
-              <MessageCircle size={16} /> Enviar Felicitación
-            </button>
-          </div>
+          <TaskCard
+            key={`bday-${i}`}
+            icon={Gift}
+            title="Cumpleañero"
+            patient={app.patient}
+            subtitle={`Turno hoy a las ${app.time}hs`}
+            color="pink"
+            action={{
+              label: 'Enviar Felicitación',
+              icon: MessageCircle,
+              onClick: () => handleWhatsApp(getPhone(app), `¡Hola ${app.patient}! De parte de todo el equipo te deseamos un muy feliz cumpleaños 🎂. Te esperamos hoy a las ${app.time}hs.`)
+            }}
+          />
         ))}
 
         {/* Primeras Visitas */}
         {canSee.primeras && (currentFilter === 'todos' || currentFilter === 'primeras') && newPatients.map((app, i) => (
-          <div key={`newp-${i}`} className="bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">🌟</div>
-            <h3 className="font-bold text-purple-500 mb-1 flex items-center gap-2">
-              <span className="p-1 bg-purple-500/20 rounded-md">🌟</span> Primera Visita
-            </h3>
-            <p className="text-[var(--text-primary)] font-bold text-lg mb-1">{app.patient}</p>
-            <p className="text-[var(--text-secondary)] text-sm mb-4">Turno hoy a las {app.time}hs</p>
-            <button 
-               onClick={() => handleWhatsApp(getPhone(app), `¡Hola ${app.patient}! Te escribimos para darte la bienvenida a nuestra clínica médica. Te esperamos hoy a las ${app.time}hs para tu primera consulta.`)}
-              className="w-full py-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-            >
-              <MessageCircle size={16} /> Enviar Bienvenida
-            </button>
-          </div>
+          <TaskCard
+            key={`newp-${i}`}
+            icon={Star}
+            title="Primera Visita"
+            patient={app.patient}
+            subtitle={`Turno hoy a las ${app.time}hs`}
+            color="purple"
+            action={{
+              label: 'Enviar Bienvenida',
+              icon: MessageCircle,
+              onClick: () => handleWhatsApp(getPhone(app), `¡Hola ${app.patient}! Te escribimos para darte la bienvenida a nuestra clínica médica. Te esperamos hoy a las ${app.time}hs para tu primera consulta.`)
+            }}
+          />
         ))}
 
         {/* Demoras en Sala */}
-        {canSee.demoras && (currentFilter === 'todos' || currentFilter === 'demoras') && delayedPatients.map(({app, delay}, i) => (
-          <div key={`delay-${i}`} className="bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Clock size={40} className="text-rose-500"/></div>
-            <h3 className="font-bold text-rose-500 mb-1 flex items-center gap-2">
-              <span className="p-1 bg-rose-500/20 rounded-md"><Clock size={16} /></span> Demora en Sala
-            </h3>
-            <p className="text-[var(--text-primary)] font-bold text-lg mb-1">{app.patient}</p>
-            <p className="text-[var(--text-secondary)] text-sm mb-4">Aguarda hace {delay} minutos (Turno {app.time})</p>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => navigate(`/dashboard/agenda`)}
-                className="flex-1 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-              >
-                Ver en Agenda
-              </button>
-            </div>
-          </div>
+        {canSee.demoras && (currentFilter === 'todos' || currentFilter === 'demoras') && delayedPatients.map(({ app, delay }, i) => (
+          <TaskCard
+            key={`delay-${i}`}
+            icon={Clock}
+            title="Demora en Sala"
+            patient={app.patient}
+            subtitle={`Aguarda hace ${delay} minutos (Turno ${app.time})`}
+            color="rose"
+            action={{
+              label: 'Ver en Agenda',
+              icon: Calendar,
+              onClick: () => navigate(`/dashboard/agenda`)
+            }}
+          />
         ))}
 
         {/* Evoluciones Faltantes */}
         {canSee.evoluciones && (currentFilter === 'todos' || currentFilter === 'evoluciones') && (userRole === 'medico' ? (
           missingNotes.map((app, i) => (
-            <div key={`evo-${i}`} className="bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Activity size={40} className="text-amber-500"/></div>
-              <h3 className="font-bold text-amber-500 mb-1 flex items-center gap-2">
-                <span className="p-1 bg-amber-500/20 rounded-md"><Activity size={16} /></span> Historia Clínica Faltante
-              </h3>
-              <p className="text-[var(--text-primary)] font-bold text-lg mb-1">{app.patient}</p>
-              <p className="text-[var(--text-secondary)] text-sm mb-4">Turno finalizado el {app.date} a las {app.time}hs</p>
-              <button 
-                onClick={() => navigate(`/dashboard/consultorio?patientId=${app.patientId || ''}&patientName=${encodeURIComponent(app.patient)}&action=add_evolution&date=${app.date}T${app.time || '12:00'}`)}
-                className="w-full py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-              >
-                <FileEdit size={16} /> Redactar Evolución
-              </button>
-            </div>
+            <TaskCard
+              key={`evo-${i}`}
+              icon={FileEdit}
+              title="Historia Clínica Faltante"
+              patient={app.patient}
+              subtitle={`Turno finalizado el ${app.date} a las ${app.time}hs`}
+              color="amber"
+              action={{
+                label: 'Redactar Evolución',
+                icon: FileEdit,
+                onClick: () => navigate(`/dashboard/consultorio?patientId=${app.patientId || ''}&patientName=${encodeURIComponent(app.patient)}&action=add_evolution&date=${app.date}T${app.time || '12:00'}`)
+              }}
+            />
           ))
         ) : (
           Object.values(
@@ -411,117 +468,207 @@ export default function TareasPage() {
           ).map((group, i) => {
             const doc = doctors.find(d => Number(d.id) === Number(group.doctorId));
             return (
-              <div key={`evo-group-${i}`} className="bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Activity size={40} className="text-amber-500"/></div>
-                <h3 className="font-bold text-amber-500 mb-1 flex items-center gap-2">
-                  <span className="p-1 bg-amber-500/20 rounded-md"><Activity size={16} /></span> Historias Clínicas Faltantes
-                </h3>
-                <p className="text-[var(--text-primary)] font-bold text-lg mb-1">Dr/a. {doc?.name || 'Desconocido'}</p>
-                <p className="text-[var(--text-secondary)] text-sm mb-4">Debe {group.count} evolución(es) médica(s).</p>
-                <button 
-                  onClick={() => {
+              <TaskCard
+                key={`evo-group-${i}`}
+                icon={FileEdit}
+                title="Historias Clínicas Faltantes"
+                patient={`Dr/a. ${doc?.name || 'Desconocido'}`}
+                subtitle={`Debe ${group.count} evolución(es) médica(s)`}
+                color="amber"
+                action={{
+                  label: 'Enviar Recordatorio',
+                  icon: MessageCircle,
+                  onClick: () => {
                     if (doc?.phone) {
                       handleWhatsApp(doc.phone, `¡Hola Dr/a. ${doc.name}! Te recordamos que tienes ${group.count} evolución(es) médica(s) pendiente(s) por completar en el sistema. Por favor ingresa para regularizarlas.`);
                     } else {
-                      import('react-hot-toast').then(({ default: toast }) => toast.error('El médico no tiene teléfono configurado'));
+                      toast.error('El médico no tiene teléfono configurado');
                     }
-                  }}
-                  className="w-full py-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-                >
-                  <MessageCircle size={16} /> Enviar Recordatorio
-                </button>
-              </div>
+                  }
+                }}
+              />
             );
           })
         ))}
 
         {/* Deudas Previas */}
-        {canSee.deudas && (currentFilter === 'todos' || currentFilter === 'deudas') && previousDebts.map(({app, debt, count}, i) => (
-          <div key={`debt-${i}`} className="bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Wallet size={40} className="text-red-500"/></div>
-            <h3 className="font-bold text-red-500 mb-1 flex items-center gap-2">
-              <span className="p-1 bg-red-500/20 rounded-md"><Wallet size={16} /></span> Deuda Pendiente
-            </h3>
-            <p className="text-[var(--text-primary)] font-bold text-lg mb-1">{app.patient}</p>
-            <p className="text-[var(--text-secondary)] text-sm mb-4">Deuda de ${debt.toLocaleString()} por {count} turno(s) pasado(s).</p>
-            <button 
-               onClick={() => navigate(`/dashboard/finanzas`)}
-              className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-            >
-              Ver en Finanzas
-            </button>
-          </div>
+        {canSee.deudas && (currentFilter === 'todos' || currentFilter === 'deudas') && previousDebts.map(({ app, debt, count }, i) => (
+          <TaskCard
+            key={`debt-${i}`}
+            icon={Wallet}
+            title="Deuda Pendiente"
+            patient={app.patient}
+            subtitle={`Deuda de $${debt.toLocaleString()} por ${count} turno(s) pasado(s)`}
+            color="red"
+            action={{
+              label: 'Ver en Finanzas',
+              icon: Wallet,
+              onClick: () => navigate(`/dashboard/finanzas`)
+            }}
+          />
         ))}
 
         {/* Faltadores */}
-        {canSee.faltadores && (currentFilter === 'todos' || currentFilter === 'faltadores') && frequentNoShows.map(({app, absences, total}, i) => (
-          <div key={`noshow-${i}`} className="bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Users size={40} className="text-orange-500"/></div>
-            <h3 className="font-bold text-orange-500 mb-1 flex items-center gap-2">
-              <span className="p-1 bg-orange-500/20 rounded-md"><Users size={16} /></span> Faltador Frecuente
-            </h3>
-            <p className="text-[var(--text-primary)] font-bold text-lg mb-1">{app.patient}</p>
-            <p className="text-[var(--text-secondary)] text-sm mb-4">Faltó a {absences} de sus {total} turnos anteriores. Tiene turno hoy a las {app.time}hs.</p>
-            <button 
-               onClick={() => handleWhatsApp(getPhone(app), `¡Hola ${app.patient}! Te escribimos de la clínica para re-confirmar tu asistencia al turno de hoy a las ${app.time}hs.`)}
-              className="w-full py-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-            >
-              <MessageCircle size={16} /> Re-confirmar por WP
-            </button>
-          </div>
+        {canSee.faltadores && (currentFilter === 'todos' || currentFilter === 'faltadores') && frequentNoShows.map(({ app, absences, total }, i) => (
+          <TaskCard
+            key={`noshow-${i}`}
+            icon={UserX}
+            title="Faltador Frecuente"
+            patient={app.patient}
+            subtitle={`Faltó a ${absences} de sus ${total} turnos anteriores. Tiene turno hoy a las ${app.time}hs`}
+            color="orange"
+            action={{
+              label: 'Re-confirmar por WP',
+              icon: MessageCircle,
+              onClick: () => handleWhatsApp(getPhone(app), `¡Hola ${app.patient}! Te escribimos de la clínica para re-confirmar tu asistencia al turno de hoy a las ${app.time}hs.`)
+            }}
+          />
         ))}
 
         {/* Retención (CRM) */}
-        {canSee.retencion && (currentFilter === 'todos' || currentFilter === 'retencion') && lostPatients.map(({app, monthsPassed}, i) => (
-          <div key={`lost-${i}`} className="bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Users size={40} className="text-indigo-500"/></div>
-            <h3 className="font-bold text-indigo-500 mb-1 flex items-center gap-2">
-              <span className="p-1 bg-indigo-500/20 rounded-md"><Users size={16} /></span> Paciente Perdido
-            </h3>
-            <p className="text-[var(--text-primary)] font-bold text-lg mb-1">{app.patient}</p>
-            <p className="text-[var(--text-secondary)] text-sm mb-4">Inactivo hace {monthsPassed} meses. Última visita: {app.date}</p>
-            <button 
-               onClick={() => handleWhatsApp(getPhone(app), `¡Hola ${app.patient}! Notamos que pasó un tiempo desde tu última visita a la clínica. Te escribimos para recordarte la importancia de realizarte un chequeo médico regular. ¿Te gustaría agendar un turno?`)}
-              className="w-full py-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-            >
-              <MessageCircle size={16} /> Mensaje de Recuperación
-            </button>
-          </div>
+        {canSee.retencion && (currentFilter === 'todos' || currentFilter === 'retencion') && lostPatients.map(({ app, monthsPassed }, i) => (
+          <TaskCard
+            key={`lost-${i}`}
+            icon={HeartPulse}
+            title="Paciente Perdido"
+            patient={app.patient}
+            subtitle={`Inactivo hace ${monthsPassed} meses. Última visita: ${app.date}`}
+            color="indigo"
+            action={{
+              label: 'Mensaje de Recuperación',
+              icon: MessageCircle,
+              onClick: () => handleWhatsApp(getPhone(app), `¡Hola ${app.patient}! Notamos que pasó un tiempo desde tu última visita a la clínica. Te escribimos para recordarte la importancia de realizarte un chequeo médico regular. ¿Te gustaría agendar un turno?`)
+            }}
+          />
         ))}
 
         {/* Salud Financiera */}
-        {canSee.salud && (currentFilter === 'todos' || currentFilter === 'salud') && financialHealth.map(({income, expenses, profit, margin}, i) => (
-          <div key={`health-${i}`} className="bg-[var(--bg-main)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Wallet size={40} className="text-emerald-500"/></div>
-            <h3 className="font-bold text-emerald-500 mb-1 flex items-center gap-2">
-              <span className="p-1 bg-emerald-500/20 rounded-md"><Wallet size={16} /></span> Rentabilidad del Negocio
-            </h3>
-            <p className="text-[var(--text-primary)] font-bold text-lg mb-1">
-              Margen: <span className={margin >= 50 ? 'text-emerald-500' : margin >= 20 ? 'text-amber-500' : 'text-rose-500'}>{margin.toFixed(1)}%</span>
-            </p>
-            <p className="text-[var(--text-secondary)] text-sm mb-4">
-              Ingresos del mes: ${income.toLocaleString()}<br/>
-              Egresos del mes: ${expenses.toLocaleString()}
-            </p>
-            <button 
-               onClick={() => navigate(`/dashboard/reportes`)}
-              className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
-            >
-              Ver Reporte Completo
-            </button>
-          </div>
+        {canSee.salud && (currentFilter === 'todos' || currentFilter === 'salud') && financialHealth.map(({ income, expenses, profit, margin }, i) => (
+          <TaskCard
+            key={`health-${i}`}
+            icon={TrendingUp}
+            title="Rentabilidad del Negocio"
+            patient={`Margen: ${margin.toFixed(1)}%`}
+            subtitle={`Ingresos: $${income.toLocaleString()} | Egresos: $${expenses.toLocaleString()}`}
+            color="emerald"
+            action={{
+              label: 'Ver Reporte Completo',
+              icon: TrendingUp,
+              onClick: () => navigate(`/dashboard/reportes`)
+            }}
+          />
         ))}
 
+        {/* Empty State */}
         {totalCount === 0 && currentFilter === 'todos' && (
           <div className="col-span-full py-20 flex flex-col items-center justify-center text-center">
-            <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle2 size={40} className="text-emerald-500" />
+            <div className="w-24 h-24 rounded-3xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center mb-6">
+              <CheckCircle2 size={48} className="text-emerald-500 dark:text-emerald-400" />
             </div>
-            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">¡Todo al día!</h2>
-            <p className="text-[var(--text-secondary)]">No hay tareas pendientes ni alertas para hoy en el Asistente Clínico.</p>
+            <h2 className="text-xl font-black text-[var(--text-primary)] mb-2">¡Todo al día!</h2>
+            <p className="text-sm text-[var(--text-secondary)] opacity-70 max-w-md">No hay tareas pendientes ni alertas para hoy en el Asistente Clínico.</p>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ═══ TASK CARD COMPONENT ═══
+function TaskCard({ icon: Icon, title, patient, subtitle, color, action }) {
+  const colorMap = {
+    pink: {
+      bg: 'bg-pink-500/10 dark:bg-pink-500/15',
+      border: 'border-pink-500/20',
+      text: 'text-pink-500 dark:text-pink-400',
+      hover: 'hover:border-pink-500/40',
+      button: 'bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 hover:bg-pink-500/20 border-pink-500/20'
+    },
+    purple: {
+      bg: 'bg-purple-500/10 dark:bg-purple-500/15',
+      border: 'border-purple-500/20',
+      text: 'text-purple-500 dark:text-purple-400',
+      hover: 'hover:border-purple-500/40',
+      button: 'bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 border-purple-500/20'
+    },
+    rose: {
+      bg: 'bg-rose-500/10 dark:bg-rose-500/15',
+      border: 'border-rose-500/20',
+      text: 'text-rose-500 dark:text-rose-400',
+      hover: 'hover:border-rose-500/40',
+      button: 'bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 border-rose-500/20'
+    },
+    amber: {
+      bg: 'bg-amber-500/10 dark:bg-amber-500/15',
+      border: 'border-amber-500/20',
+      text: 'text-amber-500 dark:text-amber-400',
+      hover: 'hover:border-amber-500/40',
+      button: 'bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border-amber-500/20'
+    },
+    red: {
+      bg: 'bg-red-500/10 dark:bg-red-500/15',
+      border: 'border-red-500/20',
+      text: 'text-red-500 dark:text-red-400',
+      hover: 'hover:border-red-500/40',
+      button: 'bg-red-500/10 dark:bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/20 border-red-500/20'
+    },
+    orange: {
+      bg: 'bg-orange-500/10 dark:bg-orange-500/15',
+      border: 'border-orange-500/20',
+      text: 'text-orange-500 dark:text-orange-400',
+      hover: 'hover:border-orange-500/40',
+      button: 'bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 border-orange-500/20'
+    },
+    indigo: {
+      bg: 'bg-indigo-500/10 dark:bg-indigo-500/15',
+      border: 'border-indigo-500/20',
+      text: 'text-indigo-500 dark:text-indigo-400',
+      hover: 'hover:border-indigo-500/40',
+      button: 'bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 border-indigo-500/20'
+    },
+    emerald: {
+      bg: 'bg-emerald-500/10 dark:bg-emerald-500/15',
+      border: 'border-emerald-500/20',
+      text: 'text-emerald-500 dark:text-emerald-400',
+      hover: 'hover:border-emerald-500/40',
+      button: 'bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20'
+    }
+  };
+
+  const colors = colorMap[color] || colorMap.indigo;
+
+  return (
+    <div className={`card-premium p-5 sm:p-6 border border-[var(--glass-border)] ${colors.hover} transition-all duration-300 group hover:shadow-md relative overflow-hidden`}>
+      {/* Decorative gradient */}
+      <div className={`absolute top-0 right-0 w-32 h-32 ${colors.bg} rounded-full blur-3xl opacity-30 -translate-y-1/2 translate-x-1/2 pointer-events-none transition-opacity group-hover:opacity-50`}></div>
+
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4 relative z-10">
+        <div className="flex items-center gap-3">
+          <div className={`p-2.5 ${colors.bg} ${colors.border} border rounded-xl ${colors.text} transition-transform duration-300 group-hover:scale-110`}>
+            <Icon size={18} />
+          </div>
+          <h3 className={`font-black text-sm ${colors.text} uppercase tracking-wide`}>{title}</h3>
+        </div>
+        <ChevronRight size={16} className="text-[var(--text-secondary)] opacity-30 group-hover:opacity-60 group-hover:translate-x-1 transition-all" />
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10 mb-4">
+        <p className="text-base sm:text-lg font-black text-[var(--text-primary)] mb-1 truncate">{patient}</p>
+        <p className="text-xs sm:text-sm text-[var(--text-secondary)] opacity-70 line-clamp-2">{subtitle}</p>
+      </div>
+
+      {/* Action Button */}
+      {action && (
+        <button
+          onClick={action.onClick}
+          className={`w-full py-3 ${colors.button} border rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] relative z-10`}
+        >
+          <action.icon size={16} />
+          {action.label}
+        </button>
+      )}
     </div>
   );
 }
