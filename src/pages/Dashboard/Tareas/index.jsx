@@ -265,17 +265,19 @@ export default function TareasPage() {
   return (
     <div className="space-y-6 animate-fade-in-quick">
       {/* ═══ HEADER ═══ */}
-      <div className="glass-effect p-5 sm:p-6 rounded-3xl shadow-[var(--glass-shadow)] border border-[var(--glass-border)] relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl opacity-50 pointer-events-none transition-transform duration-1000 group-hover:scale-110"></div>
+      <div className="glass-effect p-5 sm:p-6 rounded-3xl shadow-[var(--glass-shadow)] border border-[var(--glass-border)] relative group">
+        <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-[var(--accent-primary)]/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl opacity-50 transition-transform duration-1000 group-hover:scale-110"></div>
+        </div>
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg shadow-indigo-500/20 transform group-hover:rotate-6 transition-transform duration-500">
-              <Sparkles size={24} />
+            <div className="p-3 bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-hover)] rounded-2xl text-white shadow-lg shadow-[var(--accent-primary)]/20 transform group-hover:rotate-6 transition-transform duration-500">
+              <CheckCircle2 size={24} />
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight">
-                Centro de <span className="text-indigo-500">Tareas</span>
+                Centro de <span className="text-[var(--accent-primary)]">Tareas</span>
               </h1>
               <p className="text-sm text-[var(--text-secondary)] font-medium opacity-70 mt-0.5">
                 Gestiona alertas y notificaciones inteligentes

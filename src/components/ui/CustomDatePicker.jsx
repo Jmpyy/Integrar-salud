@@ -108,7 +108,7 @@ export default function CustomDatePicker({ value, onChange, min, max, isDateDisa
     <div 
       ref={popoverRef}
       style={{ top: coords.top, left: coords.left }}
-      className="absolute p-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl shadow-black/50 z-[99999] w-[300px] animate-fade-in-quick overflow-hidden flex flex-col"
+      className="custom-date-picker-popover absolute p-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl shadow-black/50 z-[99999] w-[300px] animate-fade-in-quick overflow-hidden flex flex-col"
     >
       {viewMode === 'days' && (
         <>

@@ -8,7 +8,11 @@ export default function CustomDateRangePicker({ dateFrom, dateTo, onChange, plac
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      if (
+        containerRef.current && 
+        !containerRef.current.contains(event.target) &&
+        !event.target.closest('.custom-date-picker-popover')
+      ) {
         setIsOpen(false);
       }
     }
