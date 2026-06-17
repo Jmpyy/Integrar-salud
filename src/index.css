@@ -3,16 +3,21 @@
 
 :root {
   /* LIGHT THEME (DEFAULT) */
-  --bg-main: #f3f7fa; 
+  --bg-main: #f3f7fa;
   --bg-card: #ffffff;
   --bg-sidebar: rgba(255, 255, 255, 0.8);
-  --text-primary: #1e293b; /* slate-800 */
-  --text-secondary: #64748b; /* slate-500 */
-  --accent-primary: #0ea5e9; /* sky-500 (Celeste) */
-  --accent-hover: #0284c7; /* sky-600 */
+  --text-primary: #1e293b;
+  /* slate-800 */
+  --text-secondary: #64748b;
+  /* slate-500 */
+  --accent-primary: #0ea5e9;
+  /* sky-500 (Celeste) */
+  --accent-hover: #0284c7;
+  /* sky-600 */
   --accent-light: rgba(14, 165, 233, 0.1);
-  --border-color: rgba(226, 232, 240, 0.8); /* slate-200 */
-  
+  --border-color: rgba(226, 232, 240, 0.8);
+  /* slate-200 */
+
   /* Glassmorphism */
   --glass-bg: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(255, 255, 255, 0.5);
@@ -21,15 +26,21 @@
 
 [data-theme='dark'] {
   /* SOFT DARK THEME - REFINED */
-  --bg-main: #0b0f1a; /* Más profundo */
-  --bg-card: #161c2d; /* Ligeramente más claro que el fondo para elevación */
+  --bg-main: #0b0f1a;
+  /* Más profundo */
+  --bg-card: #161c2d;
+  /* Ligeramente más claro que el fondo para elevación */
   --bg-sidebar: rgba(22, 28, 45, 0.8);
-  --text-primary: #f8fafc; /* slate-50 */
-  --text-secondary: #94a3b8; /* slate-400 */
-  --accent-primary: #38bdf8; /* sky-400 */
+  --text-primary: #f8fafc;
+  /* slate-50 */
+  --text-secondary: #94a3b8;
+  /* slate-400 */
+  --accent-primary: #38bdf8;
+  /* sky-400 */
   --accent-hover: #7dd3fc;
   --accent-light: rgba(56, 189, 248, 0.15);
-  --border-color: rgba(51, 65, 85, 0.4); /* slate-700 */
+  --border-color: rgba(51, 65, 85, 0.4);
+  /* slate-700 */
 
   /* Glassmorphism Dark - REFINED */
   --glass-bg: rgba(22, 28, 45, 0.7);
@@ -55,8 +66,10 @@ body {
 body::before {
   content: "";
   position: fixed;
-  top: -10%; left: -10%;
-  width: 120%; height: 120%;
+  top: -10%;
+  left: -10%;
+  width: 120%;
+  height: 120%;
   /* Gradiente más suave para no necesitar el filtro de desenfoque */
   background: radial-gradient(circle at center, var(--accent-light) 0%, transparent 60%);
   z-index: -1;
@@ -66,7 +79,8 @@ body::before {
 
 /* --- Glassmorphism Utils --- */
 .glass-effect {
-  background: var(--bg-card); /* Más opaco para compensar la falta de blur */
+  background: var(--bg-card);
+  /* Más opaco para compensar la falta de blur */
   /* backdrop-filter: blur(12px); - REMOVED FOR PERFORMANCE */
   /* -webkit-backdrop-filter: blur(12px); - REMOVED FOR PERFORMANCE */
   border: 1px solid var(--border-color);
@@ -74,7 +88,9 @@ body::before {
 }
 
 /* Global Performance Override for Weak Devices */
-*, ::before, ::after {
+*,
+::before,
+::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -97,6 +113,7 @@ body::before {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -106,13 +123,16 @@ body::before {
   width: 6px;
   height: 6px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent; 
+  background: transparent;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: var(--border-color);
   border-radius: 10px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-secondary);
 }
@@ -123,6 +143,7 @@ body::before {
       opacity: 0;
       transform: translateY(20px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -134,6 +155,7 @@ body::before {
       opacity: 1;
       transform: translateY(0);
     }
+
     to {
       opacity: 0;
       transform: translateY(20px);
@@ -149,176 +171,206 @@ body::before {
   }
 }
 
-  @keyframes spinSlow {
-    from { transform: rotate(-180deg); }
-    to { transform: rotate(0deg); }
+@keyframes spinSlow {
+  from {
+    transform: rotate(-180deg);
   }
 
-  .animate-spin-slow {
-    animation: spinSlow 0.8s ease-out forwards;
+  to {
+    transform: rotate(0deg);
   }
+}
 
-  /* --- Animaciones Premium para Botones --- */
-  
-  @keyframes shine {
-    0% { left: -100%; }
-    100% { left: 100%; }
-  }
+.animate-spin-slow {
+  animation: spinSlow 0.8s ease-out forwards;
+}
 
-  .animate-shine::after {
-    content: '';
-    position: absolute;
-    top: 0;
+/* --- Animaciones Premium para Botones --- */
+
+@keyframes shine {
+  0% {
     left: -100%;
-    width: 50%;
-    height: 100%;
-    background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%);
-    transform: skewX(-20deg);
-    animation: shine 4s infinite cubic-bezier(0.19, 1, 0.22, 1);
   }
 
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
+  100% {
+    left: 100%;
+  }
+}
+
+.animate-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0) 100%);
+  transform: skewX(-20deg);
+  animation: shine 4s infinite cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0);
   }
 
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Ocultar el botón nativo de revelado de contraseña en Edge/IE */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+/* ── Touch: evitar doble-tap-zoom en iOS en botones e inputs ── */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+/* ── Safe-area utilities (notch / home indicator) ── */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* ── Viewport dinámico para iOS Safari ── */
+.min-h-dvh {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@keyframes fadeInQuick {
+  from {
+    opacity: 0;
   }
 
-  /* Ocultar el botón nativo de revelado de contraseña en Edge/IE */
-  input::-ms-reveal,
-  input::-ms-clear {
-    display: none;
+  to {
+    opacity: 1;
   }
+}
 
-  /* ── Touch: evitar doble-tap-zoom en iOS en botones e inputs ── */
-  button,
-  a,
-  input,
-  select,
-  textarea,
-  [role="button"] {
-    touch-action: manipulation;
-  }
+.animate-fade-in-quick {
+  animation: fadeInQuick 0.2s ease-out forwards;
+}
 
-  /* ── Safe-area utilities (notch / home indicator) ── */
-  .safe-area-inset-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .safe-area-inset-top {
-    padding-top: env(safe-area-inset-top);
-  }
+/* --- FIX BUGS DE RENDERIZADO EN IOS SAFARI --- */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="date"],
+input[type="time"],
+select,
+textarea {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background-clip: padding-box;
+}
 
-  /* ── Viewport dinámico para iOS Safari ── */
-  .min-h-dvh {
-    min-height: 100vh;
-    min-height: 100dvh;
-  }
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  height: 1.5em;
+  margin: 0;
+}
 
-  @keyframes fadeInQuick {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
+/* ------------------------------------------- */
 
-  .animate-fade-in-quick {
-    animation: fadeInQuick 0.2s ease-out forwards;
-  }
-
-  /* --- FIX BUGS DE RENDERIZADO EN IOS SAFARI --- */
-  input[type="text"],
-  input[type="email"],
-  input[type="tel"],
-  input[type="date"],
-  input[type="time"],
-  select,
-  textarea {
-    -webkit-appearance: none !important;
-    appearance: none !important;
-    background-clip: padding-box;
-  }
-
-  input[type="date"]::-webkit-date-and-time-value,
-  input[type="time"]::-webkit-date-and-time-value {
-    height: 1.5em;
-    margin: 0;
-  }
-
-  /* ------------------------------------------- */
-
-  /* --- Patrones Visuales (Agenda) --- */
-  .bg-stripes {
-    background-image: repeating-linear-gradient(
-      45deg,
+/* --- Patrones Visuales (Agenda) --- */
+.bg-stripes {
+  background-image: repeating-linear-gradient(45deg,
       transparent,
       transparent 10px,
       rgba(0, 0, 0, 0.03) 10px,
-      rgba(0, 0, 0, 0.03) 20px
-    );
+      rgba(0, 0, 0, 0.03) 20px);
+}
+
+/* --- MOBILE NAV (solo pantallas pequeñas) --- */
+@media (max-width: 1023px) {
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    /* Altura base + safe-area para Home Indicator de iPhone */
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid var(--glass-border);
+    justify-content: space-around;
+    align-items: flex-start;
+    padding-top: 8px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 1000;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.1);
   }
 
-  /* --- MOBILE NAV (solo pantallas pequeñas) --- */
-  @media (max-width: 1023px) {
-    .mobile-bottom-nav {
-      display: flex;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      /* Altura base + safe-area para Home Indicator de iPhone */
-      height: calc(60px + env(safe-area-inset-bottom, 0px));
-      background: var(--glass-bg);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border-top: 1px solid var(--glass-border);
-      justify-content: space-around;
-      align-items: flex-start;
-      padding-top: 8px;
-      padding-bottom: env(safe-area-inset-bottom, 0px);
-      z-index: 1000;
-      box-shadow: 0 -8px 24px rgba(0,0,0,0.1);
-    }
-    /* Links dentro del bottom nav: área táctil mínima 44px */
-    .mobile-bottom-nav a {
-      min-height: 44px;
-      min-width: 44px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
+  /* Links dentro del bottom nav: área táctil mínima 44px */
+  .mobile-bottom-nav a {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
+}
 
-  /* --- FORZAR IMPRESIÓN --- */
-  @media print {
-    * {
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    nav, aside, header, button, .no-print, .mobile-bottom-nav {
-      display: none !important;
-    }
-    main {
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 100% !important;
-    }
-  }
-
-  /* Responsive Spacing Utilities */
-  @media (max-width: 640px) {
-    .container-responsive {
-      /* Safe-area en los laterales para dispositivos con notch horizontal (landscape) */
-      padding-left: max(12px, env(safe-area-inset-left)) !important;
-      padding-right: max(12px, env(safe-area-inset-right)) !important;
-    }
-    .card-premium {
-      padding: 16px !important;
-      border-radius: 16px !important;
-    }
-  }
-
-  /* ── Mejoras de tap-highlight en mobile ── */
+/* --- FORZAR IMPRESIÓN --- */
+@media print {
   * {
-    -webkit-tap-highlight-color: rgba(14, 165, 233, 0.08);
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
+
+  nav,
+  aside,
+  header,
+  button,
+  .no-print,
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* Responsive Spacing Utilities */
+@media (max-width: 640px) {
+  .container-responsive {
+    /* Safe-area en los laterales para dispositivos con notch horizontal (landscape) */
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+  }
+
+  .card-premium {
+    padding: 16px !important;
+    border-radius: 16px !important;
+  }
+}
+
+/* ── Mejoras de tap-highlight en mobile ── */
+* {
+  -webkit-tap-highlight-color: rgba(14, 165, 233, 0.08);
+}

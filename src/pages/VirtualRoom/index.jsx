@@ -128,6 +128,9 @@ export default function VirtualRoomPage() {
             if (data.data?.status === 'activa' || data.data?.status === 'en_curso' || data.status === 'activa' || data.status === 'en_curso') {
               setRoomState('active_call');
             }
+            // Update delay message from polling
+            const delayMsg = data.data?.delayMessage || data.delayMessage || null;
+            setDelayMessage(delayMsg);
           }
         } catch (e) {
           console.error('Error en polling:', e);
@@ -281,6 +284,7 @@ export default function VirtualRoomPage() {
 
       const actualData = data.data || data;
       setAppointmentData(actualData); 
+      setDelayMessage(actualData.delayMessage || null);
       
       if (actualData.status === 'finalizada') {
         setRoomState('goodbye');
